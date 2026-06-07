@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pacto Horas Extras — {{ doc.trabajador.nombre_completo }}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
+  .page { width:210mm; min-height:297mm; margin:0 auto; padding:18mm 20mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  h1.titulo { font-size:13px; font-weight:bold; text-align:center; text-decoration:underline; margin-bottom:14px; }
+  .ciudad-fecha { text-align:right; font-style:italic; margin-bottom:12px; }
+  .seccion-titulo { font-weight:bold; text-decoration:underline; margin:10px 0 4px; }
+  table.datos td { padding:2px 4px; }
+  table.datos td:first-child { font-weight:bold; width:220px; }
+  .valor { border-bottom:1px solid #000; min-width:120px; display:inline-block; padding:0 3px; }
+  .clausula { margin-bottom:8px; line-height:1.5; text-align:justify; }
+  .firma-section { display:flex; justify-content:space-between; margin-top:50px; }
+  .firma-box { text-align:center; width:45%; }
+  .firma-linea { border-top:1px solid #000; margin-top:50px; padding-top:4px; }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <strong>Pacto Horas Extras — {{ doc.trabajador.nombre_completo }}</strong>
+  <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
+  <a href="{% url 'doc_generado_edit' doc.pk %}" style="color:#adc8ff">Editar</a>
+  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
+  <a href="{% url 'doc_generado_list' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
+</div>
+
+<div class="page" style="margin-top:45px">
+  <h1 class="titulo">PACTO HORAS EXTRAORDINARIAS</h1>
+  <div class="ciudad-fecha">{{ d.ciudad_documento|default:"Concepción" }}, {{ d.fecha_documento|date:"d \d\e F \d\e Y"|default:"___________" }}</div>
+
+  <div class="seccion-titulo">INDIVIDUALIZACION DEL TRABAJADOR:</div>
+  <table class="datos">
+    <tr><td>Nombre del Trabajador:</td><td><span class="valor">{{ doc.trabajador.nombre_completo }}</span></td></tr>
+    <tr><td>Cédula Nac. de Identidad:</td><td><span class="valor">{{ doc.trabajador.rut }}</span></td></tr>
+  </table>
+
+  <div class="seccion-titulo">INDIVIDUALIZACION DEL EMPLEADOR:</div>
+  <table class="datos">
+    <tr><td>Nombre del Empleador :</td><td><b>{{ doc.empresa.nombre }}</b></td><td><b>RUT N°</b></td><td><b>{{ doc.empresa.rut_empresa }}</b></td></tr>
+    <tr><td>Dirección:</td><td>{{ doc.empresa.direccion }}</td><td><b>Ciudad:</b></td><td>{{ doc.empresa.ciudad }}</td></tr>
+    <tr><td>Representante Legal</td><td><b>{{ doc.empresa.nombre_representante }}</b></td><td><b>RUT N°</b></td><td>{{ doc.empresa.rut_representante }}</td></tr>
+  </table>
+
+  <p class="clausula" style="margin:12px 0">Por medio del presente documento, conforme al artículo treinta y dos del Código del Trabajo, las partes convienen en formular el siguiente acuerdo:</p>
+
+  <p class="clausula"><b>1°</b> El Trabajador da su consentimiento a trabajar hasta <b>{{ d.horas_diarias|default:"2" }}</b> horas diarias extraordinarias por día al ser requerido por el Empleador, tomando en consideración las necesidades técnicas de funcionamiento y avance de la Obra. Las cuales se considerarán una prolongación de su horario normal de trabajo.</p>
+
+  <p class="clausula"><b>2°</b> Las horas extraordinarias deberán quedar registradas en el sistema de control de asistencia, y se pagarán con un recargo del <b>{{ d.recargo|default:"50" }}%</b> sobre su remuneración horaria.</p>
+
+  <p class="clausula"><b>3°</b> Este acuerdo tendrá una duración de <b>{{ d.duracion_meses|default:"3" }}</b> meses.</p>
+
+  <p class="clausula"><b>4°</b> Para constancia y en señal de mutuo acuerdo, firman las partes, quedando el trabajador con un ejemplar.</p>
+
+  <div class="firma-section">
+    <div class="firma-box"><div class="firma-linea"><b>Firma del Empleador</b><br>{{ doc.empresa.rut_empresa }}</div></div>
+    <div class="firma-box"><div class="firma-linea">Firma del Trabajador<br>Rut: {{ doc.trabajador.rut }}</div></div>
+  </div>
+</div>
+</body>
+</html>

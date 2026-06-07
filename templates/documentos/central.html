@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Centro de Documentos | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-folder2-open text-primary me-2"></i>Centro de Documentos</h2>
+  <div class="d-flex gap-2">
+    <a href="{% url 'documentos_exportar_excel' %}" class="btn btn-outline-success">
+      <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+    </a>
+    <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('batchForm').submit()">
+      <i class="bi bi-download me-1"></i>Descargar Selección
+    </button>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar nombre o RUT...">
+      </div>
+      <div class="col-md-2">
+        <select name="obra_id" class="form-select">
+          <option value="">Todas las obras</option>
+          {% for o in obras %}<option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="especialidad_id" class="form-select">
+          <option value="">Todas las especialidades</option>
+          {% for e in especialidades %}<option value="{{ e.pk }}" {% if especialidad_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="tipo_id" class="form-select">
+          <option value="">Todos los tipos</option>
+          {% for t in tipos %}<option value="{{ t.pk }}" {% if tipo_id == t.pk|stringformat:"s" %}selected{% endif %}>{{ t.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="estado" class="form-select">
+          <option value="">Todos los estados</option>
+          <option value="ok" {% if estado_filter == 'ok' %}selected{% endif %}>Vigente</option>
+          <option value="vencido" {% if estado_filter == 'vencido' %}selected{% endif %}>Vencido</option>
+          <option value="proximo" {% if estado_filter == 'proximo' %}selected{% endif %}>Por vencer</option>
+          <option value="pendiente" {% if estado_filter == 'pendiente' %}selected{% endif %}>Pendiente</option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-search"></i></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabla de documentos -->
+<form id="batchForm" method="post" action="{% url 'documentos_batch_download' %}">
+  {% csrf_token %}
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th><input type="checkbox" id="selectAll" class="form-check-input"></th>
+            <th>Trabajador</th>
+            <th>RUT</th>
+            <th>Obra</th>
+            <th>Tipo Documento</th>
+            <th>Fecha Carga</th>
+            <th>Vencimiento</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documentos %}
+          <tr class="{% if doc.estado_visual == 'ok' %}table-success{% elif doc.estado_visual == 'vencido' %}table-danger{% elif doc.estado_visual == 'proximo' %}table-warning{% else %}table-light{% endif %}">
+            <td>
+              <input type="checkbox" name="doc_ids" value="{{ doc.pk }}" class="form-check-input doc-check">
+            </td>
+            <td>
+              {% if doc.contrato and doc.contrato.trabajador %}
+                <a href="{% url 'trabajador_detail' doc.contrato.trabajador.rut %}">{{ doc.contrato.trabajador.nombre_completo }}</a>
+              {% elif doc.trabajador_rut %}
+                <a href="{% url 'trabajador_detail' doc.trabajador_rut %}">{{ doc.trabajador_rut }}</a>
+              {% else %}
+                <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <code>{% if doc.contrato and doc.contrato.trabajador %}{{ doc.contrato.trabajador.rut }}{% else %}{{ doc.trabajador_rut|default:"-" }}{% endif %}</code>
+            </td>
+            <td>
+              {% if doc.contrato and doc.contrato.obra %}
+                {{ doc.contrato.obra.nombre }}
+              {% elif doc.obra %}
+                {{ doc.obra.nombre }}
+              {% else %}
+                <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td><span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span></td>
+            <td class="small">{{ doc.fecha_carga|date:"d/m/Y" }}</td>
+            <td class="small">
+              {% if doc.fecha_vencimiento %}
+                {{ doc.fecha_vencimiento|date:"d/m/Y" }}
+                {% if doc.dias_para_vencer is not None and doc.dias_para_vencer <= 30 and not doc.esta_vencido %}
+                  <span class="badge bg-warning text-dark ms-1">{{ doc.dias_para_vencer }}d</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">No vence</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if doc.estado_visual == 'ok' %}
+                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Vigente</span>
+              {% elif doc.estado_visual == 'vencido' %}
+                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Vencido</span>
+              {% elif doc.estado_visual == 'proximo' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Por vencer</span>
+              {% else %}
+                <span class="badge bg-secondary">Pendiente</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if doc.archivo %}
+                <button type="button"
+                  onclick="previewDoc('{{ doc.archivo.url }}','{{ doc.tipo_documento.nombre }}','{{ doc.extension }}')"
+                  class="btn btn-sm btn-outline-primary py-0 px-1" title="Vista previa">
+                  <i class="bi bi-eye"></i>
+                </button>
+                <a href="{% url 'documento_download' doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Descargar">
+                  <i class="bi bi-download"></i>
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-5 text-muted">
+              <i class="bi bi-folder-x fs-2 d-block mb-2"></i>
+              No se encontraron documentos con esos criterios.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer text-muted small d-flex justify-content-between align-items-center">
+      <span>{{ total }} documento(s) mostrado(s)</span>
+      {% if total >= 200 %}<span class="text-warning"><i class="bi bi-info-circle me-1"></i>Mostrando máximo 200 registros. Use los filtros para acotar.</span>{% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const selectAll = document.getElementById('selectAll');
+if (selectAll) {
+  selectAll.addEventListener('change', function() {
+    document.querySelectorAll('.doc-check').forEach(cb => cb.checked = this.checked);
+  });
+}
+</script>
+{% endblock %}

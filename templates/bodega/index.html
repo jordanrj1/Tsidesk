@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+{% block title %}Bodega / Materiales | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-boxes text-primary me-2"></i>Gestión de Bodega</h2>
+</div>
+
+<!-- Selector de obra -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold mb-1">Seleccionar Obra</label>
+        <select name="obra_id" class="form-select" onchange="this.form.submit()">
+          <option value="">-- Seleccione una obra --</option>
+          {% for o in obras %}
+          <option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if obra %}
+
+<!-- Formulario de despacho lateral -->
+<div class="row g-3">
+  <div class="col-lg-8">
+    <h5 class="fw-bold mb-3">Inventario: {{ obra.nombre }}</h5>
+    <div class="row g-2" id="inventario">
+      {% for item in bodega_items %}
+      <div class="col-md-4 col-sm-6">
+        <div class="card border-0 h-100 {% if item.bajo_stock %}border-danger border-2 stock-critico{% else %}shadow-sm{% endif %}">
+          <div class="card-body text-center py-3 position-relative">
+            {% if item.bajo_stock %}
+            <span class="position-absolute top-0 end-0 m-1 badge bg-danger pulse"><i class="bi bi-exclamation-triangle"></i></span>
+            {% endif %}
+            <div class="fs-1 fw-bold {% if item.bajo_stock %}text-danger{% else %}text-success{% endif %}">
+              {{ item.stock_actual }}
+            </div>
+            <div class="fw-semibold small">{{ item.material.nombre }}</div>
+            <div class="text-muted small">Mín: {{ item.material.stock_minimo }}</div>
+            {% if item.bajo_stock %}
+            <div class="mt-2 d-flex gap-1 justify-content-center flex-wrap">
+              <button class="btn btn-danger btn-sm" onclick="abrirIngreso({{ item.material.pk }}, '{{ item.material.nombre }}')">
+                <i class="bi bi-plus-lg"></i> Ingresar
+              </button>
+              <button class="btn btn-outline-warning btn-sm" onclick="abrirUmbral({{ item.pk }}, {{ item.material.stock_minimo }})">
+                <i class="bi bi-gear"></i> Umbral
+              </button>
+            </div>
+            {% else %}
+            <div class="mt-2 d-flex gap-1 justify-content-center">
+              <button class="btn btn-outline-primary btn-sm" onclick="abrirIngreso({{ item.material.pk }}, '{{ item.material.nombre }}')">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="abrirDespacho({{ item.material.pk }}, '{{ item.material.nombre }}', {{ item.stock_actual }})">
+                <i class="bi bi-arrow-right-circle"></i>
+              </button>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-12 text-muted text-center py-4">No hay materiales configurados. Configure el catálogo primero.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Panel despacho -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm mb-3" id="panelDespacho" style="display:none">
+      <div class="card-header bg-primary text-white">
+        <i class="bi bi-arrow-right-circle me-2"></i><strong>Despacho a Terreno</strong>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'bodega_despacho' obra.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="material_id" id="despachoMaterialId">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Material</label>
+            <input type="text" id="despachoMaterialNombre" class="form-control" readonly>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Capataz Receptor <span class="text-danger">*</span></label>
+            <select name="capataz_rut" class="form-select" id="selectCapataz">
+              <option value="">Cargando...</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Cantidad <span class="text-danger">*</span></label>
+            <input type="number" name="cantidad" min="1" class="form-control" id="despachoMaximo">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Observación</label>
+            <textarea name="observacion" class="form-control" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check2 me-1"></i>Confirmar Despacho</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3" id="panelIngreso" style="display:none">
+      <div class="card-header bg-success text-white">
+        <i class="bi bi-plus-lg me-2"></i><strong>Ingreso de Stock</strong>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'bodega_ingreso_stock' obra.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="material_id" id="ingresoMaterialId">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Material</label>
+            <input type="text" id="ingresoMaterialNombre" class="form-control" readonly>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Cantidad a Ingresar <span class="text-danger">*</span></label>
+            <input type="number" name="cantidad" min="1" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Observación</label>
+            <textarea name="observacion" class="form-control" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn btn-success w-100"><i class="bi bi-check2 me-1"></i>Registrar Ingreso</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Historial -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-dark text-white"><strong><i class="bi bi-clock-history me-2"></i>Últimos Movimientos</strong></div>
+      <div class="list-group list-group-flush" style="max-height:400px;overflow-y:auto">
+        {% for h in historial %}
+        <div class="list-group-item list-group-item-action py-2">
+          <div class="d-flex justify-content-between">
+            <span class="badge {% if h.tipo_movimiento == 'INGRESO_STOCK' %}bg-success{% elif h.tipo_movimiento == 'ENTREGA_TERRENO' %}bg-primary{% else %}bg-warning text-dark{% endif %} small">
+              {{ h.tipo_movimiento }}
+            </span>
+            <small class="text-muted">{{ h.fecha_movimiento|date:"d/m H:i" }}</small>
+          </div>
+          <div class="small fw-semibold">{{ h.material.nombre }} &times;{{ h.cantidad }}</div>
+          {% if h.trabajador_capataz %}<small class="text-muted">Capataz: {{ h.trabajador_capataz.nombre_completo }}</small>{% endif %}
+        </div>
+        {% empty %}
+        <div class="list-group-item text-muted text-center py-3">Sin movimientos.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-boxes fs-1 d-block mb-2"></i>
+  <h5>Seleccione una obra para ver el inventario</h5>
+</div>
+{% endif %}
+
+<!-- Modal umbral -->
+<div class="modal fade" id="modalUmbral" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Ajustar Umbral Mínimo</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" id="formUmbral">
+        {% csrf_token %}
+        <div class="modal-body">
+          <label class="form-label">Nuevo stock mínimo</label>
+          <input type="number" name="stock_minimo" id="umbralValor" class="form-control" min="0">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-warning btn-sm">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function abrirDespacho(matId, matNombre, stockMax) {
+  document.getElementById('panelDespacho').style.display = 'block';
+  document.getElementById('panelIngreso').style.display = 'none';
+  document.getElementById('despachoMaterialId').value = matId;
+  document.getElementById('despachoMaterialNombre').value = matNombre;
+  document.getElementById('despachoMaximo').max = stockMax;
+
+  // Cargar capataces via AJAX
+  fetch('/bodega/{{ obra.pk }}/capataces/')
+    .then(r => r.json())
+    .then(d => {
+      const sel = document.getElementById('selectCapataz');
+      sel.innerHTML = '<option value="">-- Seleccione capataz --</option>';
+      d.capataces.forEach(c => {
+        sel.innerHTML += `<option value="${c.rut}">${c.nombre} (${c.rut})</option>`;
+      });
+    });
+}
+
+function abrirIngreso(matId, matNombre) {
+  document.getElementById('panelIngreso').style.display = 'block';
+  document.getElementById('panelDespacho').style.display = 'none';
+  document.getElementById('ingresoMaterialId').value = matId;
+  document.getElementById('ingresoMaterialNombre').value = matNombre;
+}
+
+function abrirUmbral(itemId, valorActual) {
+  document.getElementById('formUmbral').action = `/bodega/umbral/${itemId}/`;
+  document.getElementById('umbralValor').value = valorActual;
+  new bootstrap.Modal(document.getElementById('modalUmbral')).show();
+}
+</script>
+{% endblock %}

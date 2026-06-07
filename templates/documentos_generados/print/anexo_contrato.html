@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Anexo Contrato — {{ doc.trabajador.nombre_completo }}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 20mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
+  .print-bar a { color:#adc8ff; text-decoration:none; margin-left:auto; }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  h1.titulo { font-size:14px; font-weight:bold; text-align:center; text-decoration:underline; margin-bottom:14px; }
+  .ciudad-fecha { text-align:right; font-style:italic; margin-bottom:12px; }
+  .seccion-titulo { font-weight:bold; text-decoration:underline; margin:10px 0 6px; }
+  table.datos td { padding:2px 4px; }
+  table.datos td:first-child { font-weight:bold; width:200px; }
+  .valor { border-bottom:1px solid #000; min-width:100px; display:inline-block; padding:0 3px; }
+  .clausula { margin-bottom:8px; line-height:1.5; text-align:justify; }
+  table.montos { width:60%; margin:10px auto; border-collapse:collapse; }
+  table.montos td { padding:3px 8px; }
+  table.montos td:last-child { text-align:right; font-weight:bold; }
+  .firma-section { display:flex; justify-content:space-between; margin-top:50px; }
+  .firma-box { text-align:center; width:45%; }
+  .firma-linea { border-top:1px solid #000; margin-top:50px; padding-top:4px; }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <strong>Anexo Contrato — {{ doc.trabajador.nombre_completo }}</strong>
+  <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
+  <a href="{% url 'doc_generado_edit' doc.pk %}">Editar</a>
+  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
+  <a href="{% url 'doc_generado_list' %}">← Volver</a>
+</div>
+
+<div class="page" style="margin-top:45px">
+  <h1 class="titulo">ANEXO CONTRATO DE TRABAJO</h1>
+  <div class="ciudad-fecha">En {{ d.ciudad_documento|default:"___________" }}, {{ d.fecha_documento|date:"d \d\e F \d\e Y"|default:"___________" }}</div>
+
+  <div class="seccion-titulo">INDIVIDUALIZACION DEL TRABAJADOR:</div>
+  <table class="datos">
+    <tr><td>Nombre del Trabajador:</td><td><span class="valor">{{ doc.trabajador.nombre_completo }}</span></td></tr>
+    <tr><td>Cédula Nac. de Identidad:</td><td><span class="valor">{{ doc.trabajador.rut }}</span></td></tr>
+  </table>
+
+  <div class="seccion-titulo">INDIVIDUALIZACION DEL EMPLEADOR:</div>
+  <table class="datos">
+    <tr><td>Nombre del Empleador:</td><td><b>{{ doc.empresa.nombre }}</b></td>
+        <td><b>R.U.T. N°</b></td><td><b>{{ doc.empresa.rut_empresa }}</b></td></tr>
+    <tr><td>Domicilio</td><td>{{ doc.empresa.direccion }}</td></tr>
+    <tr><td>Rep. Legal</td><td><b>{{ doc.empresa.nombre_representante }}</b></td>
+        <td><b>R.U.T. N°</b></td><td>{{ doc.empresa.rut_representante }}</td></tr>
+  </table>
+
+  <p class="clausula" style="margin-top:12px">Entre las partes arriba individualizadas se suscribe el presente <b>Anexo de Contrato de Trabajo</b>, para cuyo efecto los contratantes convienen en denominarse <b>Trabajador y Empleador</b>, respectivamente.</p>
+
+  <p class="clausula"><b>1.-</b> A contar del <span class="valor">{{ d.fecha_contrato_original|date:"d \d\e F \d\e Y"|default:"___________" }}</span>, entre las partes ya individualizadas anteriormente se firma el siguiente Anexo de Contrato con el objeto de regularizar el primero.</p>
+
+  <p class="clausula"><b>2.-</b> Queda de manifiesto que se conservarán todas y cada una de las cláusulas del contrato original de fecha <span class="valor">{{ d.fecha_contrato_original|date:"d \d\e F \d\e Y"|default:"" }}</span> y demás disposiciones que se dicten con posterioridad a la fecha de suscripción del presente "Anexo de Contrato", y que tengan relación con él.</p>
+
+  <p class="clausula"><b>3.-</b> El presente anexo al contrato se firma en dos ejemplares del mismo tenor, dejando expresa constancia que el trabajador recibe uno de ellos.</p>
+
+  <p class="clausula"><b>4.-</b> El Empleador se compromete a suministrar al trabajador los siguientes beneficios en forma proporcional a los días trabajados:</p>
+
+  <table class="montos">
+    <tr><td>Asignación de Colación</td><td>$ {{ d.monto_colacion|default:"90.000" }}</td></tr>
+    <tr><td>Asignación de Movilización</td><td>$ {{ d.monto_movilizacion|default:"60.000" }}</td></tr>
+    <tr><td>Desgaste Herramientas</td><td>$ {{ d.monto_herramientas|default:"45.000" }}</td></tr>
+  </table>
+
+  {% if d.observaciones %}<p class="clausula">{{ d.observaciones }}</p>{% endif %}
+
+  <div class="firma-section">
+    <div class="firma-box"><div class="firma-linea"><b>Firma del Empleador</b><br>{{ doc.empresa.rut_empresa }}</div></div>
+    <div class="firma-box"><div class="firma-linea">Firma del Trabajador.<br>{{ doc.trabajador.rut }}</div></div>
+  </div>
+</div>
+</body>
+</html>

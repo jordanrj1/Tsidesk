@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo Contrato | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Nuevo Contrato</h2>
+  <a href="{% url 'contratos_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+</div>
+
+{% if contratos_activos %}
+<div class="alert alert-warning border-warning mb-4">
+  <div class="d-flex align-items-start gap-2">
+    <i class="bi bi-exclamation-triangle-fill fs-5 mt-1 flex-shrink-0"></i>
+    <div class="w-100">
+      <strong>{{ trabajador.nombre_completo }}</strong> ya tiene {{ contratos_activos|length }} contrato(s) activo(s) en otras obras:
+      <ul class="mb-2 mt-2">
+        {% for c in contratos_activos %}
+        <li>
+          <strong>{{ c.obra.nombre }}</strong> — Estado: <span class="badge
+            {% if c.estado == 'Pendiente de Firma' %}bg-warning text-dark
+            {% elif c.estado == 'Vigente' %}bg-success
+            {% else %}bg-secondary{% endif %}">{{ c.estado }}</span>
+          {% if c.docs_pendientes %}
+          <span class="ms-2 text-danger small"><i class="bi bi-file-x me-1"></i>Pendiente: {{ c.docs_pendientes|join:", " }}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <small class="text-muted">Si el trabajador se traslada de obra, asegúrese de gestionar el finiquito de la obra anterior antes o después de crear este contrato.</small>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div id="duplicadoAlert" class="d-none mb-3"></div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% if form.errors %}
+    <div class="alert alert-danger mb-3">
+      <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Corrija los siguientes errores:</strong>
+      <ul class="mb-0 mt-2">
+        {% for field, errors in form.errors.items %}
+          {% for error in errors %}<li>{% if field != '__all__' %}<strong>{{ field }}:</strong> {% endif %}{{ error }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Trabajador <span class="text-danger">*</span></label>
+          {{ form.trabajador }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Obra <span class="text-danger">*</span></label>
+          {{ form.obra }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Especialidad <span class="text-danger">*</span></label>
+          {{ form.especialidad }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Tipo de Contrato <span class="text-danger">*</span></label>
+          {{ form.tipo_contrato }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Sueldo Base <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            {{ form.sueldo_base }}
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Fecha Inicio <span class="text-danger">*</span></label>
+          {{ form.fecha_inicio }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Fecha Término Estimada <small class="text-muted fw-normal">(opcional)</small></label>
+          {{ form.fecha_termino_estimada }}
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="bg-light border rounded px-3 py-2 w-100">
+            <small class="text-muted d-block">Estado inicial</small>
+            <span class="badge bg-warning text-dark fs-6"><i class="bi bi-hourglass-split me-1"></i>Pendiente de Firma</span>
+          </div>
+        </div>
+      </div>
+      <hr>
+      <div class="d-flex gap-2 justify-content-end">
+        <a href="{% url 'contratos_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Crear Contrato</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const trabajadorSel = document.getElementById('id_trabajador');
+const obraSel = document.getElementById('id_obra');
+const duplicadoAlert = document.getElementById('duplicadoAlert');
+
+async function checkDuplicado() {
+  const trabajadorId = trabajadorSel ? trabajadorSel.value : '';
+  const obraId = obraSel ? obraSel.value : '';
+  if (!trabajadorId || !obraId) {
+    duplicadoAlert.className = 'd-none mb-3';
+    return;
+  }
+  const res = await fetch(`/contratos/check-duplicado/?trabajador_id=${encodeURIComponent(trabajadorId)}&obra_id=${encodeURIComponent(obraId)}`);
+  const data = await res.json();
+  if (data.duplicado) {
+    duplicadoAlert.className = 'alert alert-danger mb-3';
+    duplicadoAlert.innerHTML = '<i class="bi bi-x-circle-fill me-2"></i><strong>Duplicado:</strong> Este trabajador ya tiene un contrato activo en esta misma obra. Verifique antes de continuar.';
+  } else {
+    duplicadoAlert.className = 'd-none mb-3';
+    duplicadoAlert.innerHTML = '';
+  }
+}
+
+if (trabajadorSel) trabajadorSel.addEventListener('change', checkDuplicado);
+if (obraSel) obraSel.addEventListener('change', checkDuplicado);
+</script>
+{% endblock %}

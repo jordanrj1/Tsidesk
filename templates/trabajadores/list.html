@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% load core_extras %}
+{% block title %}Trabajadores | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-person-badge-fill text-primary me-2"></i>Fichas de Trabajadores</h2>
+  <a href="{% url 'trabajador_create' %}" class="btn btn-primary">
+    <i class="bi bi-person-plus-fill me-1"></i>Nuevo Trabajador
+  </a>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por nombre, RUT, teléfono o correo...">
+      </div>
+      <div class="col-md-3">
+        <select name="estado" class="form-select">
+          <option value="">Todos los estados</option>
+          <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Con contrato vigente</option>
+          <option value="sin_contrato" {% if estado == 'sin_contrato' %}selected{% endif %}>Sin contrato activo</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="lista_negra" class="form-select">
+          <option value="">Sin filtro</option>
+          <option value="1" {% if lista_negra == '1' %}selected{% endif %}>Lista Negra</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-search me-1"></i>Buscar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>RUT</th>
+            <th>Nombre Completo</th>
+            <th>Teléfono</th>
+            <th>Contratos Activos</th>
+            <th>Documentos</th>
+            <th>Strikes</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in trabajadores %}
+          <tr {% if t.en_lista_negra %}class="table-danger"{% elif t.rut in ruts_con_alerta_traslado %}class="table-warning"{% endif %}>
+            <td><code>{{ t.rut }}</code></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                {% if t.foto %}
+                  <img src="{{ t.foto.url }}" class="rounded-circle" width="32" height="32" style="object-fit:cover">
+                {% else %}
+                  <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:32px;height:32px;font-size:0.75rem">
+                    {{ t.nombres|first }}{{ t.apellidos|first }}
+                  </div>
+                {% endif %}
+                <div>
+                  <div class="fw-semibold">{{ t.nombre_completo }}</div>
+                  {% if t.en_lista_negra %}<span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Lista Negra</span>{% endif %}
+                  {% if t.rut in ruts_con_alerta_traslado %}<span class="badge bg-warning text-dark ms-1"><i class="bi bi-exclamation-triangle me-1"></i>Finiquito pendiente</span>{% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="text-muted">{{ t.telefono|default:"-" }}</td>
+            <td>
+              {% with cnt=t.contratos_vigentes.count %}
+                {% if cnt > 0 %}
+                  <span class="badge bg-success">{{ cnt }} activo{% if cnt > 1 %}s{% endif %}</span>
+                  {% if cnt > 1 %}<span class="badge bg-info ms-1">Multi-obra</span>{% endif %}
+                {% else %}
+                  <span class="badge bg-secondary">Sin contrato</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td>
+              {% with prog=progreso_dict|get_item:t.rut %}
+                {% if prog %}
+                  <a href="{% url 'trabajador_detail' t.rut %}?tab=documentos" class="text-decoration-none">
+                    <span class="badge {% if prog.total == 0 %}bg-secondary{% elif prog.ok == prog.total %}bg-success{% elif prog.ok > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                      {{ prog.ok }}/{{ prog.total }}
+                    </span>
+                  </a>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td>
+              {% if t.strikes_activos >= 3 %}
+                <span class="badge bg-danger">{{ t.strikes_activos }} strikes</span>
+              {% elif t.strikes_activos > 0 %}
+                <span class="badge bg-warning text-dark">{{ t.strikes_activos }} strike{% if t.strikes_activos > 1 %}s{% endif %}</span>
+              {% else %}
+                <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if t.en_lista_negra %}
+                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Vetado</span>
+              {% else %}
+                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Activo</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'trabajador_detail' t.rut %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+              <a href="{% url 'contrato_create' %}?trabajador_rut={{ t.rut }}" class="btn btn-sm btn-outline-success" title="Nuevo contrato"><i class="bi bi-file-earmark-plus"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center py-5 text-muted">
+            <i class="bi bi-search fs-2 d-block mb-2"></i>No se encontraron trabajadores con esos criterios.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small">{{ trabajadores|length }} registro(s) encontrado(s)</div>
+</div>
+{% endblock %}

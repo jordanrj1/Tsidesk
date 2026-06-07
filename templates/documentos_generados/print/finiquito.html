@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Finiquito — {{ doc.trabajador.nombre_completo }}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 20mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
+  .print-bar a { color:#adc8ff; text-decoration:none; }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  h1.titulo { font-size:14px; font-weight:bold; text-align:center; text-decoration:underline; margin-bottom:14px; }
+  .obra-header { font-weight:bold; margin-bottom:4px; }
+  .ciudad-fecha { text-align:right; font-style:italic; margin-bottom:12px; }
+  .seccion-titulo { font-weight:bold; text-decoration:underline; margin:10px 0 4px; }
+  .datos-line { margin-bottom:4px; }
+  .valor { border-bottom:1px solid #000; min-width:120px; display:inline-block; padding:0 3px; }
+  .clausula { margin-bottom:8px; line-height:1.5; text-align:justify; }
+  table.montos { width:100%; border-collapse:collapse; margin:10px 0; }
+  table.montos td { padding:3px 8px; }
+  table.montos td:last-child { text-align:right; font-weight:bold; }
+  table.montos .total-row { border-top:2px solid #000; font-weight:bold; }
+  .highlight { background:#90EE90; }
+  .firma-section { display:flex; justify-content:space-between; margin-top:40px; }
+  .firma-box { text-align:center; width:45%; }
+  .firma-linea { border-top:1px solid #000; margin-top:50px; padding-top:4px; }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <strong>Finiquito — {{ doc.trabajador.nombre_completo }}</strong>
+  <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
+  <a href="{% url 'doc_generado_edit' doc.pk %}" style="color:#adc8ff">Editar</a>
+  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}{% if doc.contrato_id %}?contrato_id={{ doc.contrato_id }}{% endif %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
+  <a href="{% url 'doc_generado_list' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
+</div>
+
+<div class="page" style="margin-top:45px">
+  <div class="obra-header">OBRA: {{ d.nombre_obra|default:"" }}</div>
+  <h1 class="titulo">FINIQUITO DE TRABAJO</h1>
+  <div class="ciudad-fecha">En {{ d.ciudad_documento|default:"___________" }}, {{ d.fecha_documento|date:"d \d\e F \d\e Y"|default:"___________" }}</div>
+
+  <div class="seccion-titulo">Individualización del Trabajador:</div>
+  <div class="datos-line"><b>Nombre del Trabajador:</b> <span class="highlight valor">{{ doc.trabajador.nombre_completo }}</span></div>
+  <div class="datos-line"><b>Cédula Nac. de Identidad:</b> <span class="highlight valor">{{ doc.trabajador.rut }}</span></div>
+
+  <div class="seccion-titulo" style="margin-top:10px">Individualización del Empleador:</div>
+  <table style="width:100%">
+    <tr>
+      <td><b>Nombre del Empleador :</b> {{ doc.empresa.nombre }}</td>
+      <td><b>RUT N°</b> {{ doc.empresa.rut_empresa }}</td>
+    </tr>
+    <tr>
+      <td><b>Dirección</b> {{ doc.empresa.direccion }}</td>
+      <td><b>Ciudad:</b> {{ doc.empresa.ciudad }}</td>
+    </tr>
+    <tr>
+      <td><b>Representante Legal</b> {{ doc.empresa.nombre_representante }}</td>
+      <td><b>RUT N°</b> {{ doc.empresa.rut_representante }}</td>
+    </tr>
+  </table>
+
+  <p class="clausula" style="margin-top:12px"><b>1.-</b> Don <span class="valor">{{ doc.trabajador.nombre_completo }}</span> quien prestó servicios a <b>{{ doc.empresa.nombre }}</b> en calidad de <span class="highlight valor">{{ d.especialidad|default:"" }}</span> desde el día <span class="highlight valor">{{ d.fecha_inicio_contrato|date:"d-m-Y"|default:"" }}</span> <b>hasta el dia</b> <span class="highlight valor">{{ d.fecha_termino_contrato|date:"d-m-Y"|default:"" }}</span>, fecha de término de sus servicios, por lo siguiente de acuerdo a lo estipulado en el {{ d.causal|default:"Art. 159 N°5 – Conclusión del trabajo o servicio que dio origen al contrato" }}.</p>
+
+  <p class="clausula"><b>2.-</b> Don <span class="valor">{{ doc.trabajador.rut }}</span> recibe en este acto, con satisfacción, de parte de <b>{{ doc.empresa.nombre }}</b> las cifras que se indican a continuación por lo siguiente:</p>
+
+  <table class="montos">
+    {% if d.monto_feriado %}<tr><td>Feriado proporcional</td><td>$ {{ d.monto_feriado }}</td></tr>{% endif %}
+    {% if d.monto_indemnizacion %}<tr><td>Indemnización por Término de Contrato</td><td>$ {{ d.monto_indemnizacion }}</td></tr>{% endif %}
+    {% if d.otros_montos_descripcion and d.otros_montos_monto %}<tr><td>{{ d.otros_montos_descripcion }}</td><td>$ {{ d.otros_montos_monto }}</td></tr>{% endif %}
+    <tr class="total-row"><td style="text-align:right">Total $</td><td>$ {{ d.total|default:"0" }}</td></tr>
+  </table>
+
+  <p class="clausula"><b>3.-</b> Don <span class="valor">{{ doc.trabajador.nombre_completo }}</span> deja constancia que por el tiempo que prestó servicios a <b>{{ doc.empresa.nombre }}</b> recibió a tiempo y correctamente todas las remuneraciones convenidas, de acuerdo con su contrato, por el trabajo hecho, reajustes legales, cargas familiares autorizadas por la institución de prevención respectiva, horas extraordinarias, feriados legales, gratificaciones, conforme a la ley y que no se le debe nada por los conceptos indicados anteriormente ni por ningún otro, sea de origen legal o contractual venido de la prestación de servicios, por lo cual, sin tener reclamo que hacer en contra de <b>{{ doc.empresa.nombre }}</b> le da total finiquito, declaración que formula libremente en total conocimiento de todos sus derechos.</p>
+
+  {% if d.retencion_alimentos %}<p class="clausula"><b>4.-</b> En aplicación de la ley 21.389, el empleador declara retener el dinero del finiquito del trabajador por encontrarse sujeto a retención judicial de pensión alimenticia.</p>{% endif %}
+
+  <p class="clausula">Para dejar constancia firman ambas partes este finiquito en tres ejemplares, quedándose el empleador con dos y el trabajador con el restante.</p>
+
+  {% if d.observaciones %}<p class="clausula"><em>{{ d.observaciones }}</em></p>{% endif %}
+
+  <div class="firma-section">
+    <div class="firma-box"><div class="firma-linea"><b>Firma del Empleador</b><br>{{ doc.empresa.rut_empresa }}</div></div>
+    <div class="firma-box"><div class="firma-linea">Firma del Trabajador.<br>{{ doc.trabajador.rut }}</div></div>
+  </div>
+</div>
+</body>
+</html>

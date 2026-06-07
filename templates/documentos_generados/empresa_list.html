@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Empresas | TsDesk{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-building-fill text-primary me-2"></i>Empresas</h2>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevaEmpresa">
+    <i class="bi bi-plus-circle me-1"></i>Nueva Empresa
+  </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>Empresa</th><th>RUT</th><th>Ciudad</th><th>Representante Legal</th><th>Giro</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for e in empresas %}
+        <tr>
+          <td class="fw-semibold">{{ e.nombre }}</td>
+          <td><code>{{ e.rut_empresa }}</code></td>
+          <td>{{ e.ciudad }}</td>
+          <td>{{ e.nombre_representante }}<br><small class="text-muted">{{ e.cargo_representante }}</small></td>
+          <td>{{ e.giro }}</td>
+          <td>
+            <a href="{% url 'empresa_edit' e.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{% url 'empresa_delete' e.pk %}" class="d-inline" onsubmit="return confirm('¿Eliminar empresa?')">
+              {% csrf_token %}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-building fs-2 d-block mb-2"></i>No hay empresas registradas. Cree la primera.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nueva empresa -->
+<div class="modal fade" id="modalNuevaEmpresa" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-building-fill me-2"></i>Nueva Empresa</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row g-3">
+            {% for field in form %}
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Guardar Empresa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

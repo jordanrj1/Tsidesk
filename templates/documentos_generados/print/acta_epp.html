@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Acta EPP — {{ doc.trabajador.nombre_completo }}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
+  .page { width:210mm; min-height:297mm; margin:0 auto; padding:15mm 18mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  h1.titulo { font-size:12px; font-weight:bold; text-align:center; margin-bottom:14px; border:1px solid #000; padding:6px; }
+  .empresa-data { margin-bottom:10px; }
+  .empresa-data div { margin-bottom:2px; }
+  .label { font-weight:bold; display:inline-block; width:130px; }
+  .valor { border-bottom:1px solid #000; min-width:150px; display:inline-block; padding:0 3px; }
+  table.epp { width:100%; border-collapse:collapse; margin-top:14px; }
+  table.epp th { background:#333; color:#fff; padding:5px 8px; text-align:left; font-size:10px; }
+  table.epp td { border:1px solid #999; padding:5px 8px; }
+  table.epp td:first-child { font-weight:bold; }
+  .firma-section { display:flex; justify-content:space-between; margin-top:40px; }
+  .firma-box { text-align:center; width:45%; }
+  .firma-linea { border-top:1px solid #000; margin-top:50px; padding-top:4px; }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <strong>Acta EPP — {{ doc.trabajador.nombre_completo }}</strong>
+  <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
+  <a href="{% url 'doc_generado_edit' doc.pk %}" style="color:#adc8ff">Editar</a>
+  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
+  <a href="{% url 'doc_generado_list' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
+</div>
+
+<div class="page" style="margin-top:45px">
+  <h1 class="titulo">ACTA DE ENTREGA DE ELEMENTOS DE PROTECCION PERSONAL</h1>
+
+  <div class="empresa-data">
+    <div><span class="label">RAZON SOCIAL</span> {{ doc.empresa.nombre }}</div>
+    <div><span class="label">R.U.T.</span> {{ doc.empresa.rut_empresa }}</div>
+    <div><span class="label">GIRO</span> {{ doc.empresa.giro }}</div>
+    <div><span class="label">DOMICILIO</span> {{ doc.empresa.direccion }}</div>
+    <div><span class="label">CIUDAD</span> {{ doc.empresa.ciudad }}</div>
+  </div>
+
+  <div style="margin-top:10px">
+    <div><span class="label">NOMBRE DEL TRABAJADOR</span> <span class="valor">{{ doc.trabajador.nombre_completo }}</span></div>
+    <div style="margin-top:4px"><span class="label">FECHA</span> <span class="valor">{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</span></div>
+    <div style="margin-top:4px"><span class="label">R.U.N.:</span> <span class="valor">{{ doc.trabajador.rut }}</span></div>
+  </div>
+
+  <table class="epp">
+    <thead>
+      <tr>
+        <th style="width:40%">ELEMENTOS DE PROT. PERSONAL</th>
+        <th style="width:20%">FECHA DE ENTREGA</th>
+        <th style="width:20%">FECHA DE DEVOLUCION</th>
+        <th style="width:20%">FIRMA DE RECEPCION</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if d.casco %}<tr><td>CASCO DE SEGURIDAD</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.lentes %}<tr><td>LENTE DE SEGURIDAD</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.chaleco %}<tr><td>CHALECO REFLECTANTE</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.zapatos %}<tr><td>ZAPATO DE SEGURIDAD</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.guantes %}<tr><td>GUANTE DE SEGURIDAD</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.ropa_agua %}<tr><td>ROPA DE AGUA</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.protector_solar %}<tr><td>PROTECTOR SOLAR</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.legionario %}<tr><td>LEGIONARIO</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.bloqueador %}<tr><td>BLOQUEADOR SOLAR</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.fonos %}<tr><td>FONOS AUDITIVOS</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.arnes %}<tr><td>ARNES DE SEGURIDAD</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.cabos %}<tr><td>2 CABOS DE VIDA</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+      {% if d.otros_epp %}
+        {% for linea in d.otros_epp.splitlines %}
+        {% if linea.strip %}<tr><td>{{ linea|upper }}</td><td>{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</td><td></td><td></td></tr>{% endif %}
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="firma-section">
+    <div class="firma-box"><div class="firma-linea"><b>Firma del Empleador</b></div></div>
+    <div class="firma-box"><div class="firma-linea">Firma del Trabajador</div></div>
+  </div>
+</div>
+</body>
+</html>

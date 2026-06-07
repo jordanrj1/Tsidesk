@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Contrato de Trabajo N°{{ contrato.pk }}</title>
+  <style>
+    @page { size: A4; margin: 1.4cm 1.5cm 2cm 1.5cm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; color: #000; background: #fff; }
+
+    /* ── Print bar (hidden on print) ── */
+    .print-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+      background: #2c3e50; padding: 8px 16px; display: flex; gap: 10px; align-items: center; }
+    .print-bar button { background: #3498db; border: none; color: #fff; padding: 6px 18px;
+      border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+    .print-bar button:hover { background: #2980b9; }
+    .print-bar a { color: #aaa; text-decoration: none; font-size: 13px; }
+    .bar-spacer { height: 44px; }
+    @media print { .print-bar, .bar-spacer { display: none !important; } }
+
+    /* ── Page ── */
+    .page { max-width: 19cm; margin: 0 auto; padding: 0.3cm 0; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 3px; }
+    td, th { border: 1px solid #000; padding: 2px 5px; vertical-align: middle; line-height: 1.3; }
+    td.nb { border: none; }
+
+    /* ── Header ── */
+    .titulo { text-align: center; font-weight: bold; font-size: 13pt; text-transform: uppercase; padding: 5px 0; }
+    .subtipo { text-align: center; font-size: 9pt; text-transform: uppercase; padding: 2px 0; }
+
+    /* ── Sections ── */
+    .sec-hdr { background: #c6efce; font-weight: bold; font-size: 8.5pt; }
+    .lbl { font-weight: bold; font-size: 8pt; white-space: nowrap; }
+    .val { font-size: 8pt; }
+    .green { background: #c6efce; }
+
+    /* ── Clauses ── */
+    .cuerpo { margin: 3px 0; font-size: 8.5pt; text-align: justify; line-height: 1.4; }
+    .cnum { font-weight: bold; }
+
+    /* ── Schedule ── */
+    .obs-red { background: #ff0000; color: #fff; font-weight: bold; font-size: 8pt;
+      padding: 2px 6px; margin: 2px 0; }
+
+    /* ── Signatures ── */
+    .sig-line { border-bottom: 1px solid #000; height: 30px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="print-bar">
+  <button onclick="window.print()">🖨&nbsp; Imprimir / Guardar PDF</button>
+  <a href="javascript:history.back()">✕ Volver</a>
+</div>
+<div class="bar-spacer"></div>
+
+<div class="page">
+
+  <!-- ╔═ TÍTULO ═╗ -->
+  <table>
+    <tr><td colspan="4" class="titulo">CONTRATO DE TRABAJO</td></tr>
+    <tr><td colspan="4" class="subtipo">{{ contrato.tipo_contrato|upper }}</td></tr>
+    <tr>
+      <td colspan="2" class="nb" style="width:55%;"></td>
+      <td colspan="2" style="text-align:right; font-size:8.5pt; width:45%;">
+        En {{ ciudad_doc }},&nbsp; a {{ fecha_doc|date:"d \d\e F \d\e Y" }}
+      </td>
+    </tr>
+  </table>
+
+  <!-- ╔═ TRABAJADOR ═╗ -->
+  <table>
+    <tr><td colspan="4" class="sec-hdr">INDIVIDUALIZACION DEL TRABAJADOR:</td></tr>
+    <tr>
+      <td class="lbl" style="width:22%;">Nombre del Trabajador:</td>
+      <td class="val" style="width:28%;">{{ contrato.trabajador.nombre_completo }}</td>
+      <td class="lbl" style="width:22%;">Nacionalidad:</td>
+      <td class="val" style="width:28%;">{{ contrato.trabajador.nacionalidad|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Cédula Nac. de Identidad:</td>
+      <td class="val">{{ contrato.trabajador.rut }}</td>
+      <td class="lbl">Estado Civil:</td>
+      <td class="val">{{ contrato.trabajador.estado_civil|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Fecha de Nacimiento:</td>
+      <td class="val">{{ contrato.trabajador.fecha_nacimiento|date:"d/m/Y"|default:"" }}</td>
+      <td class="lbl">Procedencia:</td>
+      <td class="val">{{ contrato.trabajador.procedencia|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Domicilio:</td>
+      <td class="val">{{ contrato.trabajador.direccion|default:"" }}</td>
+      <td class="lbl">Ciudad:</td>
+      <td class="val">{{ contrato.trabajador.ciudad|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Previsión:</td>
+      <td class="val">{{ contrato.trabajador.prevision|default:"" }}</td>
+      <td class="lbl">Salud:</td>
+      <td class="val">{{ contrato.trabajador.salud|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Teléfono:</td>
+      <td colspan="3" class="val">{{ contrato.trabajador.telefono|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Correo electrónico:</td>
+      <td colspan="3" class="val">{{ contrato.trabajador.correo|default:"" }}</td>
+    </tr>
+  </table>
+
+  <!-- ╔═ EMPLEADOR ═╗ -->
+  <table>
+    <tr><td colspan="4" class="sec-hdr">INDIVIDUALIZACION DEL EMPLEADOR:</td></tr>
+    <tr>
+      <td class="lbl" style="width:22%;">Nombre del Empleador:</td>
+      <td class="val green" style="width:28%;">{{ empresa.nombre|default:"" }}</td>
+      <td class="lbl" style="width:22%;">RUT N°</td>
+      <td class="val green" style="width:28%;">{{ empresa.rut_empresa|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Dirección:</td>
+      <td class="val green">{{ empresa.direccion|default:"" }}</td>
+      <td class="lbl">Ciudad:</td>
+      <td class="val green">{{ empresa.ciudad|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Correo electrónico:</td>
+      <td colspan="3" class="val green">{{ empresa.correo_electronico|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Representante Legal:</td>
+      <td class="val green">{{ empresa.nombre_representante|default:"" }}</td>
+      <td class="lbl">RUT N°</td>
+      <td class="val green">{{ empresa.rut_representante|default:"" }}</td>
+    </tr>
+  </table>
+
+  <!-- ╔═ INTRO ═╗ -->
+  <p class="cuerpo" style="margin-top:5px;">
+    Entre las partes arriba individualizadas se suscribe el presente contrato de trabajo, para cuyo efecto, los contratantes convienen en denominarse Trabajador y Empleador, respectivamente.
+  </p>
+
+  <!-- ╔═ CLÁUSULA 1 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">1.-</span> El Trabajador se compromete a ejecutar la labor de
+    <span class="green">&nbsp;{{ contrato.especialidad.nombre }}&nbsp;</span>
+    en la obra denominada <span class="green">&nbsp;{{ contrato.obra.nombre }}&nbsp;</span>
+    ubicada en <span class="green">&nbsp;{{ contrato.obra.direccion|default:"______________________________" }}&nbsp;</span>;<br>
+    el trabajo se efectuará fundamentalmente en la obra mencionada en el párrafo anterior, sin perjuicio de la facultad del Empleador para trasladar, por causa justificada, al trabajador a cualquier Obra que tenga en ejecución dentro de la ciudad, sin que ello importe menoscabo.
+  </p>
+
+  <!-- ╔═ CLÁUSULA 2 — JORNADA ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">2.-</span> La jornada de trabajo se ejecutará de
+    <span class="green">&nbsp;Lunes a Viernes&nbsp;</span>
+    con <span class="green">&nbsp;44hrs semanales con 1 hr de colación&nbsp;</span>
+    la que no se considerará laborada para ningún efecto legal.
+  </p>
+  <div class="obs-red">OBS: HORARIO SERÁ SEGÚN LO ESTIPULADO POR OBRA</div>
+  <table style="font-size:8pt; margin-bottom:3px;">
+    <tr>
+      <td class="lbl green" rowspan="2" style="width:20%; text-align:center;">LUNES A JUEVES</td>
+      <td style="width:12%;">Desde</td>
+      <td style="width:14%;" class="green">08:00 HRS.</td>
+      <td style="width:8%;">A</td>
+      <td class="green">13:00 HRS.</td>
+    </tr>
+    <tr>
+      <td>Desde</td>
+      <td class="green">14:00 HRS</td>
+      <td>A</td>
+      <td class="green">18:00 HRS.</td>
+    </tr>
+    <tr>
+      <td class="lbl green" rowspan="2" style="text-align:center;">VIERNES</td>
+      <td>Desde</td>
+      <td class="green">08:00 HRS</td>
+      <td>A</td>
+      <td class="green">13:00 HRS</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td class="green">14:00 HRS</td>
+      <td>A</td>
+      <td class="green">17:00 HRS</td>
+    </tr>
+  </table>
+
+  <!-- ╔═ CLÁUSULA 3 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">3.-</span> El trabajo se ejecutará por:
+    <span class="green">&nbsp;{{ contrato.tipo_contrato|upper }}&nbsp;</span>
+  </p>
+
+  <!-- ╔═ CLÁUSULA 4 — REMUNERACIÓN ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">4.-</span> El Empleador se compromete a remunerar al trabajador, por mes efectivamente trabajado en jornada completa, la suma de: $<span class="green">&nbsp;{{ sueldo_formateado }}&nbsp;</span>
+    (<span class="green">{{ sueldo_palabras }}</span> pesos.-)<br>
+    El tiempo extraordinario se pagará con el recargo legal y se cancelará conjuntamente con el respectivo sueldo, dentro de los cinco primeros días del mes siguiente al período vencido, y de cuyo monto el Empleador hará las deducciones que establecen las leyes vigentes.
+  </p>
+
+  <!-- ╔═ CLÁUSULA 5 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">5.-</span> El presente contrato durará hasta el:
+    {% if contrato.fecha_termino_estimada %}
+    <span class="green">&nbsp;{{ contrato.fecha_termino_estimada|date:"d \d\e F \d\e Y" }}&nbsp;</span>
+    {% else %}
+    ___________________________________
+    {% endif %}
+    , sin embargo, podrá ponérsele término cuando concurran para ello causas justificadas, que en conformidad a la Ley, puedan producir su caducidad o término.
+  </p>
+
+  <!-- ╔═ CLÁUSULA 6 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">6.-</span> En este acto las partes acuerdan que, sin perjuicio de lo dispuesto en las cláusulas anteriores, este contrato podrá expirar paulatina y anticipadamente al término final o entrega definitiva de la obra, en virtud de ir concluyendo en forma decreciente las labores de la faena.<br>
+    También este contrato terminará anticipadamente cuando el trabajador incurra en causales para ello, según lo dispuesto en el artículo 160 del Código del Trabajo, sin derecho a indemnización alguna. Igualmente, este contrato terminará anticipadamente, si el dueño de la obra termina unilateralmente el contrato con el empleador, o reduce el monto o cuantía del contrato celebrado, en cuyo caso el trabajador acepta que la causa de término de la relación laboral, sea el artículo 159, N° 5 del Código del Trabajo, es decir, "Conclusión del trabajo o servicio que dio origen al contrato".
+  </p>
+
+  <!-- ╔═ CLÁUSULA 7 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">7.-</span> Se deja constancia que el trabajador: <strong>{{ contrato.trabajador.nombre_completo }}</strong> ingresó al servicio el
+    <span class="green">&nbsp;{{ contrato.fecha_inicio|date:"d \d\e F \d\e Y" }}&nbsp;</span>
+  </p>
+
+  <!-- ╔═ CLÁUSULA 8 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">8.-</span> Se entienden incorporadas al presente contrato todas las disposiciones legales que se dicten con posterioridad a la fecha de suscripción y que tengan relación con él, y las cláusulas adicionales estipuladas en el <strong>ANEXO DE CONTRATO DE TRABAJO</strong>. -
+  </p>
+
+  <!-- ╔═ CLÁUSULA 9 ═╗ -->
+  <p class="cuerpo">
+    <span class="cnum">9.-</span> El presente contrato se firma en tres ejemplares del mismo tenor, dejando expresa constancia que en este acto el Trabajador recibe uno de ellos.
+  </p>
+
+  <!-- ╔═ FIRMAS ═╗ -->
+  <table style="margin-top: 35px; border: none;">
+    <tr>
+      <td class="nb" style="width:50%; text-align:center; padding-top:35px;">
+        <div class="sig-line" style="width:75%; margin:0 auto;"></div>
+        <strong>Firma del Empleador</strong><br>
+        <span style="font-size:8pt;">{{ empresa.nombre|default:"" }}</span><br>
+        <span style="font-size:8pt;">RUT:&nbsp; {{ empresa.rut_empresa|default:"" }}</span>
+      </td>
+      <td class="nb" style="width:50%; text-align:center; padding-top:35px;">
+        <div class="sig-line" style="width:75%; margin:0 auto;"></div>
+        <strong>Firma del Trabajador</strong><br>
+        <span style="font-size:8pt;">{{ contrato.trabajador.nombre_completo }}</span><br>
+        <span style="font-size:8pt;">RUT:&nbsp; {{ contrato.trabajador.rut }}</span>
+      </td>
+    </tr>
+  </table>
+
+  <p style="font-size:7pt; color:#888; text-align:center; margin-top:18px;">
+    Contrato N° {{ contrato.pk }} &mdash; Generado por TsDesk &mdash; {{ contrato.fecha_inicio|date:"d/m/Y" }}
+  </p>
+
+</div>
+</body>
+</html>

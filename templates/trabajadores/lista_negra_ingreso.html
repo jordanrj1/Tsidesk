@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Ingresar a Lista Negra | TsDesk{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold text-danger"><i class="bi bi-slash-circle-fill me-2"></i>Ingresar a Lista Negra</h2>
+  <a href="{% url 'trabajador_detail' trabajador.rut %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+</div>
+<div class="card border-danger border-2 shadow-sm">
+  <div class="card-header bg-danger text-white">
+    <strong>{{ trabajador.nombre_completo }}</strong> &mdash; <code>{{ trabajador.rut }}</code>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <strong>Acción irreversible sin justificación:</strong> El trabajador quedará vetado y sus contratos vigentes serán rescindidos. Se requiere justificación mínima de 20 caracteres.
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">{{ form.motivo.label }}</label>
+        {{ form.motivo }}
+        {% if form.motivo.errors %}<div class="text-danger small mt-1">{{ form.motivo.errors }}</div>{% endif %}
+        <div id="charCount" class="form-text"></div>
+      </div>
+      <div class="d-flex gap-2 justify-content-end">
+        <a href="{% url 'trabajador_detail' trabajador.rut %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-danger" id="submitBtn" disabled>
+          <i class="bi bi-slash-circle me-1"></i>Confirmar Ingreso a Lista Negra
+        </button>
+      </div>
+    </form>
+
+    {% if contratos_vigentes %}
+    <div class="alert alert-warning mt-3">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <strong>Atención:</strong> Al confirmar, los contratos vigentes de este trabajador serán rescindidos automáticamente.
+      Recuerde generar y cargar los finiquitos correspondientes para poder cerrar las obras asignadas.
+      <ul class="mb-0 mt-2">
+        {% for c in contratos_vigentes %}
+        <li>
+          <a href="{% url 'contrato_edit' c.pk %}">Contrato #{{ c.pk }}</a> &mdash; {{ c.obra.nombre }}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const ta = document.querySelector('textarea[name="motivo"]');
+const btn = document.getElementById('submitBtn');
+const cc = document.getElementById('charCount');
+ta.addEventListener('input', () => {
+  const len = ta.value.trim().length;
+  cc.textContent = `${len} caracteres (mínimo 20)`;
+  cc.className = len >= 20 ? 'form-text text-success' : 'form-text text-danger';
+  btn.disabled = len < 20;
+});
+</script>
+{% endblock %}

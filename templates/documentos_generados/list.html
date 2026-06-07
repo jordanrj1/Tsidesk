@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Documentos de Empresa | TsDesk{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-file-earmark-ruled-fill text-primary me-2"></i>Documentos de Empresa</h2>
+  <a href="{% url 'doc_generado_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Nuevo Documento</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por nombre o RUT...">
+      </div>
+      <div class="col-md-3">
+        <select name="tipo" class="form-select">
+          <option value="">Todos los tipos</option>
+          {% for val, label in tipo_choices %}<option value="{{ val }}" {% if tipo == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-search me-1"></i>Filtrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>Tipo</th><th>Trabajador</th><th>Empresa</th><th>Obra</th><th>Creado</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        {% for doc in documentos %}
+        <tr>
+          <td><span class="badge bg-secondary">{{ doc.get_tipo_display }}</span></td>
+          <td>
+            <a href="{% url 'trabajador_detail' doc.trabajador.rut %}">{{ doc.trabajador.nombre_completo }}</a>
+            <div class="small text-muted"><code>{{ doc.trabajador.rut }}</code></div>
+          </td>
+          <td>{{ doc.empresa.nombre }}</td>
+          <td>{{ doc.obra.nombre|default:"-" }}</td>
+          <td class="small text-muted">{{ doc.creado_el|date:"d/m/Y H:i" }}</td>
+          <td>
+            <a href="{% url 'doc_generado_preview' doc.pk %}" class="btn btn-sm btn-success" title="Ver / Imprimir"><i class="bi bi-printer"></i></a>
+            <a href="{% url 'doc_generado_edit' doc.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{% url 'doc_generado_delete' doc.pk %}" class="d-inline" onsubmit="return confirm('¿Eliminar este documento?')">
+              {% csrf_token %}<button class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-file-earmark-x fs-2 d-block mb-2"></i>No hay documentos generados aún.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted small">{{ documentos|length }} documento(s)</div>
+</div>
+{% endblock %}

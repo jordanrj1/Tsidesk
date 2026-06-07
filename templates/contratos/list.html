@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Contratos | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-file-earmark-text-fill text-primary me-2"></i>Control de Contratos</h2>
+  <a href="{% url 'contrato_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-1"></i>Nuevo Contrato</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nombre o RUT...">
+      </div>
+      <div class="col-md-2">
+        <select name="obra_id" class="form-select">
+          <option value="">Todas las obras</option>
+          {% for o in obras %}<option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="estado" class="form-select">
+          <option value="">Todos los estados</option>
+          <option value="Vigente" {% if estado == 'Vigente' %}selected{% endif %}>Vigente</option>
+          <option value="Pendiente de Firma" {% if estado == 'Pendiente de Firma' %}selected{% endif %}>Pendiente de Firma</option>
+          <option value="Finalizado" {% if estado == 'Finalizado' %}selected{% endif %}>Finalizado</option>
+          <option value="Rescindido" {% if estado == 'Rescindido' %}selected{% endif %}>Rescindido</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="especialidad_id" class="form-select">
+          <option value="">Todas las especialidades</option>
+          {% for e in especialidades %}<option value="{{ e.pk }}" {% if especialidad_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-1">
+        <button type="submit" class="btn btn-outline-primary flex-grow-1"><i class="bi bi-search"></i></button>
+        <a href="?multiples=1" class="btn btn-outline-warning" title="Multi-obra"><i class="bi bi-diagram-2"></i></a>
+      </div>
+    </form>
+    <div class="mt-2 d-flex gap-2 flex-wrap">
+      {% if multiples %}<span class="badge bg-warning text-dark"><i class="bi bi-filter me-1"></i>Filtro activo: trabajadores con múltiples contratos</span>{% endif %}
+      <a href="?vence_pronto=1" class="btn btn-sm {% if vence_pronto %}btn-warning{% else %}btn-outline-warning{% endif %}">
+        <i class="bi bi-lightning-fill me-1"></i>Por vencer
+      </a>
+      <a href="?sin_finiquito=1" class="btn btn-sm {% if sin_finiquito %}btn-danger{% else %}btn-outline-danger{% endif %}">
+        <i class="bi bi-file-earmark-x me-1"></i>Sin finiquito
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th><th>Trabajador</th><th>RUT</th><th>Obra</th>
+          <th>Especialidad</th><th>Sueldo</th><th>Vigencia</th><th>Estado</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in contratos %}
+        <tr {% if vence_pronto %}class="table-warning"{% endif %}>
+          <td><code>{{ c.pk }}</code></td>
+          <td><a href="{% url 'trabajador_detail' c.trabajador.rut %}">{{ c.trabajador.nombre_completo }}</a></td>
+          <td><code>{{ c.trabajador.rut }}</code></td>
+          <td>{{ c.obra.nombre }}</td>
+          <td>{{ c.especialidad.nombre }}</td>
+          <td>${{ c.sueldo_base|floatformat:0 }}</td>
+          <td class="small">
+            {{ c.fecha_inicio|date:"d/m/Y" }}<br>
+            <span class="text-muted">{{ c.fecha_termino_estimada|date:"d/m/Y"|default:"Indefinido" }}</span>
+            {% if c.dias_para_vencer != None and c.dias_para_vencer <= 10 and c.estado == 'Vigente' %}
+              <span class="badge bg-danger d-block mt-1">{{ c.dias_para_vencer }}d</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if c.estado == 'Vigente' %}bg-success
+              {% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark
+              {% elif c.estado == 'Finalizado' %}bg-secondary
+              {% else %}bg-danger{% endif %}">
+              {{ c.estado }}
+            </span>
+          </td>
+          <td>
+            <a href="{% url 'trabajador_detail' c.trabajador.rut %}?tab=documentos" class="btn btn-sm btn-outline-secondary" title="Ver documentos"><i class="bi bi-folder2"></i></a>
+            <a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
+            <a href="{% url 'contrato_pdf' c.pk %}" class="btn btn-sm btn-outline-dark" title="Ver PDF" target="_blank"><i class="bi bi-file-pdf"></i></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-center py-5 text-muted">
+          <i class="bi bi-search fs-2 d-block mb-2"></i>No se encontraron contratos.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted small">{{ contratos|length }} registro(s)</div>
+</div>
+{% endblock %}

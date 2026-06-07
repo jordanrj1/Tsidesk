@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Registrar Strike | TsDesk{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Registrar Strike</h2>
+  <a href="{% url 'trabajador_detail' trabajador.rut %}?tab=strikes" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-warning text-dark">
+    <strong>{{ trabajador.nombre_completo }}</strong> &mdash; <code>{{ trabajador.rut }}</code>
+    &mdash; Strikes actuales: <strong>{{ trabajador.strikes_activos }}</strong>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Categoría</label>
+          {{ form.categoria }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Fecha del Incidente</label>
+          {{ form.fecha_incidente }}
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Descripción del Incidente</label>
+          {{ form.descripcion }}
+        </div>
+      </div>
+      <hr>
+      <div class="d-flex gap-2 justify-content-end">
+        <a href="{% url 'trabajador_detail' trabajador.rut %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-warning"><i class="bi bi-save me-1"></i>Registrar Strike</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Obras y Proyectos | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-building text-primary me-2"></i>Obras y Proyectos</h2>
+  <a href="{% url 'obra_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-1"></i>Nueva Obra</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por nombre o constructora...">
+      </div>
+      <div class="col-md-3">
+        <select name="estado" class="form-select">
+          <option value="">Todos los estados</option>
+          <option value="Activa" {% if estado == 'Activa' %}selected{% endif %}>Activa</option>
+          <option value="Pausada" {% if estado == 'Pausada' %}selected{% endif %}>Pausada</option>
+          <option value="Cerrada" {% if estado == 'Cerrada' %}selected{% endif %}>Cerrada</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-1">
+        <button type="submit" class="btn btn-outline-primary flex-grow-1"><i class="bi bi-search me-1"></i>Buscar</button>
+        <a href="?proximas_cierre=1" class="btn {% if proximas_cierre %}btn-warning{% else %}btn-outline-warning{% endif %}" title="Obras próximas a cierre"><i class="bi bi-calendar-x"></i></a>
+      </div>
+    </form>
+    {% if proximas_cierre %}<div class="mt-2"><span class="badge bg-warning text-dark"><i class="bi bi-filter me-1"></i>Filtro activo: obras próximas a cierre (30 días)</span></div>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for obra in obras %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm h-100" data-contratos-vigentes="{{ obra.contratos_vigentes_count }}">
+      <div class="card-header d-flex justify-content-between align-items-center
+          {% if obra.estado == 'Activa' %}bg-success text-white
+          {% elif obra.estado == 'Pausada' %}bg-warning text-dark
+          {% else %}bg-secondary text-white{% endif %}">
+        <strong>{{ obra.nombre }}</strong>
+        <div class="d-flex gap-1 align-items-center">
+          <span class="badge bg-white text-dark">{{ obra.estado }}</span>
+          {% if proximas_cierre %}<span class="badge bg-danger">Prox. Cierre</span>{% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="small mb-2">
+          <i class="bi bi-building me-1 text-muted"></i>{{ obra.constructora_mandante }}
+        </div>
+        <div class="small mb-2">
+          <i class="bi bi-calendar me-1 text-muted"></i>
+          {{ obra.fecha_inicio|date:"d/m/Y" }} &mdash; {{ obra.fecha_termino_estimada|date:"d/m/Y" }}
+        </div>
+        {% if obra.monto_proyecto %}
+        <div class="small mb-2">
+          <i class="bi bi-currency-dollar me-1 text-muted"></i>${{ obra.monto_proyecto|floatformat:0 }}
+        </div>
+        {% endif %}
+
+        <!-- Barra de progreso temporal -->
+        {% with hoy=obra.fecha_inicio %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small text-muted mb-1">
+            <span>Progreso temporal</span>
+            <span>{{ obra.contratos_vigentes_count }} contrato(s) activo(s)</span>
+          </div>
+          <div class="progress" style="height:6px">
+            <div class="progress-bar bg-{% if obra.estado == 'Activa' %}success{% elif obra.estado == 'Pausada' %}warning{% else %}secondary{% endif %}"
+                 style="width:{% widthratio obra.contratos_vigentes_count 20 100 %}%"></div>
+          </div>
+        </div>
+        {% endwith %}
+      </div>
+      <div class="card-footer bg-white border-0 d-flex gap-2">
+        <a href="{% url 'obra_detail' obra.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+          <i class="bi bi-eye me-1"></i>Ver Obra
+        </a>
+        <a href="{% url 'obra_edit' obra.pk %}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pencil"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12 text-center py-5 text-muted">
+    <i class="bi bi-building fs-1 d-block mb-2"></i>No se encontraron obras.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

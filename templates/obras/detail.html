@@ -1,0 +1,395 @@
+{% extends 'base.html' %}
+{% block title %}{{ obra.nombre }} | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <nav aria-label="breadcrumb"><ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{% url 'obras_list' %}">Obras</a></li>
+    <li class="breadcrumb-item active">{{ obra.nombre }}</li>
+  </ol></nav>
+  <div class="d-flex gap-2">
+    <a href="{% url 'obra_edit' obra.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
+    <a href="{% url 'obra_download_zip' obra.pk %}" class="btn btn-sm btn-dark"><i class="bi bi-file-zip me-1"></i>Descargar Todo ZIP</a>
+    {% if obra.estado != 'Cerrada' %}
+    <button class="btn btn-sm btn-danger" id="btnCerrarObra" data-obra-id="{{ obra.pk }}">
+      <i class="bi bi-lock-fill me-1"></i>Cerrar Obra
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Header obra -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h3 class="fw-bold mb-1">{{ obra.nombre }}</h3>
+        <p class="text-muted mb-1"><i class="bi bi-building me-1"></i>{{ obra.constructora_mandante }}</p>
+        <div class="d-flex gap-3 flex-wrap small text-muted">
+          <span><i class="bi bi-calendar-range me-1"></i>{{ obra.fecha_inicio|date:"d/m/Y" }} &rarr; {{ obra.fecha_termino_estimada|date:"d/m/Y" }}</span>
+          {% if obra.monto_proyecto %}<span><i class="bi bi-currency-dollar me-1"></i>${{ obra.monto_proyecto|floatformat:0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="col-md-4 text-end">
+        <span class="badge fs-6
+          {% if obra.estado == 'Activa' %}bg-success
+          {% elif obra.estado == 'Pausada' %}bg-warning text-dark
+          {% else %}bg-secondary{% endif %}">
+          <i class="bi bi-circle-fill me-1"></i>{{ obra.estado }}
+        </span>
+        <div class="mt-2">
+          <span class="badge bg-primary">{{ obra.contratos_vigentes_count }} contratos vigentes</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pestañas -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <ul class="nav nav-tabs card-header-tabs">
+      <li class="nav-item"><a class="nav-link {% if tab == 'resumen' %}active{% endif %}" href="?tab=resumen"><i class="bi bi-info-circle me-1"></i>Resumen</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'dotacion' %}active{% endif %}" href="?tab=dotacion"><i class="bi bi-people me-1"></i>Dotación</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'documentos' %}active{% endif %}" href="?tab=documentos"><i class="bi bi-folder2 me-1"></i>Documentos</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'bodega' %}active{% endif %}" href="?tab=bodega"><i class="bi bi-boxes me-1"></i>Inventario</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'cierres' %}active{% endif %}" href="?tab=cierres"><i class="bi bi-calendar-check me-1"></i>Cierres</a></li>
+    </ul>
+  </div>
+
+  <div class="card-body">
+
+    {% if tab == 'resumen' %}
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="card bg-primary text-white text-center"><div class="card-body py-3">
+          <div class="fs-2 fw-bold">{{ obra.contratos_vigentes_count }}</div>
+          <small>Contratos Vigentes</small>
+        </div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-success text-white text-center"><div class="card-body py-3">
+          <div class="fs-2 fw-bold">{{ documentos|length }}</div>
+          <small>Documentos de Obra</small>
+        </div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-warning text-dark text-center"><div class="card-body py-3">
+          <div class="fs-2 fw-bold">{{ bodega|length }}</div>
+          <small>Artículos en Bodega</small>
+        </div></div>
+      </div>
+    </div>
+    {% if obra.observaciones %}
+    <div class="mt-3">
+      <h6 class="text-muted text-uppercase small">Observaciones</h6>
+      <p>{{ obra.observaciones }}</p>
+    </div>
+    {% endif %}
+
+    {% elif tab == 'dotacion' %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0">Dotación de Obra <span class="badge bg-primary ms-1">{{ contratos|length }}</span></h6>
+      <div class="d-flex gap-2">
+        <a href="{% url 'obra_traslado_masivo' obra.pk %}" class="btn btn-sm btn-warning">
+          <i class="bi bi-arrow-right-circle-fill me-1"></i>Trasladar Personal
+        </a>
+        <a href="{% url 'contrato_create' %}?obra_id={{ obra.pk }}" class="btn btn-sm btn-success"><i class="bi bi-person-plus me-1"></i>Agregar Trabajador</a>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr><th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Sueldo Base</th><th>Inicio</th><th>Término</th><th>Estado</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for c in contratos %}
+          {% with otras=c.trabajador.contratos_vigentes %}
+          <tr {% if c.trabajador.en_lista_negra %}class="table-danger"{% endif %}>
+            <td>
+              <a href="{% url 'trabajador_detail' c.trabajador.rut %}">{{ c.trabajador.nombre_completo }}</a>
+              {% if c.trabajador.en_lista_negra %}<span class="badge bg-danger ms-1">Lista Negra</span>{% endif %}
+              {% if otras.count > 1 %}
+              <span class="badge bg-warning text-dark ms-1" title="Participa en múltiples obras">
+                <i class="bi bi-diagram-2-fill"></i> {{ otras.count }} obras
+              </span>
+              {% endif %}
+            </td>
+            <td><code>{{ c.trabajador.rut }}</code></td>
+            <td>{{ c.especialidad.nombre }}</td>
+            <td>${{ c.sueldo_base|floatformat:0 }}</td>
+            <td>{{ c.fecha_inicio|date:"d/m/Y" }}</td>
+            <td>{{ c.fecha_termino_estimada|date:"d/m/Y"|default:"Indef." }}</td>
+            <td><span class="badge {% if c.estado == 'Vigente' %}bg-success{% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ c.estado }}</span></td>
+            <td><a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a></td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-4">Sin personal asignado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% elif tab == 'documentos' %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0">Documentos de Trabajadores Activos</h6>
+      <a href="{% url 'obra_download_zip' obra.pk %}" class="btn btn-sm btn-dark"><i class="bi bi-file-zip me-1"></i>Descargar Todo ZIP</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th><input type="checkbox" id="checkAll" class="form-check-input"></th>
+            <th>Trabajador</th>
+            <th>Tipo Documento</th>
+            <th>Contrato</th>
+            <th>Fecha Carga</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in docs_trabajadores %}
+          <tr>
+            <td><input type="checkbox" class="form-check-input doc-check" value="{{ doc.pk }}"></td>
+            <td>
+              {% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}
+              {% elif doc.trabajador_rut %}<a href="{% url 'trabajador_detail' doc.trabajador_rut %}">{{ doc.trabajador_rut }}</a>
+              {% else %}&mdash;{% endif %}
+            </td>
+            <td><span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span></td>
+            <td>{% if doc.contrato %}#{{ doc.contrato.pk }}{% else %}&mdash;{% endif %}</td>
+            <td class="small text-muted">{{ doc.fecha_carga|date:"d/m/Y H:i" }}</td>
+            <td>
+              <a href="{{ doc.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1"><i class="bi bi-eye"></i></a>
+              <a href="{% url 'documento_download' doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-download"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-4">Sin documentos cargados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% elif tab == 'bodega' %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0">Inventario de Bodega</h6>
+      <a href="{% url 'bodega_index' %}?obra_id={{ obra.pk }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-boxes me-1"></i>Ir a Gestión de Bodega</a>
+    </div>
+    <div class="row g-3">
+      {% for item in bodega %}
+      <div class="col-md-4 col-sm-6">
+        <div class="card border-0 {% if item.bajo_stock %}border-danger border-2 bg-danger bg-opacity-10{% else %}shadow-sm{% endif %} h-100">
+          <div class="card-body text-center py-3">
+            <div class="fs-1 fw-bold {% if item.bajo_stock %}text-danger{% else %}text-primary{% endif %}">
+              {{ item.stock_actual }}
+            </div>
+            <div class="fw-semibold small">{{ item.material.nombre }}</div>
+            <div class="text-muted small">Mínimo: {{ item.material.stock_minimo }}</div>
+            {% if item.bajo_stock %}<span class="badge bg-danger mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Stock crítico</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-12 text-center text-muted py-4">Sin artículos en bodega.</div>
+      {% endfor %}
+    </div>
+
+    {% elif tab == 'cierres' %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0">Cierres Mensuales de Planilla</h6>
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalCierre">
+        <i class="bi bi-calendar-plus me-1"></i>Ejecutar Cierre Mensual
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead class="table-light">
+          <tr><th>Período</th><th>Fecha Cierre</th><th>Usuario</th></tr>
+        </thead>
+        <tbody>
+          {% for c in cierres %}
+          <tr>
+            <td><strong>{{ c.mes }}/{{ c.anio }}</strong></td>
+            <td>{{ c.fecha_cierre|date:"d/m/Y H:i" }}</td>
+            <td>{{ c.usuario_cierre }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted py-4">Sin cierres registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Modal Cierre Mensual -->
+<div class="modal fade" id="modalCierre" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Ejecutar Cierre Mensual</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'obra_cierre_mensual' obra.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row g-3 mb-3">
+            <div class="col-4">
+              <label class="form-label">Mes</label>
+              <select name="mes" id="cierreMes" class="form-select">
+                <option value="1">Enero</option><option value="2">Febrero</option>
+                <option value="3">Marzo</option><option value="4">Abril</option>
+                <option value="5">Mayo</option><option value="6">Junio</option>
+                <option value="7">Julio</option><option value="8">Agosto</option>
+                <option value="9">Septiembre</option><option value="10">Octubre</option>
+                <option value="11">Noviembre</option><option value="12">Diciembre</option>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label">Año</label>
+              <input type="number" name="anio" class="form-control" value="2026" min="2020" max="2035">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Archivo Consolidado <small class="text-muted">(opcional)</small></label>
+              <input type="file" name="archivo_consolidado" class="form-control" accept=".pdf,.xlsx,.xls">
+            </div>
+          </div>
+
+          <!-- Preview dotación -->
+          <div id="dotacionPreview">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0 fw-bold">Dotación activa al momento del cierre</h6>
+              <span id="dotacionTotal" class="badge bg-primary"></span>
+            </div>
+            <div class="table-responsive" style="max-height:260px;overflow-y:auto">
+              <table class="table table-sm table-bordered mb-0">
+                <thead class="table-dark sticky-top">
+                  <tr><th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Multiobra</th></tr>
+                </thead>
+                <tbody id="dotacionBody">
+                  <tr><td colspan="4" class="text-center text-muted py-3">
+                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>Cargando dotación...
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Confirmar Cierre</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Cierre de Obra -->
+<div class="modal fade" id="modalCierreObra" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-lock-fill me-2"></i>Diagnóstico de Cierre de Obra</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="diagnosticoBody">
+        <div class="text-center py-3"><div class="spinner-border text-danger"></div><p class="mt-2 text-muted">Verificando integridad...</p></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" action="{% url 'obra_cerrar' obra.pk %}" id="formCierreObra">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" id="btnConfirmarCierre" disabled>
+            <i class="bi bi-lock-fill me-1"></i>Confirmar Cierre Definitivo
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Check all docs
+const checkAll = document.getElementById('checkAll');
+if (checkAll) {
+  checkAll.addEventListener('change', () => {
+    document.querySelectorAll('.doc-check').forEach(cb => cb.checked = checkAll.checked);
+  });
+}
+
+// Cargar dotación al abrir modal de cierre mensual
+const modalCierre = document.getElementById('modalCierre');
+if (modalCierre) {
+  modalCierre.addEventListener('show.bs.modal', cargarDotacion);
+}
+
+function cargarDotacion() {
+  fetch('{% url "obra_cierre_dotacion_ajax" obra.pk %}')
+    .then(r => r.json())
+    .then(data => {
+      const body = document.getElementById('dotacionBody');
+      const total = document.getElementById('dotacionTotal');
+      total.textContent = `${data.total} trabajador(es)`;
+      if (data.dotacion.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sin dotación activa.</td></tr>';
+        return;
+      }
+      body.innerHTML = data.dotacion.map(d => {
+        const multiobra = d.otras_obras.length > 0
+          ? `<span class="badge bg-warning text-dark"><i class="bi bi-diagram-2-fill"></i> ${d.otras_obras.join(', ')}</span>`
+          : '<span class="text-muted small">—</span>';
+        return `<tr>
+          <td>${d.nombre}</td>
+          <td><code>${d.rut}</code></td>
+          <td>${d.especialidad}</td>
+          <td>${multiobra}</td>
+        </tr>`;
+      }).join('');
+    })
+    .catch(() => {
+      document.getElementById('dotacionBody').innerHTML =
+        '<tr><td colspan="4" class="text-center text-muted">No se pudo cargar la dotación.</td></tr>';
+    });
+}
+
+// Cierre de obra
+const btnCerrar = document.getElementById('btnCerrarObra');
+if (btnCerrar) {
+  btnCerrar.addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('modalCierreObra'));
+    modal.show();
+    fetch('{% url "obra_cierre_check" obra.pk %}')
+      .then(r => r.json())
+      .then(data => {
+        const body = document.getElementById('diagnosticoBody');
+        const btn = document.getElementById('btnConfirmarCierre');
+        let html = '<ul class="list-group">';
+        if (data.contratos_vigentes === 0) {
+          html += '<li class="list-group-item list-group-item-success"><i class="bi bi-check-circle me-2"></i>Contratos operativos: <strong>Todos cerrados</strong></li>';
+        } else {
+          html += `<li class="list-group-item list-group-item-danger"><i class="bi bi-x-circle me-2"></i>ERROR: Existen <strong>${data.contratos_vigentes} contrato(s) vigente(s)</strong></li>`;
+        }
+        if (data.sin_finiquito === 0) {
+          html += '<li class="list-group-item list-group-item-success"><i class="bi bi-check-circle me-2"></i>Finiquitos: <strong>Todos cargados</strong></li>';
+        } else {
+          html += `<li class="list-group-item list-group-item-danger"><i class="bi bi-x-circle me-2"></i>ALERTA: Faltan <strong>${data.sin_finiquito} finiquito(s)</strong> en el sistema</li>`;
+        }
+        html += '</ul>';
+        if (!data.puede_cerrar) {
+          html += '<div class="alert alert-danger mt-3 mb-0"><i class="bi bi-lock me-2"></i>Resuelva los pendientes antes de cerrar la obra.</div>';
+        } else {
+          html += '<div class="alert alert-success mt-3 mb-0"><i class="bi bi-check-circle me-2"></i>La obra cumple con todos los requisitos para ser cerrada.</div>';
+        }
+        body.innerHTML = html;
+        btn.disabled = !data.puede_cerrar;
+      });
+  });
+}
+</script>
+{% endblock %}

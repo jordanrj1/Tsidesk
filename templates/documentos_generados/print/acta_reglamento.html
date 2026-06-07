@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Acta Reglamento — {{ doc.trabajador.nombre_completo }}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
+  .page { width:210mm; min-height:297mm; margin:0 auto; padding:18mm 20mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  h1.titulo { font-size:12px; font-weight:bold; text-align:center; margin-bottom:14px; border:1px solid #000; padding:6px; }
+  .empresa-data div { margin-bottom:2px; }
+  .label { font-weight:bold; display:inline-block; width:160px; }
+  .valor { border-bottom:1px solid #000; min-width:150px; display:inline-block; padding:0 3px; }
+  table.reg { width:100%; border-collapse:collapse; margin-top:20px; }
+  table.reg th { background:#333; color:#fff; padding:5px 8px; text-align:left; }
+  table.reg td { border:1px solid #999; padding:8px; }
+  .firma-section { display:flex; justify-content:space-between; margin-top:50px; }
+  .firma-box { text-align:center; width:45%; }
+  .firma-linea { border-top:1px solid #000; margin-top:50px; padding-top:4px; }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <strong>Acta Reglamento — {{ doc.trabajador.nombre_completo }}</strong>
+  <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
+  <a href="{% url 'doc_generado_edit' doc.pk %}" style="color:#adc8ff">Editar</a>
+  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
+  <a href="{% url 'doc_generado_list' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
+</div>
+
+<div class="page" style="margin-top:45px">
+  <h1 class="titulo">ACTA DE ENTREGA DEL REGLAMENTO INTERNO DE HIGIENE Y SEGURIDAD</h1>
+
+  <div class="empresa-data" style="margin-bottom:12px">
+    <div><span class="label">RAZON SOCIAL</span> {{ doc.empresa.nombre }}</div>
+    <div><span class="label">R.U.T.</span> {{ doc.empresa.rut_empresa }}</div>
+    <div><span class="label">GIRO</span> {{ doc.empresa.giro }}</div>
+    <div><span class="label">DOMICILIO</span> {{ doc.empresa.direccion }}</div>
+    <div><span class="label">CIUDAD</span> {{ doc.empresa.ciudad }}</div>
+  </div>
+
+  <div>
+    <div><span class="label">FECHA</span> <span class="valor">{{ d.fecha_documento|date:"d/m/Y"|default:"" }}</span></div>
+    <div style="margin-top:6px"><span class="label">NOMBRE DEL TRABAJADOR</span> <span class="valor">{{ doc.trabajador.nombre_completo }}</span></div>
+    <div style="margin-top:4px"><span class="label">R.U.N.:</span> <span class="valor">{{ doc.trabajador.rut }}</span></div>
+  </div>
+
+  <table class="reg">
+    <thead>
+      <tr>
+        <th>TIPO DE MATERIA</th>
+        <th>FECHA DE ENTREGA</th>
+        <th>FIRMA DE RECEPCION</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>REGLAMENTO INTERNO</td>
+        <td>{{ d.fecha_entrega|date:"d/m/Y"|default:"" }}</td>
+        <td style="height:50px"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="firma-section">
+    <div class="firma-box"><div class="firma-linea"><b>Firma del Empleador</b></div></div>
+    <div class="firma-box"><div class="firma-linea">Firma del Trabajador</div></div>
+  </div>
+</div>
+</body>
+</html>

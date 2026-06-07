@@ -1,0 +1,366 @@
+{% extends 'base.html' %}
+{% block title %}Centro de Alertas | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-speedometer2 text-primary me-2"></i>Centro de Alertas</h2>
+    <small class="text-muted">{{ hoy|date:"l, d \d\e F \d\e Y" }}</small>
+  </div>
+</div>
+
+<!-- Botones rápidos -->
+<div class="row g-2 mb-4">
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'trabajador_create' %}" class="btn btn-success w-100"><i class="bi bi-person-plus-fill me-1"></i>Nuevo Trabajador</a>
+  </div>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'contrato_create' %}" class="btn btn-primary w-100"><i class="bi bi-file-earmark-plus me-1"></i>Nuevo Contrato</a>
+  </div>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'obra_create' %}" class="btn btn-info text-white w-100"><i class="bi bi-building me-1"></i>Nueva Obra</a>
+  </div>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'trabajadores_list' %}" class="btn btn-outline-primary w-100"><i class="bi bi-search me-1"></i>Buscar Trabajador</a>
+  </div>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'obras_list' %}" class="btn btn-outline-secondary w-100"><i class="bi bi-building me-1"></i>Buscar Obra</a>
+  </div>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'documentos_pendientes' %}" class="btn btn-outline-danger w-100"><i class="bi bi-folder-x me-1"></i>Docs Pendientes</a>
+  </div>
+  <div class="col-6 col-sm-4 col-md-3 col-lg-auto">
+    <a href="{% url 'reportes_consolidados' %}" class="btn btn-outline-dark w-100"><i class="bi bi-bar-chart me-1"></i>Reportes</a>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-lg-2">
+    <a href="{% url 'trabajadores_list' %}?estado=activo" class="text-decoration-none">
+    <div class="card border-0 shadow-sm h-100 bg-primary text-white">
+      <div class="card-body d-flex align-items-center gap-2 p-3">
+        <i class="bi bi-person-badge-fill fs-2 opacity-75"></i>
+        <div>
+          <div class="fs-3 fw-bold">{{ total_trabajadores }}</div>
+          <small style="font-size:0.72rem">Trabajadores Activos</small>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <a href="{% url 'obras_list' %}?estado=Activa" class="text-decoration-none">
+    <div class="card border-0 shadow-sm h-100 bg-success text-white">
+      <div class="card-body d-flex align-items-center gap-2 p-3">
+        <i class="bi bi-building fs-2 opacity-75"></i>
+        <div>
+          <div class="fs-3 fw-bold">{{ obras_activas_count }}</div>
+          <small style="font-size:0.72rem">Obras en Ejecución</small>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <a href="{% url 'contratos_list' %}?vence_pronto=1" class="text-decoration-none">
+    <div class="card border-0 shadow-sm h-100 {% if contratos_por_vencer_count > 0 %}bg-warning{% else %}bg-secondary{% endif %} text-white">
+      <div class="card-body d-flex align-items-center gap-2 p-3">
+        <i class="bi bi-file-earmark-x-fill fs-2 opacity-75"></i>
+        <div>
+          <div class="fs-3 fw-bold">{{ contratos_por_vencer_count }}</div>
+          <small style="font-size:0.72rem">Contratos por Vencer</small>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <a href="{% url 'contratos_list' %}?estado=Pendiente+de+Firma" class="text-decoration-none">
+    <div class="card border-0 shadow-sm h-100 {% if contratos_pendientes_firma_count > 0 %}bg-warning{% else %}bg-secondary{% endif %} text-white">
+      <div class="card-body d-flex align-items-center gap-2 p-3">
+        <i class="bi bi-pen-fill fs-2 opacity-75"></i>
+        <div>
+          <div class="fs-3 fw-bold">{{ contratos_pendientes_firma_count }}</div>
+          <small style="font-size:0.72rem">Pendientes de Firma</small>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <a href="{% url 'contratos_list' %}?sin_finiquito=1" class="text-decoration-none">
+    <div class="card border-0 shadow-sm h-100 {% if finiquitos_pendientes_count > 0 %}bg-danger{% else %}bg-secondary{% endif %} text-white">
+      <div class="card-body d-flex align-items-center gap-2 p-3">
+        <i class="bi bi-file-earmark-break-fill fs-2 opacity-75"></i>
+        <div>
+          <div class="fs-3 fw-bold">{{ finiquitos_pendientes_count }}</div>
+          <small style="font-size:0.72rem">Finiquitos Pendientes</small>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <a href="{% url 'obras_list' %}?proximas_cierre=1" class="text-decoration-none">
+    <div class="card border-0 shadow-sm h-100 {% if obras_proximas_cierre_count > 0 %}bg-warning{% else %}bg-secondary{% endif %} text-white">
+      <div class="card-body d-flex align-items-center gap-2 p-3">
+        <i class="bi bi-calendar-x-fill fs-2 opacity-75"></i>
+        <div>
+          <div class="fs-3 fw-bold">{{ obras_proximas_cierre_count }}</div>
+          <small style="font-size:0.72rem">Obras Próx. a Cierre</small>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+</div>
+
+<!-- Mensaje resumen operativo -->
+<div class="alert alert-info border-0 shadow-sm mb-4">
+  <strong><i class="bi bi-info-circle-fill me-2"></i>RESUMEN OPERATIVO DIARIO:</strong>
+  El sistema ha procesado las reglas de negocio y ha detectado incidencias administrativas que requieren atención.
+  Resuelva con prioridad las alertas en <strong>rojo</strong> para evitar contingencias legales o quiebres de stock.
+</div>
+
+<div class="row g-4">
+  <!-- Columna principal de alertas -->
+  <div class="col-lg-8">
+
+    <!-- Contratos por vencer -->
+    {% if alertas_contratos %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-warning text-dark d-flex align-items-center gap-2">
+        <i class="bi bi-clock-fill"></i>
+        <strong>Contratos por Vencer (próximos 10 días)</strong>
+        <span class="badge bg-dark ms-auto">{{ alertas_contratos|length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 table-sm">
+          <thead class="table-light">
+            <tr><th>Trabajador</th><th>Obra</th><th>Vence</th><th>Días</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for c in alertas_contratos %}
+            <tr class="table-warning">
+              <td><a href="{% url 'trabajador_detail' c.trabajador.rut %}">{{ c.trabajador.nombre_completo }}</a></td>
+              <td>{{ c.obra.nombre }}</td>
+              <td>{{ c.fecha_termino_estimada|date:"d/m/Y" }}</td>
+              <td><span class="badge bg-danger">{{ c.dias_para_vencer }} días</span></td>
+              <td><a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-warning"><i class="bi bi-lightning-fill"></i> Resolver</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Documentación incompleta / vencida -->
+    {% if alertas_documentos %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-danger text-white d-flex align-items-center gap-2">
+        <i class="bi bi-folder-x"></i>
+        <strong>Documentación Incompleta o Vencida</strong>
+        <span class="badge bg-dark ms-auto">{{ alertas_documentos|length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 table-sm">
+          <thead class="table-light">
+            <tr><th>Trabajador</th><th>Obra</th><th>Documento</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for a in alertas_documentos %}
+            <tr class="{% if a.estado_doc == 'vencido' %}table-danger{% else %}table-warning{% endif %}">
+              <td>{{ a.trabajador.nombre_completo }}</td>
+              <td>{{ a.obra.nombre }}</td>
+              <td><span class="badge bg-secondary">{{ a.tipo_documento.nombre }}</span></td>
+              <td>
+                {% if a.estado_doc == 'vencido' %}
+                  <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>VENCIDO</span>
+                  {% if a.doc.fecha_vencimiento %}
+                    <small class="text-muted d-block">Venció: {{ a.doc.fecha_vencimiento|date:"d/m/Y" }}</small>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>PENDIENTE</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'trabajador_detail' a.trabajador.rut %}?tab=documentos" class="btn btn-sm btn-danger">
+                  <i class="bi bi-lightning-fill"></i> Resolver
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Stock crítico -->
+    {% if alertas_stock %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-warning text-dark d-flex align-items-center gap-2">
+        <i class="bi bi-boxes"></i>
+        <strong>Stock Crítico en Bodega</strong>
+        <span class="badge bg-dark ms-auto">{{ alertas_stock|length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 table-sm">
+          <thead class="table-light">
+            <tr><th>Obra</th><th>Material</th><th>Stock</th><th>Mínimo</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for b in alertas_stock %}
+            <tr class="table-warning">
+              <td>{{ b.obra.nombre }}</td>
+              <td>{{ b.material.nombre }}</td>
+              <td><span class="badge bg-danger">{{ b.stock_actual }}</span></td>
+              <td>{{ b.material.stock_minimo }}</td>
+              <td><a href="{% url 'bodega_index' %}?obra_id={{ b.obra_id }}" class="btn btn-sm btn-warning"><i class="bi bi-lightning-fill"></i> Resolver</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Traslados con finiquito pendiente -->
+    {% if traslados_pendientes_finiquito %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-warning text-dark d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-right-circle-fill"></i>
+        <strong>Traslados con Finiquito Pendiente</strong>
+        <span class="badge bg-dark ms-auto">{{ traslados_pendientes_finiquito|length }}</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for t in traslados_pendientes_finiquito %}
+        <div class="list-group-item list-group-item-warning">
+          <div class="d-flex justify-content-between">
+            <div>
+              <strong>{{ t.trabajador.nombre_completo }}</strong>
+              <div class="small text-muted">
+                <i class="bi bi-building me-1"></i>{{ t.obra_origen.nombre }}
+                {% if t.obra_destino %} &rarr; {{ t.obra_destino.nombre }}{% endif %}
+              </div>
+            </div>
+            <div class="d-flex gap-1 align-items-start">
+              <a href="{% url 'trabajador_detail' t.trabajador.rut %}" class="btn btn-sm btn-outline-dark">Ver ficha</a>
+              <a href="{% url 'trabajador_upload_doc' t.trabajador.rut %}?contrato_id={{ t.contrato_origen_id }}" class="btn btn-sm btn-warning">Cargar Finiquito</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Riesgo disciplinario -->
+    {% if alertas_disciplina %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-danger text-white d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>Riesgo Disciplinario Máximo (3+ Strikes)</strong>
+        <span class="badge bg-dark ms-auto">{{ alertas_disciplina|length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 table-sm">
+          <thead class="table-light">
+            <tr><th>Trabajador</th><th>Strikes</th><th>Obras</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for a in alertas_disciplina %}
+            <tr class="table-danger">
+              <td>{{ a.trabajador.nombre_completo }}</td>
+              <td><span class="badge bg-danger fs-6">{{ a.strikes_count }}</span></td>
+              <td>{% for c in a.contratos %}<span class="badge bg-secondary me-1">{{ c.obra.nombre }}</span>{% endfor %}</td>
+              <td><a href="{% url 'trabajador_detail' a.trabajador.rut %}?tab=strikes" class="btn btn-sm btn-danger"><i class="bi bi-lightning-fill"></i> Resolver</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not alertas_contratos and not alertas_documentos and not alertas_stock and not alertas_disciplina and not traslados_pendientes_finiquito %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center py-5 text-success">
+        <i class="bi bi-check-circle-fill fs-1 mb-3 d-block"></i>
+        <h5>Sin alertas críticas</h5>
+        <p class="text-muted mb-0">Todas las operaciones están al día.</p>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Panel lateral: Próximos vencimientos + Docs semana -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-dark text-white">
+        <i class="bi bi-calendar-event-fill me-2"></i>
+        <strong>Próximos Vencimientos (15 días)</strong>
+      </div>
+      <div class="card-body p-0">
+        {% if proximos_vencimientos %}
+        <ul class="list-group list-group-flush">
+          {% for c in proximos_vencimientos %}
+          <li class="list-group-item list-group-item-action d-flex justify-content-between align-items-start py-2
+              {% if c.dias_para_vencer <= 5 %}list-group-item-danger{% else %}list-group-item-warning{% endif %}">
+            <div>
+              <div class="fw-semibold small">{{ c.trabajador.nombre_completo }}</div>
+              <small class="text-muted">{{ c.obra.nombre }}</small>
+            </div>
+            <div class="text-end">
+              <span class="badge {% if c.dias_para_vencer <= 5 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                {{ c.dias_para_vencer }}d
+              </span>
+              <div class="small text-muted">{{ c.fecha_termino_estimada|date:"d/m" }}</div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-3 text-center text-muted">
+          <i class="bi bi-calendar-check me-1"></i> Sin vencimientos próximos
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Documentos que Vencen Esta Semana -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-danger text-white">
+        <i class="bi bi-file-earmark-x-fill me-2"></i>
+        <strong>Documentos que Vencen Esta Semana</strong>
+      </div>
+      <div class="card-body p-0">
+        {% if docs_vencen_semana %}
+        <ul class="list-group list-group-flush">
+          {% for doc in docs_vencen_semana %}
+          <li class="list-group-item list-group-item-action d-flex justify-content-between align-items-start py-2 list-group-item-warning">
+            <div>
+              <div class="fw-semibold small">{{ doc.tipo_documento.nombre }}</div>
+              <small class="text-muted">
+                {% if doc.trabajador_rut %}RUT: {{ doc.trabajador_rut }}{% elif doc.contrato %}Contrato #{{ doc.contrato_id }}{% endif %}
+              </small>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-warning text-dark">{{ doc.fecha_vencimiento|date:"d/m" }}</span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-3 text-center text-muted">
+          <i class="bi bi-check-circle me-1"></i> Sin documentos por vencer esta semana
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

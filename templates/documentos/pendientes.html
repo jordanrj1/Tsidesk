@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Documentos Pendientes | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Documentos Pendientes</h2>
+  <div class="d-flex gap-2">
+    <span class="badge bg-danger fs-6 align-self-center">{{ total }} pendiente(s)</span>
+    <a href="{% url 'documentos_exportar_excel' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+       class="btn btn-success btn-sm">
+      <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+    </a>
+    <button class="btn btn-dark btn-sm" id="btnBatchDownload" disabled>
+      <i class="bi bi-download me-1"></i>Descargar Selección
+    </button>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <select name="obra_id" class="form-select">
+          <option value="">Todas las obras</option>
+          {% for o in obras %}<option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <select name="especialidad_id" class="form-select">
+          <option value="">Todas las especialidades</option>
+          {% for e in especialidades %}<option value="{{ e.pk }}" {% if especialidad_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-search me-1"></i>Filtrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<form id="batchForm" method="post" action="{% url 'documentos_batch_download' %}">
+  {% csrf_token %}
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th><input type="checkbox" id="checkAll" class="form-check-input" title="Seleccionar todos"></th>
+            <th>Trabajador</th><th>RUT</th><th>Obra</th><th>Especialidad</th><th>Documento</th><th>Estado</th><th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pendientes %}
+          <tr class="{% if p.estado_doc == 'vencido' %}table-danger{% else %}table-warning{% endif %}">
+            <td>
+              {% if p.doc %}
+                <input type="checkbox" name="doc_ids" value="{{ p.doc.pk }}" class="form-check-input doc-check">
+              {% endif %}
+            </td>
+            <td><a href="{% url 'trabajador_detail' p.trabajador.rut %}">{{ p.trabajador.nombre_completo }}</a></td>
+            <td><code>{{ p.trabajador.rut }}</code></td>
+            <td>{{ p.obra.nombre }}</td>
+            <td>{{ p.especialidad.nombre }}</td>
+            <td><span class="badge bg-secondary">{{ p.tipo_documento.nombre }}</span></td>
+            <td>
+              {% if p.estado_doc == 'vencido' %}
+                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>VENCIDO</span>
+                {% if p.doc and p.doc.fecha_vencimiento %}
+                  <small class="text-muted d-block">{{ p.doc.fecha_vencimiento|date:"d/m/Y" }}</small>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>PENDIENTE</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'trabajador_upload_doc' p.trabajador.rut %}?nivel=Trabajador" class="btn btn-sm btn-danger">
+                <i class="bi bi-upload me-1"></i>{% if p.estado_doc == 'vencido' %}Renovar{% else %}Subir{% endif %}
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center py-5 text-success">
+            <i class="bi bi-check-circle-fill fs-1 d-block mb-2"></i>
+            <strong>¡Sin pendientes!</strong> Toda la documentación obligatoria está al día.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const checkAll = document.getElementById('checkAll');
+const btnBatch = document.getElementById('btnBatchDownload');
+
+function actualizarBoton() {
+  const checked = document.querySelectorAll('.doc-check:checked').length;
+  btnBatch.disabled = checked === 0;
+  btnBatch.textContent = checked > 0
+    ? `Descargar Selección (${checked})`
+    : 'Descargar Selección';
+  // re-add icon
+  btnBatch.innerHTML = `<i class="bi bi-download me-1"></i>` + (checked > 0 ? `Descargar Selección (${checked})` : 'Descargar Selección');
+}
+
+if (checkAll) {
+  checkAll.addEventListener('change', () => {
+    document.querySelectorAll('.doc-check').forEach(cb => cb.checked = checkAll.checked);
+    actualizarBoton();
+  });
+}
+
+document.querySelectorAll('.doc-check').forEach(cb => {
+  cb.addEventListener('change', actualizarBoton);
+});
+
+btnBatch.addEventListener('click', () => {
+  document.getElementById('batchForm').submit();
+});
+</script>
+{% endblock %}

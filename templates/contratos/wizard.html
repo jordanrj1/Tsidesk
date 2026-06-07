@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Contrato Generado | TsDesk{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+  <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+  <h3 class="fw-bold">¡Contrato #{{ contrato.pk }} Generado!</h3>
+  <p class="text-muted">Seleccione la siguiente acción para completar el flujo de contratación.</p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-primary text-white">
+        <i class="bi bi-person-badge me-2"></i>
+        <strong>{{ contrato.trabajador.nombre_completo }}</strong> &mdash; {{ contrato.obra.nombre }}
+      </div>
+      <div class="card-body">
+        <div class="row g-2 text-center">
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <small class="text-muted d-block">Especialidad</small>
+              <strong>{{ contrato.especialidad.nombre }}</strong>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <small class="text-muted d-block">Sueldo Base</small>
+              <strong>${{ contrato.sueldo_base|floatformat:0 }}</strong>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <small class="text-muted d-block">Estado</small>
+              <span class="badge bg-warning text-dark">{{ contrato.estado }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header"><strong><i class="bi bi-signpost-split me-2"></i>¿Cuál es el siguiente paso?</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+
+          <div class="col-md-6">
+            <a href="{% url 'contrato_pdf' contrato.pk %}" target="_blank"
+               class="card text-decoration-none text-dark border-primary h-100 wizard-card">
+              <div class="card-body text-center py-4">
+                <i class="bi bi-printer-fill text-primary fs-2 d-block mb-2"></i>
+                <strong>Descargar PDF para Firma</strong>
+                <p class="text-muted small mb-0 mt-1">Genera el contrato imprimible listo para obtener la firma física.</p>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6">
+            <a href="#" class="card text-decoration-none text-dark border-success h-100 wizard-card"
+               data-bs-toggle="modal" data-bs-target="#modalSubirFirmado">
+              <div class="card-body text-center py-4">
+                <i class="bi bi-cloud-arrow-up-fill text-success fs-2 d-block mb-2"></i>
+                <strong>Subir Contrato Firmado</strong>
+                <p class="text-muted small mb-0 mt-1">Cargue el PDF firmado y cambie el estado a Vigente de inmediato.</p>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6">
+            <a href="{% url 'trabajador_detail' contrato.trabajador.rut %}"
+               class="card text-decoration-none text-dark border-secondary h-100 wizard-card">
+              <div class="card-body text-center py-4">
+                <i class="bi bi-person-circle text-secondary fs-2 d-block mb-2"></i>
+                <strong>Ir a Ficha del Trabajador</strong>
+                <p class="text-muted small mb-0 mt-1">Acceda al perfil completo del trabajador.</p>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6">
+            <a href="{% url 'contratos_list' %}"
+               class="card text-decoration-none text-dark border-warning h-100 wizard-card">
+              <div class="card-body text-center py-4">
+                <i class="bi bi-list-ul text-warning fs-2 d-block mb-2"></i>
+                <strong>Volver a la Lista</strong>
+                <p class="text-muted small mb-0 mt-1">Continuar gestionando otros contratos.</p>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-12">
+            <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ contrato.trabajador.rut }}&contrato_id={{ contrato.pk }}&obra_id={{ contrato.obra.pk }}"
+               class="card text-decoration-none text-white bg-primary border-primary h-100 wizard-card">
+              <div class="card-body text-center py-4">
+                <i class="bi bi-file-earmark-text-fill fs-2 d-block mb-2"></i>
+                <strong class="fs-5">Generar Contrato de Trabajo</strong>
+                <p class="small mb-0 mt-1 opacity-75">Crea el documento formal con los datos del trabajador y la obra, listo para imprimir y firmar.</p>
+                <div class="mt-2">
+                  <span class="badge bg-light text-dark me-1">Contrato</span>
+                  <span class="badge bg-light text-dark me-1">Anexo</span>
+                  <span class="badge bg-light text-dark me-1">Acta EPP</span>
+                  <span class="badge bg-light text-dark">Finiquito</span>
+                </div>
+              </div>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal subir firmado -->
+<div class="modal fade" id="modalSubirFirmado" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Subir Contrato Firmado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="drop-zone border-2 border-dashed rounded p-4 text-center mb-3" id="dropZone">
+          <i class="bi bi-cloud-arrow-up fs-1 text-muted d-block mb-2"></i>
+          <p class="text-muted mb-2">Arrastre el archivo firmado aquí o haga clic para seleccionar</p>
+          <input type="file" id="archivoFirmado" accept=".pdf,.jpg,.jpeg,.png" class="form-control">
+        </div>
+        <div id="uploadFeedback"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="btnSubirFirmado">
+          <i class="bi bi-upload me-1"></i>Subir y Activar Contrato
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('btnSubirFirmado').addEventListener('click', async function() {
+  const fileInput = document.getElementById('archivoFirmado');
+  if (!fileInput.files.length) {
+    alert('Seleccione un archivo primero.');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('archivo', fileInput.files[0]);
+  formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+  const fb = document.getElementById('uploadFeedback');
+  fb.innerHTML = '<div class="alert alert-info">Subiendo...</div>';
+  const r = await fetch('{% url "contrato_upload_firmado" contrato.pk %}', {method:'POST', body: formData});
+  const d = await r.json();
+  if (d.ok) {
+    fb.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Contrato activado correctamente.</div>';
+    setTimeout(() => window.location.href = '{% url "contratos_list" %}', 1500);
+  } else {
+    fb.innerHTML = `<div class="alert alert-danger">${d.error}</div>`;
+  }
+});
+</script>
+{% endblock %}

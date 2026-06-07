@@ -1,0 +1,432 @@
+{% extends 'base.html' %}
+{% block title %}{{ trabajador.nombre_completo }} | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'trabajadores_list' %}">Trabajadores</a></li>
+      <li class="breadcrumb-item active">{{ trabajador.nombre_completo }}</li>
+    </ol>
+  </nav>
+</div>
+
+{% if alertas_cruzadas %}
+<div class="alert alert-danger border-0 shadow-sm mb-3">
+  <i class="bi bi-exclamation-octagon-fill me-2"></i>
+  <strong>Alerta de Traslado Incompleto:</strong>
+  <ul class="mb-0 mt-1">
+    {% for a in alertas_cruzadas %}
+    <li>{{ a.mensaje }} — <a href="{% url 'obra_detail' a.obra.pk %}?tab=dotacion" class="alert-link">Ver obra</a></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- BLOQUE IZQUIERDO -->
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        {% if trabajador.foto %}
+          <img src="{{ trabajador.foto.url }}" class="rounded-circle mb-3 border border-3 border-primary" width="100" height="100" style="object-fit:cover">
+        {% else %}
+          <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white mx-auto mb-3" style="width:100px;height:100px;font-size:2rem">
+            {{ trabajador.nombres|first }}{{ trabajador.apellidos|first }}
+          </div>
+        {% endif %}
+
+        <h5 class="fw-bold mb-1">{{ trabajador.nombre_completo }}</h5>
+        <code class="text-muted d-block mb-2">{{ trabajador.rut }}</code>
+
+        {% if trabajador.en_lista_negra %}
+          <div class="alert alert-danger py-2 mb-2">
+            <i class="bi bi-slash-circle-fill me-1"></i><strong>EN LISTA NEGRA</strong>
+          </div>
+        {% else %}
+          <span class="badge bg-success mb-2"><i class="bi bi-check-circle me-1"></i>Trabajador Activo</span>
+        {% endif %}
+
+        {% if trabajador.strikes_activos > 0 %}
+          <div class="mb-2">
+            <span class="badge {% if trabajador.strikes_activos >= 3 %}bg-danger{% else %}bg-warning text-dark{% endif %} fs-6">
+              <i class="bi bi-exclamation-triangle me-1"></i>{{ trabajador.strikes_activos }} Strike(s)
+            </span>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card-body border-top pt-3">
+        <ul class="list-unstyled mb-0 small">
+          {% if trabajador.telefono %}
+          <li class="mb-2"><i class="bi bi-telephone text-primary me-2"></i>{{ trabajador.telefono }}</li>
+          {% endif %}
+          {% if trabajador.correo %}
+          <li class="mb-2"><i class="bi bi-envelope text-primary me-2"></i>{{ trabajador.correo }}</li>
+          {% endif %}
+          {% if trabajador.direccion %}
+          <li class="mb-2"><i class="bi bi-geo-alt text-primary me-2"></i>{{ trabajador.direccion }}</li>
+          {% endif %}
+          {% if trabajador.fecha_nacimiento %}
+          <li class="mb-2"><i class="bi bi-calendar text-primary me-2"></i>{{ trabajador.fecha_nacimiento|date:"d/m/Y" }}</li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <div class="card-body border-top pt-3 d-grid gap-2">
+        <a href="{% url 'trabajador_edit' trabajador.rut %}" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-pencil-fill me-1"></i>Editar Ficha
+        </a>
+        <a href="{% url 'contrato_create' %}?trabajador_rut={{ trabajador.rut }}" class="btn btn-success btn-sm">
+          <i class="bi bi-file-earmark-plus-fill me-1"></i>Nuevo Contrato
+        </a>
+        <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ trabajador.rut }}" class="btn btn-outline-info btn-sm">
+          <i class="bi bi-file-earmark-ruled-fill me-1"></i>Generar Documento
+        </a>
+        <a href="{% url 'trabajador_upload_doc' trabajador.rut %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-upload me-1"></i>Subir Documento
+        </a>
+        <a href="{% url 'trabajador_upload_doc_masivo' trabajador.rut %}" class="btn btn-outline-info btn-sm">
+          <i class="bi bi-files me-1"></i>Carga Masiva
+        </a>
+        <a href="{% url 'trabajador_add_strike' trabajador.rut %}" class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-exclamation-triangle me-1"></i>Registrar Strike
+        </a>
+        {% if trabajador.en_lista_negra %}
+          <a href="{% url 'trabajador_lista_negra_salida' trabajador.rut %}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-check-circle me-1"></i>Quitar de Lista Negra
+          </a>
+        {% else %}
+          <a href="{% url 'trabajador_lista_negra_ingreso' trabajador.rut %}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-slash-circle me-1"></i>Ingresar a Lista Negra
+          </a>
+        {% endif %}
+        <a href="{% url 'trabajador_download_zip' trabajador.rut %}" class="btn btn-dark btn-sm">
+          <i class="bi bi-file-zip-fill me-1"></i>Descargar Carpeta ZIP
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLOQUE DERECHO: PESTAÑAS -->
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom-0">
+        <ul class="nav nav-tabs card-header-tabs" id="workerTabs">
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'contratos' %}active{% endif %}" href="?tab=contratos">
+              <i class="bi bi-file-earmark-text me-1"></i>Contratos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'documentos' %}active{% endif %}" href="?tab=documentos">
+              <i class="bi bi-folder2-open me-1"></i>Carpeta Digital
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'strikes' %}active{% endif %}" href="?tab=strikes">
+              <i class="bi bi-exclamation-triangle me-1"></i>Strikes
+              {% if trabajador.strikes_activos > 0 %}<span class="badge bg-danger ms-1">{{ trabajador.strikes_activos }}</span>{% endif %}
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'lista_negra' %}active{% endif %}" href="?tab=lista_negra">
+              <i class="bi bi-slash-circle me-1"></i>Lista Negra
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'traslados' %}active{% endif %}" href="?tab=traslados">
+              <i class="bi bi-arrow-right-circle me-1"></i>Traslados
+              {% if alertas_cruzadas %}<span class="badge bg-danger ms-1">{{ alertas_cruzadas|length }}</span>{% endif %}
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card-body">
+
+        <!-- TAB: Contratos -->
+        {% if tab == 'contratos' %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr><th>#</th><th>Obra</th><th>Especialidad</th><th>Sueldo</th><th>Inicio</th><th>Término</th><th>Estado</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for c in contratos %}
+              <tr>
+                <td><code>{{ c.pk }}</code></td>
+                <td><a href="{% url 'obra_detail' c.obra.pk %}">{{ c.obra.nombre }}</a></td>
+                <td>{{ c.especialidad.nombre }}</td>
+                <td>${{ c.sueldo_base|floatformat:0 }}</td>
+                <td>{{ c.fecha_inicio|date:"d/m/Y" }}</td>
+                <td>
+                  {{ c.fecha_termino_estimada|date:"d/m/Y"|default:"Indefinido" }}
+                  {% if c.dias_para_vencer != None and c.dias_para_vencer <= 10 %}
+                    <span class="badge bg-danger ms-1">{{ c.dias_para_vencer }}d</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge
+                    {% if c.estado == 'Vigente' %}bg-success
+                    {% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark
+                    {% elif c.estado == 'Finalizado' %}bg-secondary
+                    {% else %}bg-danger{% endif %}">
+                    {{ c.estado }}
+                  </span>
+                </td>
+                <td>
+                  <a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="8" class="text-center text-muted py-4">Sin contratos registrados.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TAB: Carpeta Digital -->
+        {% elif tab == 'documentos' %}
+
+        {% if tiene_alerta_docs %}
+        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+          <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+          <div>
+            <strong>Atención:</strong> Este trabajador tiene documentos <strong>pendientes o vencidos</strong>.
+            Si se va a generar un nuevo contrato, actualice la documentación primero.
+          </div>
+        </div>
+        {% endif %}
+
+        <h6 class="fw-bold text-uppercase text-muted mb-3 small">Documentos Personales Estáticos</h6>
+        <div class="row g-2 mb-4">
+          {% for item in checklist_trabajador %}
+          <div class="col-sm-6 col-md-4">
+            <div class="card h-100 border border-2
+              {% if item.estado == 'ok' %}border-success
+              {% elif item.estado == 'vencido' %}border-danger
+              {% elif item.estado == 'proximo' %}border-warning
+              {% else %}border-danger{% endif %}">
+              <div class="card-body p-2 text-center">
+                <i class="bi bi-file-earmark-text fs-2
+                  {% if item.estado == 'ok' %}text-success
+                  {% elif item.estado == 'vencido' %}text-danger
+                  {% elif item.estado == 'proximo' %}text-warning
+                  {% else %}text-danger{% endif %} d-block mb-1"></i>
+
+                <div class="small fw-semibold">{{ item.tipo.nombre }}</div>
+                {% if item.tipo.dias_validez %}<div class="text-muted" style="font-size:0.7rem">Validez: {{ item.tipo.dias_validez }} días</div>{% endif %}
+
+                {% if item.estado == 'ok' %}
+                  <span class="badge bg-success">Vigente</span>
+                  {% if item.doc.fecha_vencimiento %}
+                    <div class="text-muted mt-1" style="font-size:0.7rem">Vence: {{ item.doc.fecha_vencimiento|date:"d/m/Y" }}</div>
+                  {% endif %}
+                {% elif item.estado == 'vencido' %}
+                  <span class="badge bg-danger">VENCIDO</span>
+                  {% if item.doc.fecha_vencimiento %}
+                    <div class="text-danger mt-1" style="font-size:0.7rem">Venció: {{ item.doc.fecha_vencimiento|date:"d/m/Y" }}</div>
+                  {% endif %}
+                {% elif item.estado == 'proximo' %}
+                  <span class="badge bg-warning text-dark">Vence pronto</span>
+                  {% if item.doc.fecha_vencimiento %}
+                    <div class="text-warning mt-1" style="font-size:0.7rem">Vence: {{ item.doc.fecha_vencimiento|date:"d/m/Y" }} ({{ item.doc.dias_para_vencer }}d)</div>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-danger">PENDIENTE</span>
+                {% endif %}
+
+                <div class="mt-1 d-flex gap-1 justify-content-center flex-wrap">
+                  {% if item.doc %}
+                    <button type="button" onclick="previewDoc('{{ item.doc.archivo.url }}','{{ item.tipo.nombre }}','{{ item.doc.extension }}')" class="btn btn-sm btn-outline-primary py-0 px-1"><i class="bi bi-eye"></i></button>
+                    <a href="{% url 'documento_download' item.doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-download"></i></a>
+                  {% endif %}
+                  <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?nivel=Trabajador"
+                     class="btn btn-sm py-0 px-1 {% if item.estado == 'ok' %}btn-outline-warning{% else %}btn-danger{% endif %}">
+                    <i class="bi bi-{% if item.doc %}arrow-repeat{% else %}upload{% endif %}"></i>
+                    {% if not item.doc %}Subir{% endif %}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-12 text-muted text-center">No hay tipos de documentos configurados.</div>
+          {% endfor %}
+        </div>
+
+        <h6 class="fw-bold text-uppercase text-muted mb-3 small">Documentos Contractuales por Obra</h6>
+        {% for item in contratos_con_docs %}
+        <div class="mb-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-dark">Contrato #{{ item.contrato.pk }}</span>
+            <span class="text-muted">{{ item.contrato.obra.nombre }} &mdash; {{ item.contrato.especialidad.nombre }}</span>
+            <span class="badge
+              {% if item.contrato.estado == 'Vigente' %}bg-success
+              {% elif item.contrato.estado == 'Pendiente de Firma' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %} ms-1">{{ item.contrato.estado }}</span>
+            <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?nivel=Contrato&contrato_id={{ item.contrato.pk }}" class="btn btn-sm btn-outline-primary ms-auto"><i class="bi bi-upload me-1"></i>Subir</a>
+          </div>
+          <div class="row g-2">
+            {% for ci in item.checklist %}
+            <div class="col-sm-6 col-md-4">
+              <div class="card h-100 border border-2
+                {% if ci.estado == 'ok' %}border-success
+                {% elif ci.estado == 'vencido' %}border-danger
+                {% else %}border-danger{% endif %}">
+                <div class="card-body p-2 text-center">
+                  <i class="bi bi-file-earmark-{% if ci.doc %}check-fill text-success{% else %}x text-danger{% endif %} fs-4 d-block mb-1"></i>
+                  <div class="small">{{ ci.tipo.nombre }}</div>
+                  {% if ci.doc %}
+                    <small class="text-muted">{{ ci.doc.fecha_carga|date:"d/m/Y" }}</small>
+                    {% if ci.estado == 'vencido' %}<span class="badge bg-danger d-block mt-1">VENCIDO</span>{% endif %}
+                    <div class="mt-1">
+                      <button type="button" onclick="previewDoc('{{ ci.doc.archivo.url }}','{{ ci.tipo.nombre }}','{{ ci.doc.extension }}')" class="btn btn-sm btn-outline-success py-0 px-1"><i class="bi bi-eye"></i></button>
+                      <a href="{% url 'documento_download' ci.doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-download"></i></a>
+                    </div>
+                  {% else %}
+                    <span class="badge bg-danger">PENDIENTE</span>
+                    <div class="mt-1">
+                      <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?nivel=Contrato&contrato_id={{ item.contrato.pk }}"
+                         class="btn btn-sm btn-danger py-0 px-1"><i class="bi bi-upload"></i></a>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% empty %}
+            <div class="col-12 text-muted small">Sin tipos de documentos de contrato configurados.</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">Sin contratos registrados.</p>
+        {% endfor %}
+
+        <!-- TAB: Strikes -->
+        {% elif tab == 'strikes' %}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">Historial Conductual</h6>
+          <a href="{% url 'trabajador_add_strike' trabajador.rut %}" class="btn btn-sm btn-warning"><i class="bi bi-plus-circle me-1"></i>Registrar Strike</a>
+        </div>
+        {% if strikes %}
+        <div class="timeline">
+          {% for s in strikes %}
+          <div class="d-flex gap-3 mb-3">
+            <div class="flex-shrink-0">
+              <span class="badge {% if s.activo %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill p-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+              </span>
+            </div>
+            <div class="card flex-grow-1 {% if s.activo %}border-danger{% else %}border-secondary{% endif %} border-start border-3 {% if not s.activo %}opacity-50{% endif %}">
+              <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <span class="badge {% if s.activo %}bg-danger{% else %}bg-secondary{% endif %}">{{ s.categoria }}</span>
+                    {% if not s.activo %}<span class="badge bg-secondary ms-1">ANULADO</span>{% endif %}
+                  </div>
+                  <div class="d-flex gap-1 align-items-center">
+                    <small class="text-muted me-2">{{ s.fecha_incidente|date:"d/m/Y" }}</small>
+                    <a href="{% url 'trabajador_edit_strike' trabajador.rut s.pk %}" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1" title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="post" action="{% url 'trabajador_toggle_strike' trabajador.rut s.pk %}" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-xs btn-sm {% if s.activo %}btn-outline-danger{% else %}btn-outline-success{% endif %} py-0 px-1"
+                              title="{% if s.activo %}Anular strike{% else %}Reactivar strike{% endif %}"
+                              onclick="return confirm('{% if s.activo %}¿Anular este strike?{% else %}¿Reactivar este strike?{% endif %}')">
+                        <i class="bi bi-{% if s.activo %}x-circle{% else %}arrow-counterclockwise{% endif %}"></i>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+                <p class="mb-0 mt-1 small">{{ s.descripcion }}</p>
+                <small class="text-muted">Registrado por: {{ s.usuario_registro }}</small>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>Sin incidentes registrados.
+        </div>
+        {% endif %}
+
+        <!-- TAB: Lista Negra -->
+        {% elif tab == 'lista_negra' %}
+        {% if historial_negra %}
+        {% for h in historial_negra %}
+        <div class="card mb-3 border-{% if h.accion == 'INGRESO' %}danger{% else %}success{% endif %}">
+          <div class="card-header bg-{% if h.accion == 'INGRESO' %}danger{% else %}success{% endif %} text-white d-flex justify-content-between">
+            <span><i class="bi bi-{% if h.accion == 'INGRESO' %}slash-circle{% else %}check-circle{% endif %}-fill me-2"></i>{{ h.get_accion_display }}</span>
+            <small>{{ h.fecha_registro|date:"d/m/Y H:i" }}</small>
+          </div>
+          <div class="card-body">
+            <p class="mb-1">{{ h.motivo }}</p>
+            <small class="text-muted"><i class="bi bi-person me-1"></i>{{ h.usuario_registro }}</small>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-shield-check text-success fs-1 d-block mb-2"></i>Sin historial de lista negra.
+        </div>
+        {% endif %}
+
+        <!-- TAB: Traslados -->
+        {% elif tab == 'traslados' %}
+        {% if traslados %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr><th>Fecha</th><th>Obra Origen</th><th>Obra Destino</th><th>Tipo</th><th>Finiquito</th><th>Registrado por</th></tr>
+            </thead>
+            <tbody>
+              {% for t in traslados %}
+              <tr {% if t.finiquito_pendiente %}class="table-warning"{% endif %}>
+                <td>{{ t.fecha_traslado|date:"d/m/Y" }}</td>
+                <td><a href="{% url 'obra_detail' t.obra_origen.pk %}">{{ t.obra_origen.nombre }}</a></td>
+                <td>
+                  {% if t.obra_destino %}
+                    <a href="{% url 'obra_detail' t.obra_destino.pk %}">{{ t.obra_destino.nombre }}</a>
+                  {% else %}
+                    <span class="text-muted">Sin asignación</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge {% if t.tipo_traslado == 'SIN_FINIQUITO' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    {{ t.get_tipo_traslado_display }}
+                  </span>
+                </td>
+                <td>
+                  {% if t.tipo_traslado == 'CON_FINIQUITO' %}
+                    {% if t.finiquito_pendiente %}
+                      <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Pendiente</span>
+                      <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?contrato_id={{ t.contrato_origen_id }}" class="btn btn-sm btn-danger ms-1 py-0 px-1"><i class="bi bi-upload"></i></a>
+                    {% else %}
+                      <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Cargado</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-muted small">N/A</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">{{ t.usuario_registro }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-arrow-right-circle text-secondary fs-1 d-block mb-2"></i>Sin historial de traslados.
+        </div>
+        {% endif %}
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
