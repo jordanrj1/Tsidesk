@@ -210,7 +210,7 @@ class ContratoForm(forms.ModelForm):
             'obra': forms.Select(attrs={'class': 'form-select'}),
             'especialidad': forms.Select(attrs={'class': 'form-select'}),
             'tipo_contrato': forms.Select(attrs={'class': 'form-select'}),
-            'sueldo_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'sueldo_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -254,7 +254,7 @@ class ContratoEditForm(forms.ModelForm):
         fields = ['tipo_contrato', 'sueldo_base', 'fecha_termino_estimada', 'fecha_termino_real', 'estado']
         widgets = {
             'tipo_contrato': forms.Select(attrs={'class': 'form-select'}),
-            'sueldo_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'sueldo_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
             'estado': forms.Select(attrs={'class': 'form-select'}),
         }
 
@@ -275,10 +275,7 @@ class DocumentoForm(forms.ModelForm):
         fields = ['tipo_documento', 'archivo', 'fecha_vencimiento']
         widgets = {
             'tipo_documento': forms.Select(attrs={'class': 'form-select'}),
-            'archivo': forms.FileInput(attrs={
-                'class': 'form-control',
-                'accept': '.pdf,.jpg,.jpeg,.png'
-            }),
+            'archivo': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, nivel=None, **kwargs):
@@ -669,6 +666,63 @@ class ContratoTrabajoForm(forms.Form):
     termino_lj        = forms.ChoiceField(label='Salida Lunes–Jueves', choices=_T, initial='18:00 HRS', widget=forms.Select(attrs=_SEL))
     termino_v         = forms.ChoiceField(label='Salida Viernes', choices=_T, initial='17:00 HRS', widget=forms.Select(attrs=_SEL))
     observaciones     = forms.CharField(label='Observaciones / Cláusulas adicionales', required=False, widget=forms.Textarea(attrs={**_INP, 'rows': '2'}))
+
+
+class ContratoTrabajoCreateForm(ContratoTrabajoForm):
+    """Extends ContratoTrabajoForm with Section A fields that create the Contrato record."""
+    obra_contrato = forms.ModelChoiceField(
+        queryset=None,
+        label='Obra',
+        widget=forms.Select(attrs=_SEL),
+    )
+    especialidad_contrato = forms.ModelChoiceField(
+        queryset=None,
+        label='Especialidad / Labor',
+        widget=forms.Select(attrs=_SEL),
+    )
+    tipo_contrato = forms.ChoiceField(
+        choices=[
+            ('', '--- Seleccionar tipo ---'),
+            ('Plazo Fijo', 'Plazo Fijo'),
+            ('Por Obra o Faena', 'Por Obra o Faena'),
+            ('Indefinido', 'Indefinido'),
+        ],
+        label='Tipo de Contrato',
+        widget=forms.Select(attrs=_SEL),
+    )
+    sueldo_base = forms.DecimalField(
+        label='Sueldo Base',
+        max_digits=12,
+        decimal_places=2,
+        localize=False,
+        widget=forms.NumberInput(attrs={**_NUM, 'step': '1', 'min': '0'}),
+    )
+
+    def clean_sueldo_base(self):
+        val = self.cleaned_data.get('sueldo_base')
+        if val is not None:
+            import decimal
+            return val.quantize(decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP)
+        return val
+    fecha_inicio_contrato = forms.DateField(
+        label='Fecha de Inicio',
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
+        widget=forms.TextInput(attrs={**_INP, 'placeholder': 'dd/mm/aaaa'}),
+    )
+    fecha_termino_contrato = forms.DateField(
+        label='Fecha de Término Estimada',
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
+        required=False,
+        widget=forms.TextInput(attrs={**_INP, 'placeholder': 'dd/mm/aaaa (opcional)'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import Obra, Especialidad
+        self.fields['obra_contrato'].queryset = Obra.objects.filter(
+            activo=True, estado__in=['Activa', 'Pausada']
+        )
+        self.fields['especialidad_contrato'].queryset = Especialidad.objects.filter(activo=True)
 
 
 class AnexoContratoForm(forms.Form):

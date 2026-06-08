@@ -26,6 +26,7 @@ urlpatterns = [
     path('trabajadores/<str:rut>/lista-negra/salida/', views.trabajador_lista_negra_salida, name='trabajador_lista_negra_salida'),
     path('trabajadores/<str:rut>/descargar-zip/', views.trabajador_download_zip, name='trabajador_download_zip'),
     path('trabajadores/<str:rut>/alertas-cruzadas/', views.trabajador_alertas_cruzadas_ajax, name='trabajador_alertas_cruzadas_ajax'),
+    path('trabajadores/<str:rut>/eliminar/', views.trabajador_delete, name='trabajador_delete'),
 
     # Obras
     path('obras/', views.obras_list, name='obras_list'),
@@ -36,9 +37,22 @@ urlpatterns = [
     path('obras/<int:pk>/cerrar/', views.obra_cerrar, name='obra_cerrar'),
     path('obras/<int:pk>/descargar-zip/', views.obra_download_zip, name='obra_download_zip'),
     path('obras/<int:pk>/cierre-mensual/', views.obra_cierre_mensual, name='obra_cierre_mensual'),
+    path('obras/<int:pk>/cierre-mensual/<int:cierre_pk>/eliminar/', views.obra_cierre_eliminar, name='obra_cierre_eliminar'),
+    path('obras/<int:pk>/planilla-remuneraciones/', views.obra_planilla_remuneraciones, name='obra_planilla_remuneraciones'),
     path('obras/<int:pk>/traslado/', views.obra_traslado_masivo, name='obra_traslado_masivo'),
     path('obras/<int:pk>/traslado/ejecutar/', views.obra_traslado_ejecutar, name='obra_traslado_ejecutar'),
     path('obras/<int:pk>/dotacion-ajax/', views.obra_cierre_dotacion_ajax, name='obra_cierre_dotacion_ajax'),
+    path('obras/<int:pk>/nomina-ajax/', views.obra_cierre_nomina_ajax, name='obra_cierre_nomina_ajax'),
+    path('obras/<int:pk>/archivar/', views.obra_archivar, name='obra_archivar'),
+    path('obras/<int:pk>/check-trabajador/', views.obra_check_trabajador, name='obra_check_trabajador'),
+    path('obras/<int:pk>/asignar-trabajador/', views.obra_asignar_trabajador, name='obra_asignar_trabajador'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/resolver-duplicado/', views.obra_resolver_duplicado, name='obra_resolver_duplicado'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/quitar/', views.obra_quitar_trabajador, name='obra_quitar_trabajador'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/licencia/', views.obra_licencia_trabajador, name='obra_licencia_trabajador'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/reactivar/', views.obra_reactivar_trabajador, name='obra_reactivar_trabajador'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/confirmar-reactivacion/', views.obra_confirmar_reactivacion, name='obra_confirmar_reactivacion'),
+    path('obras/<int:pk>/subir-documento/', views.obra_upload_doc, name='obra_upload_doc'),
+    path('obras/documento/<int:doc_pk>/eliminar/', views.obra_doc_delete, name='obra_doc_delete'),
 
     # Contratos
     path('contratos/', views.contratos_list, name='contratos_list'),
@@ -55,12 +69,23 @@ urlpatterns = [
     path('documentos/batch-download/', views.documentos_batch_download, name='documentos_batch_download'),
     path('documentos/exportar-excel/', views.documentos_exportar_excel, name='documentos_exportar_excel'),
     path('documentos/<int:pk>/descargar/', views.documento_download, name='documento_download'),
+    path('documentos/<int:pk>/preview/', views.documento_preview_papelera, name='documento_preview_papelera'),
+    path('documentos/<int:pk>/eliminar/', views.documento_delete, name='documento_delete'),
+    path('documentos/subir-rapido/', views.documento_upload_rapido, name='documento_upload_rapido'),
+    path('documentos/papelera/', views.papelera_documentos, name='papelera_documentos'),
+    path('documentos/<int:pk>/restaurar/', views.documento_restore, name='documento_restore'),
+    path('documentos/<int:pk>/eliminar-permanente/', views.documento_hard_delete, name='documento_hard_delete'),
 
     # Bodega
     path('bodega/', views.bodega_index, name='bodega_index'),
+    path('bodega/material/guardar/', views.bodega_material_save, name='bodega_material_save'),
+    path('bodega/material/<int:pk>/eliminar/', views.bodega_material_delete, name='bodega_material_delete'),
+    path('bodega/ingreso-central/', views.bodega_ingreso_central, name='bodega_ingreso_central'),
+    path('bodega/asignar-obra/', views.bodega_asignar_obra, name='bodega_asignar_obra'),
+    path('bodega/registrar-entrega/', views.bodega_registrar_entrega, name='bodega_registrar_entrega'),
+    path('bodega/umbral/<int:bodega_item_id>/', views.bodega_ajuste_umbral, name='bodega_ajuste_umbral'),
     path('bodega/<int:obra_id>/despacho/', views.bodega_despacho, name='bodega_despacho'),
     path('bodega/<int:obra_id>/ingreso/', views.bodega_ingreso_stock, name='bodega_ingreso_stock'),
-    path('bodega/umbral/<int:bodega_item_id>/', views.bodega_ajuste_umbral, name='bodega_ajuste_umbral'),
     path('bodega/<int:obra_id>/capataces/', views.bodega_capataces_ajax, name='bodega_capataces_ajax'),
 
     # Reportes
@@ -75,10 +100,12 @@ urlpatterns = [
     # Documentos Generados
     path('documentos-empresa/', views.doc_generado_list, name='doc_generado_list'),
     path('documentos-empresa/nuevo/', views.doc_generado_create, name='doc_generado_create'),
+    path('documentos-empresa/en-blanco/', views.doc_generado_blank_preview, name='doc_generado_blank_preview'),
     path('documentos-empresa/<int:pk>/editar/', views.doc_generado_edit, name='doc_generado_edit'),
     path('documentos-empresa/<int:pk>/preview/', views.doc_generado_preview, name='doc_generado_preview'),
     path('documentos-empresa/<int:pk>/word/', views.doc_generado_word, name='doc_generado_word'),
     path('documentos-empresa/<int:pk>/eliminar/', views.doc_generado_delete, name='doc_generado_delete'),
+    path('documentos-empresa/<int:pk>/firmar/', views.doc_generado_firmar, name='doc_generado_firmar'),
 
     # Admin Panel
     path('admin-panel/usuarios/', views.admin_usuarios, name='admin_usuarios'),

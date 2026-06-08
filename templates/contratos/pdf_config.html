@@ -52,6 +52,40 @@
       </div>
     </div>
 
+    <!-- Verificación de campos del trabajador -->
+    {% with t=contrato.trabajador %}
+    {% if not t.estado_civil or not t.fecha_nacimiento or not t.prevision or not t.salud or not t.ciudad or not t.direccion or not t.procedencia %}
+    <div class="card border-warning border-0 shadow-sm mt-3">
+      <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#FFFBEB;border-left:4px solid #D97706;">
+        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+        <strong class="text-warning small">Datos incompletos — aparecerán en blanco en el contrato</strong>
+      </div>
+      <div class="card-body py-2 px-3">
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          {% if not t.estado_civil %}<span class="badge bg-warning text-dark">Estado civil</span>{% endif %}
+          {% if not t.fecha_nacimiento %}<span class="badge bg-warning text-dark">Fecha de nacimiento</span>{% endif %}
+          {% if not t.prevision %}<span class="badge bg-warning text-dark">AFP / Previsión</span>{% endif %}
+          {% if not t.salud %}<span class="badge bg-warning text-dark">Salud (FONASA / Isapre)</span>{% endif %}
+          {% if not t.ciudad %}<span class="badge bg-warning text-dark">Ciudad</span>{% endif %}
+          {% if not t.direccion %}<span class="badge bg-warning text-dark">Dirección</span>{% endif %}
+          {% if not t.procedencia %}<span class="badge bg-warning text-dark">Procedencia</span>{% endif %}
+        </div>
+        <a href="{% url 'trabajador_edit' t.rut %}?next={{ request.get_full_path|urlencode }}"
+           class="btn btn-sm btn-warning">
+          <i class="bi bi-pencil me-1"></i>Completar datos del trabajador
+        </a>
+      </div>
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-body py-2 d-flex align-items-center gap-2">
+        <i class="bi bi-check-circle-fill text-success"></i>
+        <span class="small text-success fw-semibold">Datos del trabajador completos</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
     <!-- Resumen del contrato -->
     <div class="card border-0 shadow-sm mt-3">
       <div class="card-body py-2">

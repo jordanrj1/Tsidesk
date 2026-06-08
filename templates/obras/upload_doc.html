@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Subir Documento — {{ obra.nombre }} | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-upload text-primary me-2"></i>Subir Documento de Obra</h2>
+    <small class="text-muted">Obra: <strong>{{ obra.nombre }}</strong></small>
+  </div>
+  <a href="{% url 'obra_detail' obra.pk %}?tab=carpeta" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Volver a Carpeta
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-primary text-white">
+    <i class="bi bi-folder2-open me-2"></i>Carpeta de Obra — Tipos disponibles:
+    {% for t in tipos_obra %}<span class="badge bg-white text-primary ms-1">{{ t.nombre }}</span>{% endfor %}
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      Se aceptan archivos <strong>PDF, JPG, JPEG y PNG</strong>. Si ya existe un documento del mismo tipo, el anterior quedará archivado.
+    </div>
+
+    {% if form.errors %}
+    <div class="alert alert-danger mb-3">
+      <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Corrija los errores:</strong>
+      <ul class="mb-0 mt-1">
+        {% for field, errors in form.errors.items %}
+          {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="uploadForm">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Tipo de Documento <span class="text-danger">*</span></label>
+          {{ form.tipo_documento }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Fecha de Vencimiento <small class="text-muted fw-normal">(opcional)</small></label>
+          {{ form.fecha_vencimiento }}
+          <div class="form-text text-muted">Déjelo en blanco si el documento no vence.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Archivo <span class="text-danger">*</span></label>
+          <div class="drop-zone border-2 border-dashed rounded p-3 text-center" id="dropZone">
+            <i class="bi bi-cloud-arrow-up fs-1 text-muted d-block mb-1"></i>
+            <p class="text-muted small mb-2">Arrastre el archivo aquí o haga clic para seleccionar</p>
+            {{ form.archivo }}
+          </div>
+          <div id="filePreview" class="mt-2 d-none"></div>
+        </div>
+      </div>
+      <hr class="my-3">
+      <div class="d-flex gap-2 justify-content-end">
+        <a href="{% url 'obra_detail' obra.pk %}?tab=carpeta" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Cargar Documento</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.querySelector('input[type=file]');
+const preview = document.getElementById('filePreview');
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-primary'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('border-primary');
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    showPreview(e.dataTransfer.files[0]);
+  }
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) showPreview(fileInput.files[0]); });
+
+function showPreview(file) {
+  preview.classList.remove('d-none');
+  preview.innerHTML = `<div class="alert alert-success py-2"><i class="bi bi-file-check me-2"></i><strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)</div>`;
+}
+</script>
+{% endblock %}

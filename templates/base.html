@@ -23,33 +23,26 @@
         </div>
         <hr class="border-secondary">
 
-        {% if user.is_superuser %}
-        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Administración</p>
-        <ul class="nav flex-column mb-3">
+        <!-- ACCIÓN PRINCIPAL -->
+        <div class="px-2 mb-3">
+          <a href="{% url 'doc_generado_create' %}"
+             class="btn btn-warning w-100 fw-semibold {% if request.resolver_match.url_name == 'doc_generado_create' %}active{% endif %}">
+            <i class="bi bi-file-earmark-plus me-1"></i>Generar Documento
+          </a>
+        </div>
+
+        <!-- PANEL PRINCIPAL -->
+        <ul class="nav flex-column mb-2">
           <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_usuarios' %}active bg-primary rounded{% endif %}" href="{% url 'admin_usuarios' %}">
-              <i class="bi bi-people-fill me-2"></i>Control de Usuarios
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_catalogos' %}active bg-primary rounded{% endif %}" href="{% url 'admin_catalogos' %}">
-              <i class="bi bi-gear-fill me-2"></i>Config. Catálogos
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_auditoria' %}active bg-primary rounded{% endif %}" href="{% url 'admin_auditoria' %}">
-              <i class="bi bi-journal-text me-2"></i>Logs Auditoría
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'dashboard' %}active bg-primary rounded{% endif %}" href="{% url 'dashboard' %}">
+              <i class="bi bi-speedometer2 me-2"></i>Panel Principal
             </a>
           </li>
         </ul>
-        {% else %}
+        <hr class="border-secondary my-2">
+        <!-- OPERACIONES -->
         <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Operaciones</p>
         <ul class="nav flex-column mb-3">
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'dashboard' %}active bg-primary rounded{% endif %}" href="{% url 'dashboard' %}">
-              <i class="bi bi-speedometer2 me-2"></i>Centro de Alertas
-            </a>
-          </li>
           <li class="nav-item">
             <a class="nav-link text-white {% if 'trabajadores' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'trabajadores_list' %}">
               <i class="bi bi-person-badge-fill me-2"></i>Trabajadores
@@ -61,18 +54,18 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link text-white {% if 'contratos' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'contratos_list' %}">
-              <i class="bi bi-file-earmark-text-fill me-2"></i>Contratos
-            </a>
-          </li>
-          <li class="nav-item">
             <a class="nav-link text-white {% if 'bodega' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'bodega_index' %}">
               <i class="bi bi-boxes me-2"></i>Bodega / Materiales
             </a>
           </li>
+        </ul>
+
+        <!-- DOCUMENTOS -->
+        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Documentos</p>
+        <ul class="nav flex-column mb-3">
           <li class="nav-item">
             <a class="nav-link text-white {% if request.resolver_match.url_name == 'documentos_pendientes' %}active bg-primary rounded{% endif %}" href="{% url 'documentos_pendientes' %}">
-              <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Docs. Pendientes
+              <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Pendientes
             </a>
           </li>
           <li class="nav-item">
@@ -81,13 +74,34 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link text-white {% if 'doc_generado' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'doc_generado_list' %}">
-              <i class="bi bi-file-earmark-ruled-fill me-2"></i>Generar Documentos
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'reportes_consolidados' %}active bg-primary rounded{% endif %}" href="{% url 'reportes_consolidados' %}">
+              <i class="bi bi-bar-chart-fill me-2"></i>Reportes
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'reportes_consolidados' %}active bg-primary rounded{% endif %}" href="{% url 'reportes_consolidados' %}">
-              <i class="bi bi-bar-chart-fill me-2"></i>Reportes Ejecutivos
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'papelera_documentos' %}active bg-primary rounded{% endif %}" href="{% url 'papelera_documentos' %}">
+              <i class="bi bi-trash3 me-2 text-secondary"></i>Papelera
+            </a>
+          </li>
+        </ul>
+
+        {% if user.is_superuser %}
+        <!-- ADMIN — solo superusuario -->
+        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Administración</p>
+        <ul class="nav flex-column mb-3">
+          <li class="nav-item">
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_usuarios' %}active bg-primary rounded{% endif %}" href="{% url 'admin_usuarios' %}">
+              <i class="bi bi-people-fill me-2"></i>Usuarios
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_catalogos' %}active bg-primary rounded{% endif %}" href="{% url 'admin_catalogos' %}">
+              <i class="bi bi-gear-fill me-2"></i>Catálogos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_auditoria' %}active bg-primary rounded{% endif %}" href="{% url 'admin_auditoria' %}">
+              <i class="bi bi-journal-text me-2"></i>Auditoría
             </a>
           </li>
         </ul>

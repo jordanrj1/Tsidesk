@@ -45,6 +45,7 @@
           </select>
           {% endif %}
         </div>
+        {% if not tipo == 'contrato_trabajo' or edit_mode %}
         <div class="col-md-4">
           <label class="form-label fw-semibold">Obra (opcional)</label>
           {% if edit_mode %}
@@ -59,11 +60,59 @@
           </select>
           {% endif %}
         </div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  {% if contrato_obj and tipo == 'contrato_trabajo' %}
+  {% if tipo == 'contrato_trabajo' and not edit_mode %}
+  <!-- ── Sección A: Datos del Contrato (nuevo flujo unificado) ── -->
+  <div class="card border-0 shadow-sm mb-3" style="border-left: 4px solid #0d6efd !important;">
+    <div class="card-header bg-primary text-white fw-semibold">
+      <i class="bi bi-file-earmark-text me-2"></i>Datos del Contrato
+      <small class="fw-normal ms-2 opacity-75">Se creará el registro laboral en el sistema</small>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.obra_contrato.label }} <span class="text-danger">*</span></label>
+          {{ form.obra_contrato }}
+          {% if form.obra_contrato.errors %}<div class="text-danger small">{{ form.obra_contrato.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.especialidad_contrato.label }} <span class="text-danger">*</span></label>
+          {{ form.especialidad_contrato }}
+          {% if form.especialidad_contrato.errors %}<div class="text-danger small">{{ form.especialidad_contrato.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.tipo_contrato.label }} <span class="text-danger">*</span></label>
+          {{ form.tipo_contrato }}
+          {% if form.tipo_contrato.errors %}<div class="text-danger small">{{ form.tipo_contrato.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.sueldo_base.label }} <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            {{ form.sueldo_base }}
+          </div>
+          {% if form.sueldo_base.errors %}<div class="text-danger small">{{ form.sueldo_base.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.fecha_inicio_contrato.label }} <span class="text-danger">*</span></label>
+          {{ form.fecha_inicio_contrato }}
+          {% if form.fecha_inicio_contrato.errors %}<div class="text-danger small">{{ form.fecha_inicio_contrato.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.fecha_termino_contrato.label }} <small class="text-muted fw-normal">(opcional)</small></label>
+          {{ form.fecha_termino_contrato }}
+          {% if form.fecha_termino_contrato.errors %}<div class="text-danger small">{{ form.fecha_termino_contrato.errors }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if contrato_obj and tipo == 'contrato_trabajo' and edit_mode %}
   <!-- ── Resumen del contrato — datos que se llenan solos ── -->
   <div class="card border-success border-0 shadow-sm mb-3" style="border-left: 4px solid #198754 !important;">
     <div class="card-header bg-success bg-opacity-10 text-success fw-semibold">
@@ -116,12 +165,20 @@
     <div class="card-body">
       <div class="row g-3">
         {% for field in form %}
+        {% if tipo == 'contrato_trabajo' and not edit_mode and field.html_name == 'obra_contrato' %}
+        {% elif tipo == 'contrato_trabajo' and not edit_mode and field.html_name == 'especialidad_contrato' %}
+        {% elif tipo == 'contrato_trabajo' and not edit_mode and field.html_name == 'tipo_contrato' %}
+        {% elif tipo == 'contrato_trabajo' and not edit_mode and field.html_name == 'sueldo_base' %}
+        {% elif tipo == 'contrato_trabajo' and not edit_mode and field.html_name == 'fecha_inicio_contrato' %}
+        {% elif tipo == 'contrato_trabajo' and not edit_mode and field.html_name == 'fecha_termino_contrato' %}
+        {% else %}
         <div class="col-md-{% if field.field.widget.attrs.rows %}12{% else %}6{% endif %}">
           <label class="form-label fw-semibold">{{ field.label }}</label>
           {{ field }}
           {% if field.help_text %}<small class="text-muted">{{ field.help_text }}</small>{% endif %}
           {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
         </div>
+        {% endif %}
         {% endfor %}
       </div>
     </div>

@@ -4,7 +4,16 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2 class="mb-0 fw-bold"><i class="bi bi-building text-primary me-2"></i>Obras y Proyectos</h2>
-  <a href="{% url 'obra_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-1"></i>Nueva Obra</a>
+  <div class="d-flex flex-column gap-2 align-items-end">
+    <a href="{% url 'obra_create' %}" class="btn btn-primary w-100"><i class="bi bi-plus-circle-fill me-1"></i>Nueva Obra</a>
+    {% if archivadas %}
+    <button type="button" class="btn btn-warning w-100"
+            data-bs-toggle="collapse" data-bs-target="#collapseArchivadas">
+      <i class="bi bi-archive-fill me-1"></i>Obras Archivadas
+      <span class="badge bg-dark ms-1">{{ archivadas|length }}</span>
+    </button>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-3">
@@ -21,45 +30,33 @@
           <option value="Cerrada" {% if estado == 'Cerrada' %}selected{% endif %}>Cerrada</option>
         </select>
       </div>
-      <div class="col-md-2 d-flex gap-1">
-        <button type="submit" class="btn btn-outline-primary flex-grow-1"><i class="bi bi-search me-1"></i>Buscar</button>
-        <a href="?proximas_cierre=1" class="btn {% if proximas_cierre %}btn-warning{% else %}btn-outline-warning{% endif %}" title="Obras próximas a cierre"><i class="bi bi-calendar-x"></i></a>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-search me-1"></i>Buscar</button>
       </div>
     </form>
-    {% if proximas_cierre %}<div class="mt-2"><span class="badge bg-warning text-dark"><i class="bi bi-filter me-1"></i>Filtro activo: obras próximas a cierre (30 días)</span></div>{% endif %}
   </div>
 </div>
 
 <div class="row g-3">
   {% for obra in obras %}
   <div class="col-md-6 col-lg-4">
-    <div class="card border-0 shadow-sm h-100" data-contratos-vigentes="{{ obra.contratos_vigentes_count }}">
+    <div class="card border-0 shadow-sm h-100">
       <div class="card-header d-flex justify-content-between align-items-center
           {% if obra.estado == 'Activa' %}bg-success text-white
           {% elif obra.estado == 'Pausada' %}bg-warning text-dark
           {% else %}bg-secondary text-white{% endif %}">
         <strong>{{ obra.nombre }}</strong>
-        <div class="d-flex gap-1 align-items-center">
-          <span class="badge bg-white text-dark">{{ obra.estado }}</span>
-          {% if proximas_cierre %}<span class="badge bg-danger">Prox. Cierre</span>{% endif %}
-        </div>
+        <span class="badge bg-white text-dark">{{ obra.estado }}</span>
       </div>
       <div class="card-body">
-        <div class="small mb-2">
-          <i class="bi bi-building me-1 text-muted"></i>{{ obra.constructora_mandante }}
-        </div>
+        <div class="small mb-2"><i class="bi bi-building me-1 text-muted"></i>{{ obra.constructora_mandante }}</div>
         <div class="small mb-2">
           <i class="bi bi-calendar me-1 text-muted"></i>
           {{ obra.fecha_inicio|date:"d/m/Y" }} &mdash; {{ obra.fecha_termino_estimada|date:"d/m/Y" }}
         </div>
         {% if obra.monto_proyecto %}
-        <div class="small mb-2">
-          <i class="bi bi-currency-dollar me-1 text-muted"></i>${{ obra.monto_proyecto|floatformat:0 }}
-        </div>
+        <div class="small mb-2"><i class="bi bi-currency-dollar me-1 text-muted"></i>${{ obra.monto_proyecto|floatformat:0 }}</div>
         {% endif %}
-
-        <!-- Barra de progreso temporal -->
-        {% with hoy=obra.fecha_inicio %}
         <div class="mb-3">
           <div class="d-flex justify-content-between small text-muted mb-1">
             <span>Progreso temporal</span>
@@ -70,15 +67,21 @@
                  style="width:{% widthratio obra.contratos_vigentes_count 20 100 %}%"></div>
           </div>
         </div>
-        {% endwith %}
       </div>
       <div class="card-footer bg-white border-0 d-flex gap-2">
         <a href="{% url 'obra_detail' obra.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
           <i class="bi bi-eye me-1"></i>Ver Obra
         </a>
-        <a href="{% url 'obra_edit' obra.pk %}" class="btn btn-sm btn-outline-secondary">
+        <a href="{% url 'obra_edit' obra.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
           <i class="bi bi-pencil"></i>
         </a>
+        <form method="post" action="{% url 'obra_archivar' obra.pk %}" class="d-inline"
+              onsubmit="return confirm('¿Archivar la obra "{{ obra.nombre }}"? Seguirá disponible en la sección de archivadas.')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-secondary" title="Archivar obra">
+            <i class="bi bi-archive"></i>
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -88,4 +91,55 @@
   </div>
   {% endfor %}
 </div>
+
+<!-- ── Obras Archivadas ─────────────────────────────────────────────────── -->
+{% if archivadas %}
+<div class="mt-5">
+  <div class="collapse" id="collapseArchivadas" style="transition:none !important;">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <hr class="flex-grow-1 m-0" style="border-top:2px solid #FFC107;">
+    <span class="badge fs-6 px-3 py-2 bg-warning text-dark">
+      <i class="bi bi-archive-fill me-1"></i>Obras Archivadas
+    </span>
+    <hr class="flex-grow-1 m-0" style="border-top:2px solid #FFC107;">
+  </div>
+    <div class="row g-3">
+      {% for obra in archivadas %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm h-100 opacity-75">
+          <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <strong>{{ obra.nombre }}</strong>
+            <div class="d-flex gap-1">
+              <span class="badge bg-secondary">{{ obra.estado }}</span>
+              <span class="badge bg-warning text-dark"><i class="bi bi-archive me-1"></i>Archivada</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="small mb-1 text-muted"><i class="bi bi-building me-1"></i>{{ obra.constructora_mandante }}</div>
+            <div class="small mb-1 text-muted">
+              <i class="bi bi-calendar me-1"></i>{{ obra.fecha_inicio|date:"d/m/Y" }} &mdash; {{ obra.fecha_termino_estimada|date:"d/m/Y" }}
+            </div>
+            {% if obra.monto_proyecto %}
+            <div class="small text-muted"><i class="bi bi-currency-dollar me-1"></i>${{ obra.monto_proyecto|floatformat:0 }}</div>
+            {% endif %}
+          </div>
+          <div class="card-footer bg-white border-0 d-flex gap-2">
+            <a href="{% url 'obra_detail' obra.pk %}" class="btn btn-sm btn-outline-secondary flex-grow-1">
+              <i class="bi bi-eye me-1"></i>Ver Obra
+            </a>
+            <form method="post" action="{% url 'obra_archivar' obra.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-primary" title="Desarchivar obra">
+                <i class="bi bi-arrow-up-circle me-1"></i>Desarchivar
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

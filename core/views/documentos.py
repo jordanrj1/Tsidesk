@@ -1,10 +1,10 @@
 import io, zipfile, os
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.db.models import Q
 from ..models import (Documento, Trabajador, Obra, Contrato, TipoDocumento,
-                      Especialidad, get_checklist_trabajador)
+                      Especialidad, get_checklist_trabajador, get_checklist_contrato)
 
 
 @login_required
@@ -21,49 +21,202 @@ def documentos_pendientes(request):
     if especialidad_id:
         contratos_activos = contratos_activos.filter(especialidad_id=especialidad_id)
 
-    # Checklist en vivo: agrupa por RUT para no repetir si el trabajador está en varias obras
-    pendientes = []
-    ruts_procesados = set()
+    # Agrupar pendientes por trabajador
+    grupos = {}  # {rut: {trabajador, obras_set, docs_personales, docs_contrato}}
     for contrato in contratos_activos:
         rut = contrato.trabajador.rut
-        if rut in ruts_procesados:
-            continue
-        ruts_procesados.add(rut)
-        checklist = get_checklist_trabajador(rut)
-        for item in checklist:
+        if rut not in grupos:
+            grupos[rut] = {
+                'trabajador': contrato.trabajador,
+                'obras': set(),
+                'docs_personales': [],
+                'docs_contrato': [],
+            }
+        grupos[rut]['obras'].add(contrato.obra.nombre)
+
+        # Documentos personales (deduplicados por tipo)
+        checklist_personal = get_checklist_trabajador(rut)
+        vistos_personal = {d['tipo'].pk for d in grupos[rut]['docs_personales']}
+        for item in checklist_personal:
             if not item['tipo'].obligatorio:
                 continue
-            if item['estado'] in ('pendiente', 'vencido'):
-                pendientes.append({
-                    'trabajador': contrato.trabajador,
-                    'obra': contrato.obra,
-                    'especialidad': contrato.especialidad,
-                    'tipo_documento': item['tipo'],
-                    'contrato': contrato,
-                    'estado_doc': item['estado'],
-                    'doc': item['doc'],  # El doc vencido (si existe)
+            if item['estado'] not in ('pendiente', 'vencido'):
+                continue
+            if item['tipo'].pk not in vistos_personal:
+                vistos_personal.add(item['tipo'].pk)
+                grupos[rut]['docs_personales'].append({
+                    'tipo': item['tipo'],
+                    'estado': item['estado'],
+                    'doc': item['doc'],
                 })
+
+        # Documentos de contrato/obra
+        checklist_contrato = get_checklist_contrato(contrato)
+        for item in checklist_contrato:
+            if not item['tipo'].obligatorio:
+                continue
+            if item['estado'] not in ('pendiente', 'vencido'):
+                continue
+            grupos[rut]['docs_contrato'].append({
+                'tipo': item['tipo'],
+                'estado': item['estado'],
+                'doc': item['doc'],
+                'obra': contrato.obra,
+                'contrato': contrato,
+            })
+
+    grupos_list = sorted(grupos.values(), key=lambda g: g['trabajador'].apellidos)
+    total = sum(len(g['docs_personales']) + len(g['docs_contrato']) for g in grupos_list)
 
     obras = Obra.objects.filter(activo=True)
     especialidades = Especialidad.objects.filter(activo=True)
 
     context = {
-        'pendientes': pendientes,
+        'grupos': grupos_list,
         'obras': obras,
         'especialidades': especialidades,
         'obra_id': obra_id,
         'especialidad_id': especialidad_id,
-        'total': len(pendientes),
+        'total': total,
+        'total_trabajadores': len(grupos_list),
     }
     return render(request, 'documentos/pendientes.html', context)
 
 
 @login_required
 def documento_download(request, pk):
-    doc = get_object_or_404(Documento, pk=pk, activo=True)
+    doc = get_object_or_404(Documento, pk=pk)
     response = HttpResponse(doc.archivo, content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="{doc.nombre_archivo}"'
     return response
+
+
+@login_required
+def documento_preview_papelera(request, pk):
+    """Sirve el archivo inline para previsualización en nueva pestaña (papelera)."""
+    import mimetypes
+    from django.views.decorators.clickjacking import xframe_options_exempt
+    doc = get_object_or_404(Documento, pk=pk)
+    content_type, _ = mimetypes.guess_type(doc.archivo.name)
+    content_type = content_type or 'application/octet-stream'
+    response = HttpResponse(doc.archivo.read(), content_type=content_type)
+    nombre = os.path.basename(doc.archivo.name)
+    response['Content-Disposition'] = f'inline; filename="{nombre}"'
+    return response
+
+
+@login_required
+def documento_delete(request, pk):
+    doc = get_object_or_404(Documento, pk=pk, activo=True)
+    if request.method == 'POST':
+        doc.activo = False
+        doc.save()
+        from django.contrib import messages
+        messages.success(request, f'Documento "{doc.tipo_documento.nombre}" movido a la papelera.')
+    return redirect('documentos_central')
+
+
+@login_required
+def documento_upload_rapido(request):
+    """Upload de un documento específico desde cualquier pantalla (modal), redirige a 'next'."""
+    from django.contrib import messages
+    from ..models import TipoDocumento, Trabajador, Contrato
+    from ..forms import DocumentoForm
+
+    next_url = request.POST.get('next') or request.GET.get('next') or 'documentos_pendientes'
+
+    if request.method == 'POST':
+        trabajador_rut = request.POST.get('trabajador_rut', '').strip()
+        tipo_id = request.POST.get('tipo_documento_id')
+        contrato_id = request.POST.get('contrato_id')
+        archivo = request.FILES.get('archivo')
+        fecha_vencimiento = request.POST.get('fecha_vencimiento') or None
+
+        try:
+            tipo = TipoDocumento.objects.get(pk=tipo_id, activo=True)
+        except TipoDocumento.DoesNotExist:
+            messages.error(request, 'Tipo de documento no válido.')
+            return redirect(next_url)
+
+        if not archivo:
+            messages.error(request, 'Debes seleccionar un archivo.')
+            return redirect(next_url)
+
+        doc = Documento(
+            tipo_documento=tipo,
+            trabajador_rut=trabajador_rut if tipo.nivel == 'Trabajador' else None,
+            usuario_carga=request.user.username,
+            archivo=archivo,
+        )
+        if fecha_vencimiento:
+            from datetime import date
+            try:
+                doc.fecha_vencimiento = date.fromisoformat(fecha_vencimiento)
+            except ValueError:
+                pass
+
+        if contrato_id and tipo.nivel == 'Contrato':
+            try:
+                contrato_obj = Contrato.objects.get(pk=contrato_id)
+                doc.contrato = contrato_obj
+                doc.trabajador_rut = contrato_obj.trabajador.rut
+            except Contrato.DoesNotExist:
+                pass
+
+        doc.save()
+        messages.success(request, f'"{tipo.nombre}" cargado correctamente.')
+
+    return redirect(next_url)
+
+
+@login_required
+def papelera_documentos(request):
+    from django.contrib import messages as msg_module
+    qs = Documento.objects.filter(activo=False).select_related(
+        'tipo_documento', 'obra', 'contrato', 'contrato__trabajador', 'contrato__obra'
+    ).order_by('-fecha_carga')
+
+    q = request.GET.get('q', '')
+    if q:
+        qs = qs.filter(
+            Q(trabajador_rut__icontains=q) |
+            Q(contrato__trabajador__nombres__icontains=q) |
+            Q(contrato__trabajador__apellidos__icontains=q) |
+            Q(tipo_documento__nombre__icontains=q)
+        )
+
+    return render(request, 'documentos/papelera.html', {'documentos': qs, 'q': q})
+
+
+@login_required
+def documento_restore(request, pk):
+    from django.contrib import messages
+    doc = get_object_or_404(Documento, pk=pk, activo=False)
+    if request.method == 'POST':
+        doc.activo = True
+        doc.save()
+        messages.success(request, f'Documento "{doc.tipo_documento.nombre}" restaurado correctamente.')
+    return redirect('papelera_documentos')
+
+
+@login_required
+def documento_hard_delete(request, pk):
+    from django.contrib import messages
+    if not request.user.is_superuser:
+        messages.error(request, 'Solo el administrador puede eliminar documentos permanentemente.')
+        return redirect('papelera_documentos')
+    doc = get_object_or_404(Documento, pk=pk, activo=False)
+    if request.method == 'POST':
+        nombre_tipo = doc.tipo_documento.nombre
+        if doc.archivo:
+            try:
+                if os.path.exists(doc.archivo.path):
+                    os.remove(doc.archivo.path)
+            except Exception:
+                pass
+        doc.delete()
+        messages.success(request, f'Documento "{nombre_tipo}" eliminado permanentemente.')
+    return redirect('papelera_documentos')
 
 
 @login_required
@@ -97,52 +250,101 @@ def documentos_batch_download(request):
 
 @login_required
 def documentos_central(request):
-    """Centro de documentos: todos los documentos con filtros cruzados."""
+    """Archivo de documentos: búsqueda agrupada por obra, vacía hasta aplicar filtro."""
     from django.db.models import Q
 
-    obra_id = request.GET.get('obra_id', '')
-    especialidad_id = request.GET.get('especialidad_id', '')
-    tipo_id = request.GET.get('tipo_id', '')
+    obra_id     = request.GET.get('obra_id', '')
+    tipo_id     = request.GET.get('tipo_id', '')
     estado_filter = request.GET.get('estado', '')
-    q = request.GET.get('q', '')  # search by worker name/rut
+    q           = request.GET.get('q', '')
+    has_filter  = bool(q or obra_id or tipo_id or estado_filter)
 
-    qs = Documento.objects.filter(activo=True).select_related(
-        'tipo_documento', 'contrato', 'contrato__obra',
-        'contrato__trabajador', 'contrato__especialidad'
-    ).order_by('-fecha_carga')
+    grupos_activas  = []   # [{obra, docs}]
+    grupos_cerradas = []
+    sin_obra_docs   = []
+    total = 0
 
-    if q:
-        qs = qs.filter(
-            Q(trabajador_rut__icontains=q) |
-            Q(contrato__trabajador__nombres__icontains=q) |
-            Q(contrato__trabajador__apellidos__icontains=q)
-        )
-    if tipo_id:
-        qs = qs.filter(tipo_documento_id=tipo_id)
-    if obra_id:
-        qs = qs.filter(
-            Q(obra_id=obra_id) | Q(contrato__obra_id=obra_id)
-        )
-    if especialidad_id:
-        qs = qs.filter(contrato__especialidad_id=especialidad_id)
+    if has_filter:
+        qs = Documento.objects.filter(activo=True).select_related(
+            'tipo_documento', 'obra',
+            'contrato', 'contrato__obra',
+            'contrato__trabajador', 'contrato__especialidad',
+        ).order_by('-fecha_carga')
 
-    # Aplicar filtro de estado
-    docs_list = list(qs[:200])
-    if estado_filter:
-        docs_list = [d for d in docs_list if d.estado_visual == estado_filter]
+        if q:
+            from ..models import Trabajador as TrabajadorModel
+            ruts_match = list(
+                TrabajadorModel.objects.filter(
+                    Q(nombres__icontains=q) | Q(apellidos__icontains=q)
+                ).values_list('rut', flat=True)
+            )
+            qs = qs.filter(
+                Q(trabajador_rut__icontains=q) |
+                Q(trabajador_rut__in=ruts_match) |
+                Q(contrato__trabajador__nombres__icontains=q) |
+                Q(contrato__trabajador__apellidos__icontains=q) |
+                Q(tipo_documento__nombre__icontains=q)
+            ).distinct()
+        if tipo_id:
+            qs = qs.filter(tipo_documento_id=tipo_id)
+        if obra_id:
+            qs = qs.filter(Q(obra_id=obra_id) | Q(contrato__obra_id=obra_id))
 
-    from ..models import Obra, Especialidad, TipoDocumento
+        docs_list = list(qs[:300])
+
+        # Deduplicar: solo el doc más reciente por tipo por trabajador/contrato
+        # qs viene ordenado por -fecha_carga, así que el primero por clave es el más reciente
+        seen = {}
+        for doc in docs_list:
+            key = (doc.contrato_id or doc.trabajador_rut, doc.tipo_documento_id)
+            if key not in seen:
+                seen[key] = doc
+        docs_list = list(seen.values())
+
+        if estado_filter:
+            docs_list = [d for d in docs_list if d.estado_visual == estado_filter]
+
+        # Enriquecer docs personales (sin contrato) con objeto Trabajador
+        ruts_personal = {d.trabajador_rut for d in docs_list if d.trabajador_rut and not d.contrato}
+        if ruts_personal:
+            from ..models import Trabajador as TrabajadorModel
+            trab_map = {t.rut: t for t in TrabajadorModel.objects.filter(rut__in=ruts_personal)}
+        else:
+            trab_map = {}
+        for doc in docs_list:
+            doc.trab_personal = trab_map.get(doc.trabajador_rut) if (doc.trabajador_rut and not doc.contrato) else None
+
+        # Agrupar por obra; distinguir activas vs cerradas
+        _activas  = {}   # obra.pk -> {obra, docs}
+        _cerradas = {}
+        ACTIVOS = {'Activa', 'Pausada'}
+        for doc in docs_list:
+            obra_obj = doc.obra or (doc.contrato.obra if doc.contrato else None)
+            if obra_obj:
+                bucket = _activas if obra_obj.estado in ACTIVOS else _cerradas
+                if obra_obj.pk not in bucket:
+                    bucket[obra_obj.pk] = {'obra': obra_obj, 'docs': []}
+                bucket[obra_obj.pk]['docs'].append(doc)
+            else:
+                sin_obra_docs.append(doc)
+
+        grupos_activas  = sorted(_activas.values(),  key=lambda x: x['obra'].nombre)
+        grupos_cerradas = sorted(_cerradas.values(), key=lambda x: x['obra'].nombre)
+        total = len(docs_list)
+
+    from ..models import Obra, TipoDocumento
     context = {
-        'documentos': docs_list,
-        'obras': Obra.objects.filter(activo=True),
-        'especialidades': Especialidad.objects.filter(activo=True),
-        'tipos': TipoDocumento.objects.filter(activo=True),
-        'obra_id': obra_id,
-        'especialidad_id': especialidad_id,
-        'tipo_id': tipo_id,
+        'has_filter':      has_filter,
+        'grupos_activas':  grupos_activas,
+        'grupos_cerradas': grupos_cerradas,
+        'sin_obra_docs':   sin_obra_docs,
+        'obras': Obra.objects.order_by('nombre'),   # activas + cerradas para el selector
+        'tipos': TipoDocumento.objects.filter(activo=True).order_by('nombre'),
+        'obra_id':      obra_id,
+        'tipo_id':      tipo_id,
         'estado_filter': estado_filter,
-        'q': q,
-        'total': len(docs_list),
+        'q':    q,
+        'total': total,
     }
     return render(request, 'documentos/central.html', context)
 

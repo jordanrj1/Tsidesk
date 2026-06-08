@@ -23,96 +23,125 @@
 </div>
 {% endif %}
 
-<div class="row g-4">
-  <!-- BLOQUE IZQUIERDO -->
-  <div class="col-md-4">
-    <div class="card border-0 shadow-sm">
-      <div class="card-body text-center">
+<!-- ══ HEADER CARD ══ -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-4">
+    <div class="d-flex align-items-start gap-4 flex-wrap">
+
+      <!-- Avatar -->
+      <div class="flex-shrink-0">
         {% if trabajador.foto %}
-          <img src="{{ trabajador.foto.url }}" class="rounded-circle mb-3 border border-3 border-primary" width="100" height="100" style="object-fit:cover">
+          <img src="{{ trabajador.foto.url }}" class="rounded-circle border border-3
+            {% if trabajador.en_lista_negra %}border-danger{% else %}border-primary{% endif %}"
+            width="88" height="88" style="object-fit:cover">
         {% else %}
-          <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white mx-auto mb-3" style="width:100px;height:100px;font-size:2rem">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold
+            {% if trabajador.en_lista_negra %}bg-danger{% else %}bg-primary{% endif %}"
+            style="width:88px;height:88px;font-size:2rem;flex-shrink:0">
             {{ trabajador.nombres|first }}{{ trabajador.apellidos|first }}
           </div>
         {% endif %}
+      </div>
 
-        <h5 class="fw-bold mb-1">{{ trabajador.nombre_completo }}</h5>
-        <code class="text-muted d-block mb-2">{{ trabajador.rut }}</code>
-
-        {% if trabajador.en_lista_negra %}
-          <div class="alert alert-danger py-2 mb-2">
-            <i class="bi bi-slash-circle-fill me-1"></i><strong>EN LISTA NEGRA</strong>
-          </div>
-        {% else %}
-          <span class="badge bg-success mb-2"><i class="bi bi-check-circle me-1"></i>Trabajador Activo</span>
-        {% endif %}
-
-        {% if trabajador.strikes_activos > 0 %}
-          <div class="mb-2">
-            <span class="badge {% if trabajador.strikes_activos >= 3 %}bg-danger{% else %}bg-warning text-dark{% endif %} fs-6">
-              <i class="bi bi-exclamation-triangle me-1"></i>{{ trabajador.strikes_activos }} Strike(s)
+      <!-- Identidad + contacto + stats -->
+      <div class="flex-grow-1 min-width-0">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <h4 class="fw-bold mb-0">{{ trabajador.nombre_completo }}</h4>
+          {% if trabajador.en_lista_negra %}
+            <span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Lista Negra</span>
+          {% else %}
+            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Activo</span>
+          {% endif %}
+          {% if trabajador.strikes_activos > 0 %}
+            <span class="badge {% if trabajador.strikes_activos >= 3 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+              <i class="bi bi-exclamation-triangle me-1"></i>{{ trabajador.strikes_activos }} strike{% if trabajador.strikes_activos != 1 %}s{% endif %}
             </span>
-          </div>
-        {% endif %}
+          {% endif %}
+        </div>
+        <code class="text-muted small">{{ trabajador.rut }}</code>
+
+        <!-- Contacto -->
+        <div class="d-flex gap-3 flex-wrap mt-2 small text-muted">
+          {% if trabajador.telefono %}<span><i class="bi bi-telephone me-1"></i>{{ trabajador.telefono }}</span>{% endif %}
+          {% if trabajador.correo %}<span><i class="bi bi-envelope me-1"></i>{{ trabajador.correo }}</span>{% endif %}
+          {% if trabajador.direccion %}<span><i class="bi bi-geo-alt me-1"></i>{{ trabajador.direccion }}</span>{% endif %}
+          {% if trabajador.fecha_nacimiento %}<span><i class="bi bi-calendar me-1"></i>{{ trabajador.fecha_nacimiento|date:"d/m/Y" }}</span>{% endif %}
+        </div>
+
+        <!-- Stats chips -->
+        <div class="d-flex gap-2 flex-wrap mt-3">
+          <a href="?tab=contratos" class="badge bg-light text-dark border text-decoration-none py-2 px-3">
+            <i class="bi bi-file-earmark-text me-1 text-primary"></i>
+            {{ contratos_vigentes_count }} contrato{% if contratos_vigentes_count != 1 %}s{% endif %} vigente{% if contratos_vigentes_count != 1 %}s{% endif %}
+          </a>
+          <a href="?tab=documentos" class="badge {% if docs_alerta_count > 0 %}bg-warning text-dark{% else %}bg-light text-dark border{% endif %} text-decoration-none py-2 px-3">
+            <i class="bi bi-folder2{% if docs_alerta_count > 0 %}-open{% endif %} me-1"></i>
+            {% if docs_alerta_count > 0 %}{{ docs_alerta_count }} doc{% if docs_alerta_count != 1 %}s{% endif %} con alerta{% else %}Documentos al día{% endif %}
+          </a>
+          {% if trabajador.strikes_activos > 0 %}
+          <a href="?tab=strikes" class="badge {% if trabajador.strikes_activos >= 3 %}bg-danger{% else %}bg-warning text-dark{% endif %} text-decoration-none py-2 px-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>{{ trabajador.strikes_activos }} strike{% if trabajador.strikes_activos != 1 %}s{% endif %} activo{% if trabajador.strikes_activos != 1 %}s{% endif %}
+          </a>
+          {% endif %}
+        </div>
       </div>
 
-      <div class="card-body border-top pt-3">
-        <ul class="list-unstyled mb-0 small">
-          {% if trabajador.telefono %}
-          <li class="mb-2"><i class="bi bi-telephone text-primary me-2"></i>{{ trabajador.telefono }}</li>
-          {% endif %}
-          {% if trabajador.correo %}
-          <li class="mb-2"><i class="bi bi-envelope text-primary me-2"></i>{{ trabajador.correo }}</li>
-          {% endif %}
-          {% if trabajador.direccion %}
-          <li class="mb-2"><i class="bi bi-geo-alt text-primary me-2"></i>{{ trabajador.direccion }}</li>
-          {% endif %}
-          {% if trabajador.fecha_nacimiento %}
-          <li class="mb-2"><i class="bi bi-calendar text-primary me-2"></i>{{ trabajador.fecha_nacimiento|date:"d/m/Y" }}</li>
-          {% endif %}
-        </ul>
+      <!-- Acciones -->
+      <div class="d-flex flex-column gap-2 flex-shrink-0">
+        <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ trabajador.rut }}"
+           class="btn btn-success">
+          <i class="bi bi-file-earmark-plus me-1"></i>Nuevo Contrato
+        </a>
+        <a href="{% url 'doc_generado_create' %}?trabajador_rut={{ trabajador.rut }}"
+           class="btn btn-outline-primary">
+          <i class="bi bi-file-earmark-ruled me-1"></i>Generar Documento
+        </a>
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button"
+                  data-bs-toggle="dropdown">
+            <i class="bi bi-three-dots me-1"></i>Más acciones
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+              <a class="dropdown-item" href="{% url 'trabajador_edit' trabajador.rut %}">
+                <i class="bi bi-pencil me-2 text-muted"></i>Editar ficha
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="{% url 'trabajador_add_strike' trabajador.rut %}">
+                <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Registrar strike
+              </a>
+            </li>
+            <li>
+              {% if trabajador.en_lista_negra %}
+              <a class="dropdown-item" href="{% url 'trabajador_lista_negra_salida' trabajador.rut %}">
+                <i class="bi bi-check-circle me-2 text-success"></i>Quitar de lista negra
+              </a>
+              {% else %}
+              <a class="dropdown-item text-danger" href="{% url 'trabajador_lista_negra_ingreso' trabajador.rut %}">
+                <i class="bi bi-slash-circle me-2"></i>Ingresar a lista negra
+              </a>
+              {% endif %}
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="{% url 'trabajador_download_zip' trabajador.rut %}">
+                <i class="bi bi-file-zip me-2 text-muted"></i>Descargar carpeta ZIP
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <div class="card-body border-top pt-3 d-grid gap-2">
-        <a href="{% url 'trabajador_edit' trabajador.rut %}" class="btn btn-outline-primary btn-sm">
-          <i class="bi bi-pencil-fill me-1"></i>Editar Ficha
-        </a>
-        <a href="{% url 'contrato_create' %}?trabajador_rut={{ trabajador.rut }}" class="btn btn-success btn-sm">
-          <i class="bi bi-file-earmark-plus-fill me-1"></i>Nuevo Contrato
-        </a>
-        <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ trabajador.rut }}" class="btn btn-outline-info btn-sm">
-          <i class="bi bi-file-earmark-ruled-fill me-1"></i>Generar Documento
-        </a>
-        <a href="{% url 'trabajador_upload_doc' trabajador.rut %}" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-upload me-1"></i>Subir Documento
-        </a>
-        <a href="{% url 'trabajador_upload_doc_masivo' trabajador.rut %}" class="btn btn-outline-info btn-sm">
-          <i class="bi bi-files me-1"></i>Carga Masiva
-        </a>
-        <a href="{% url 'trabajador_add_strike' trabajador.rut %}" class="btn btn-outline-warning btn-sm">
-          <i class="bi bi-exclamation-triangle me-1"></i>Registrar Strike
-        </a>
-        {% if trabajador.en_lista_negra %}
-          <a href="{% url 'trabajador_lista_negra_salida' trabajador.rut %}" class="btn btn-outline-success btn-sm">
-            <i class="bi bi-check-circle me-1"></i>Quitar de Lista Negra
-          </a>
-        {% else %}
-          <a href="{% url 'trabajador_lista_negra_ingreso' trabajador.rut %}" class="btn btn-outline-danger btn-sm">
-            <i class="bi bi-slash-circle me-1"></i>Ingresar a Lista Negra
-          </a>
-        {% endif %}
-        <a href="{% url 'trabajador_download_zip' trabajador.rut %}" class="btn btn-dark btn-sm">
-          <i class="bi bi-file-zip-fill me-1"></i>Descargar Carpeta ZIP
-        </a>
-      </div>
     </div>
   </div>
+</div>
 
-  <!-- BLOQUE DERECHO: PESTAÑAS -->
-  <div class="col-md-8">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white border-bottom-0">
-        <ul class="nav nav-tabs card-header-tabs" id="workerTabs">
+<!-- ══ TABS ══ -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom-0">
+    <ul class="nav nav-tabs card-header-tabs" id="workerTabs">
           <li class="nav-item">
             <a class="nav-link {% if tab == 'contratos' %}active{% endif %}" href="?tab=contratos">
               <i class="bi bi-file-earmark-text me-1"></i>Contratos
@@ -123,23 +152,29 @@
               <i class="bi bi-folder2-open me-1"></i>Carpeta Digital
             </a>
           </li>
+          {% if trabajador.strikes_activos > 0 or tab == 'strikes' %}
           <li class="nav-item">
             <a class="nav-link {% if tab == 'strikes' %}active{% endif %}" href="?tab=strikes">
               <i class="bi bi-exclamation-triangle me-1"></i>Strikes
-              {% if trabajador.strikes_activos > 0 %}<span class="badge bg-danger ms-1">{{ trabajador.strikes_activos }}</span>{% endif %}
+              <span class="badge bg-danger ms-1">{{ trabajador.strikes_activos }}</span>
             </a>
           </li>
+          {% endif %}
+          {% if trabajador.en_lista_negra or historial_negra or tab == 'lista_negra' %}
           <li class="nav-item">
             <a class="nav-link {% if tab == 'lista_negra' %}active{% endif %}" href="?tab=lista_negra">
               <i class="bi bi-slash-circle me-1"></i>Lista Negra
             </a>
           </li>
+          {% endif %}
+          {% if traslados or tab == 'traslados' %}
           <li class="nav-item">
             <a class="nav-link {% if tab == 'traslados' %}active{% endif %}" href="?tab=traslados">
               <i class="bi bi-arrow-right-circle me-1"></i>Traslados
               {% if alertas_cruzadas %}<span class="badge bg-danger ms-1">{{ alertas_cruzadas|length }}</span>{% endif %}
             </a>
           </li>
+          {% endif %}
         </ul>
       </div>
 
@@ -175,9 +210,7 @@
                     {{ c.estado }}
                   </span>
                 </td>
-                <td>
-                  <a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-                </td>
+                <td></td>
               </tr>
               {% empty %}
               <tr><td colspan="8" class="text-center text-muted py-4">Sin contratos registrados.</td></tr>
@@ -199,110 +232,177 @@
         </div>
         {% endif %}
 
-        <h6 class="fw-bold text-uppercase text-muted mb-3 small">Documentos Personales Estáticos</h6>
-        <div class="row g-2 mb-4">
-          {% for item in checklist_trabajador %}
-          <div class="col-sm-6 col-md-4">
-            <div class="card h-100 border border-2
-              {% if item.estado == 'ok' %}border-success
-              {% elif item.estado == 'vencido' %}border-danger
-              {% elif item.estado == 'proximo' %}border-warning
-              {% else %}border-danger{% endif %}">
-              <div class="card-body p-2 text-center">
-                <i class="bi bi-file-earmark-text fs-2
-                  {% if item.estado == 'ok' %}text-success
-                  {% elif item.estado == 'vencido' %}text-danger
-                  {% elif item.estado == 'proximo' %}text-warning
-                  {% else %}text-danger{% endif %} d-block mb-1"></i>
+        <!-- ══ CARPETA DIGITAL con carga inline ══ -->
+        <div class="accordion" id="acordeonCarpeta">
 
-                <div class="small fw-semibold">{{ item.tipo.nombre }}</div>
-                {% if item.tipo.dias_validez %}<div class="text-muted" style="font-size:0.7rem">Validez: {{ item.tipo.dias_validez }} días</div>{% endif %}
-
-                {% if item.estado == 'ok' %}
-                  <span class="badge bg-success">Vigente</span>
-                  {% if item.doc.fecha_vencimiento %}
-                    <div class="text-muted mt-1" style="font-size:0.7rem">Vence: {{ item.doc.fecha_vencimiento|date:"d/m/Y" }}</div>
-                  {% endif %}
-                {% elif item.estado == 'vencido' %}
-                  <span class="badge bg-danger">VENCIDO</span>
-                  {% if item.doc.fecha_vencimiento %}
-                    <div class="text-danger mt-1" style="font-size:0.7rem">Venció: {{ item.doc.fecha_vencimiento|date:"d/m/Y" }}</div>
-                  {% endif %}
-                {% elif item.estado == 'proximo' %}
-                  <span class="badge bg-warning text-dark">Vence pronto</span>
-                  {% if item.doc.fecha_vencimiento %}
-                    <div class="text-warning mt-1" style="font-size:0.7rem">Vence: {{ item.doc.fecha_vencimiento|date:"d/m/Y" }} ({{ item.doc.dias_para_vencer }}d)</div>
-                  {% endif %}
-                {% else %}
-                  <span class="badge bg-danger">PENDIENTE</span>
-                {% endif %}
-
-                <div class="mt-1 d-flex gap-1 justify-content-center flex-wrap">
-                  {% if item.doc %}
-                    <button type="button" onclick="previewDoc('{{ item.doc.archivo.url }}','{{ item.tipo.nombre }}','{{ item.doc.extension }}')" class="btn btn-sm btn-outline-primary py-0 px-1"><i class="bi bi-eye"></i></button>
-                    <a href="{% url 'documento_download' item.doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-download"></i></a>
-                  {% endif %}
-                  <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?nivel=Trabajador"
-                     class="btn btn-sm py-0 px-1 {% if item.estado == 'ok' %}btn-outline-warning{% else %}btn-danger{% endif %}">
-                    <i class="bi bi-{% if item.doc %}arrow-repeat{% else %}upload{% endif %}"></i>
-                    {% if not item.doc %}Subir{% endif %}
-                  </a>
+          <!-- ── Carpeta: Documentos Personales ── -->
+          <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed py-0 px-0 border-0 bg-transparent" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#carpetaPersonal" aria-expanded="false">
+                <div class="d-flex align-items-center gap-3 w-100 px-3 py-3">
+                  <i class="bi bi-folder-fill fs-2 text-warning"></i>
+                  <div class="flex-grow-1">
+                    <div class="fw-bold">Documentos Personales</div>
+                    <div class="small text-muted">AFP, Fonasa, carnet y certificados del trabajador</div>
+                  </div>
+                  <div class="d-flex gap-1 flex-wrap justify-content-end pe-2">
+                    {% if resumen_personal.vencido %}<span class="badge bg-danger">{{ resumen_personal.vencido }} vencido{% if resumen_personal.vencido != 1 %}s{% endif %}</span>{% endif %}
+                    {% if resumen_personal.proximo %}<span class="badge bg-warning text-dark">{{ resumen_personal.proximo }} por vencer</span>{% endif %}
+                    {% if resumen_personal.sin_cargar %}<span class="badge bg-danger">Falta Documentación {{ resumen_personal.sin_cargar }}</span>{% endif %}
+                    {% if not resumen_personal.vencido and not resumen_personal.proximo and not resumen_personal.sin_cargar %}<span class="badge bg-success">Sin documentos pendientes</span>{% endif %}
+                  </div>
                 </div>
-              </div>
+              </button>
+            </h2>
+            <div id="carpetaPersonal" class="accordion-collapse collapse">
+              <form method="post"
+                    action="{% url 'trabajador_upload_doc_masivo' trabajador.rut %}?nivel=Trabajador"
+                    enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="list-group list-group-flush">
+                  {% for item in checklist_trabajador %}
+                  <div class="list-group-item px-3 py-2
+                    {% if item.estado == 'vencido' %}list-group-item-danger
+                    {% elif item.estado == 'proximo' %}list-group-item-warning
+                    {% elif item.estado == 'pendiente' %}list-group-item-secondary{% endif %}">
+                    <div class="row align-items-center g-2">
+                      <div class="col-md-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-file-earmark-{% if item.doc %}check{% else %}x{% endif %}
+                          {% if item.estado == 'ok' %}text-success{% elif item.estado == 'vencido' %}text-danger{% elif item.estado == 'proximo' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
+                        <div>
+                          <div class="small fw-semibold">{{ item.tipo.nombre }}</div>
+                        </div>
+                      </div>
+                      <div class="col-md-3">
+                        {% if item.estado == 'ok' %}<span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Completo</span>
+                        {% elif item.estado == 'vencido' %}<span class="badge bg-danger">Vencido</span>
+                          {% if item.doc.fecha_vencimiento %}<div class="text-danger" style="font-size:.7rem">{{ item.doc.fecha_vencimiento|date:"d/m/Y" }}</div>{% endif %}
+                        {% elif item.estado == 'proximo' %}<span class="badge bg-warning text-dark">Por vencer ({{ item.doc.dias_para_vencer }}d)</span>
+                        {% else %}<span class="badge bg-secondary">Sin cargar</span>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-2 d-flex gap-1">
+                        {% if item.doc %}
+                          <button type="button" onclick="previewDoc('{{ item.doc.archivo.url }}','{{ item.tipo.nombre }}','{{ item.doc.extension }}')"
+                                  class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></button>
+                          <a href="{% url 'documento_download' item.doc.pk %}"
+                             class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar"><i class="bi bi-download"></i></a>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-4">
+                        <input type="file" name="archivo_{{ item.tipo.pk }}"
+                               class="form-control form-control-sm"
+                               onchange="marcarCambio(this)"
+                               title="{% if item.doc %}Reemplazar{% else %}Subir{% endif %} {{ item.tipo.nombre }}">
+                      </div>
+                    </div>
+                  </div>
+                  {% empty %}
+                  <div class="list-group-item text-muted text-center py-3">No hay tipos de documentos configurados.</div>
+                  {% endfor %}
+                  <div class="list-group-item px-3 py-2 text-end bg-light">
+                    <button type="submit" class="btn btn-sm btn-primary" id="btnGuardarPersonal" disabled>
+                      <i class="bi bi-cloud-upload me-1"></i>Guardar cambios
+                    </button>
+                    <div class="text-muted small mt-1" id="hintPersonal">Selecciona al menos un archivo para guardar</div>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
+
+          <!-- ── Carpeta por Contrato ── -->
+          {% for item in contratos_con_docs %}
+          {% with contrato=item.contrato checklist=item.checklist %}
+          <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed py-0 px-0 border-0 bg-transparent" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#carpetaContrato{{ contrato.pk }}">
+                <div class="d-flex align-items-center gap-3 w-100 px-3 py-3">
+                  <i class="bi bi-folder2-open fs-2
+                    {% if contrato.estado == 'Vigente' %}text-primary{% elif contrato.estado == 'Pendiente de Firma' %}text-warning{% else %}text-secondary{% endif %}"></i>
+                  <div class="flex-grow-1">
+                    <div class="fw-bold">{{ contrato.obra.nombre }}</div>
+                    <div class="small text-muted">{{ contrato.especialidad.nombre }}</div>
+                  </div>
+                  <div class="d-flex gap-1 flex-wrap justify-content-end pe-2">
+                    {% if item.resumen.vencido %}<span class="badge bg-danger">{{ item.resumen.vencido }} vencido{% if item.resumen.vencido != 1 %}s{% endif %}</span>{% endif %}
+                    {% if item.resumen.proximo %}<span class="badge bg-warning text-dark">{{ item.resumen.proximo }} por vencer</span>{% endif %}
+                    {% if item.resumen.sin_cargar %}<span class="badge bg-danger">Falta Documentación {{ item.resumen.sin_cargar }}</span>{% endif %}
+                    {% if not item.resumen.vencido and not item.resumen.proximo and not item.resumen.sin_cargar %}<span class="badge bg-success">Sin documentos pendientes</span>{% endif %}
+                  </div>
+                </div>
+              </button>
+            </h2>
+            <div id="carpetaContrato{{ contrato.pk }}" class="accordion-collapse collapse">
+              {% if contrato.estado == 'Pendiente de Firma' %}
+              <div class="alert alert-warning rounded-0 mb-0 py-2 px-3">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Contrato pendiente de firma. Al subir el primer documento pasará a <strong>Vigente</strong>.
+              </div>
+              {% endif %}
+              <form method="post"
+                    action="{% url 'trabajador_upload_doc_masivo' trabajador.rut %}?nivel=Contrato&contrato_id={{ contrato.pk }}"
+                    enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="list-group list-group-flush">
+                  {% for ci in checklist %}
+                  <div class="list-group-item px-3 py-2
+                    {% if ci.estado == 'vencido' %}list-group-item-danger
+                    {% elif ci.estado == 'proximo' %}list-group-item-warning
+                    {% elif ci.estado == 'pendiente' %}list-group-item-secondary{% endif %}">
+                    <div class="row align-items-center g-2">
+                      <div class="col-md-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-file-earmark-{% if ci.doc %}check{% else %}x{% endif %}
+                          {% if ci.estado == 'ok' %}text-success{% elif ci.estado == 'vencido' %}text-danger{% elif ci.estado == 'proximo' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
+                        <div>
+                          <div class="small fw-semibold">{{ ci.tipo.nombre }}</div>
+                        </div>
+                      </div>
+                      <div class="col-md-3">
+                        {% if ci.estado == 'ok' %}<span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Completo</span>
+                        {% elif ci.estado == 'vencido' %}<span class="badge bg-danger">Vencido</span>
+                          {% if ci.doc.fecha_vencimiento %}<div class="text-danger" style="font-size:.7rem">{{ ci.doc.fecha_vencimiento|date:"d/m/Y" }}</div>{% endif %}
+                        {% elif ci.estado == 'proximo' %}<span class="badge bg-warning text-dark">Por vencer ({{ ci.doc.dias_para_vencer }}d)</span>
+                        {% else %}<span class="badge bg-secondary">Sin cargar</span>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-2 d-flex gap-1">
+                        {% if ci.doc %}
+                          <button type="button" onclick="previewDoc('{{ ci.doc.archivo.url }}','{{ ci.tipo.nombre }}','{{ ci.doc.extension }}')"
+                                  class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></button>
+                          <a href="{% url 'documento_download' ci.doc.pk %}"
+                             class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar"><i class="bi bi-download"></i></a>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-4">
+                        <input type="file" name="archivo_{{ ci.tipo.pk }}"
+                               class="form-control form-control-sm file-input-contrato-{{ contrato.pk }}"
+                               onchange="marcarCambioContrato(this, {{ contrato.pk }})"
+                               title="{% if ci.doc %}Reemplazar{% else %}Subir{% endif %} {{ ci.tipo.nombre }}">
+                      </div>
+                    </div>
+                  </div>
+                  {% empty %}
+                  <div class="list-group-item text-muted text-center py-3 small">Sin tipos de documentos de contrato configurados.</div>
+                  {% endfor %}
+                  <div class="list-group-item px-3 py-2 text-end bg-light">
+                    <button type="submit" class="btn btn-sm btn-primary btn-guardar-contrato-{{ contrato.pk }}" disabled>
+                      <i class="bi bi-cloud-upload me-1"></i>Guardar cambios
+                    </button>
+                    <div class="text-muted small mt-1">Selecciona al menos un archivo para guardar</div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+          {% endwith %}
           {% empty %}
-          <div class="col-12 text-muted text-center">No hay tipos de documentos configurados.</div>
+          <div class="text-center text-muted py-3"><i class="bi bi-folder-x me-1"></i>Sin contratos registrados.</div>
           {% endfor %}
-        </div>
 
-        <h6 class="fw-bold text-uppercase text-muted mb-3 small">Documentos Contractuales por Obra</h6>
-        {% for item in contratos_con_docs %}
-        <div class="mb-3">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="badge bg-dark">Contrato #{{ item.contrato.pk }}</span>
-            <span class="text-muted">{{ item.contrato.obra.nombre }} &mdash; {{ item.contrato.especialidad.nombre }}</span>
-            <span class="badge
-              {% if item.contrato.estado == 'Vigente' %}bg-success
-              {% elif item.contrato.estado == 'Pendiente de Firma' %}bg-warning text-dark
-              {% else %}bg-secondary{% endif %} ms-1">{{ item.contrato.estado }}</span>
-            <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?nivel=Contrato&contrato_id={{ item.contrato.pk }}" class="btn btn-sm btn-outline-primary ms-auto"><i class="bi bi-upload me-1"></i>Subir</a>
-          </div>
-          <div class="row g-2">
-            {% for ci in item.checklist %}
-            <div class="col-sm-6 col-md-4">
-              <div class="card h-100 border border-2
-                {% if ci.estado == 'ok' %}border-success
-                {% elif ci.estado == 'vencido' %}border-danger
-                {% else %}border-danger{% endif %}">
-                <div class="card-body p-2 text-center">
-                  <i class="bi bi-file-earmark-{% if ci.doc %}check-fill text-success{% else %}x text-danger{% endif %} fs-4 d-block mb-1"></i>
-                  <div class="small">{{ ci.tipo.nombre }}</div>
-                  {% if ci.doc %}
-                    <small class="text-muted">{{ ci.doc.fecha_carga|date:"d/m/Y" }}</small>
-                    {% if ci.estado == 'vencido' %}<span class="badge bg-danger d-block mt-1">VENCIDO</span>{% endif %}
-                    <div class="mt-1">
-                      <button type="button" onclick="previewDoc('{{ ci.doc.archivo.url }}','{{ ci.tipo.nombre }}','{{ ci.doc.extension }}')" class="btn btn-sm btn-outline-success py-0 px-1"><i class="bi bi-eye"></i></button>
-                      <a href="{% url 'documento_download' ci.doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-download"></i></a>
-                    </div>
-                  {% else %}
-                    <span class="badge bg-danger">PENDIENTE</span>
-                    <div class="mt-1">
-                      <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?nivel=Contrato&contrato_id={{ item.contrato.pk }}"
-                         class="btn btn-sm btn-danger py-0 px-1"><i class="bi bi-upload"></i></a>
-                    </div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-            {% empty %}
-            <div class="col-12 text-muted small">Sin tipos de documentos de contrato configurados.</div>
-            {% endfor %}
-          </div>
-        </div>
-        {% empty %}
-        <p class="text-muted">Sin contratos registrados.</p>
-        {% endfor %}
+        </div><!-- /acordeón -->
 
         <!-- TAB: Strikes -->
         {% elif tab == 'strikes' %}
@@ -427,6 +527,25 @@
 
       </div>
     </div>
-  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function marcarCambio(input) {
+  const btn = document.getElementById('btnGuardarPersonal');
+  const hint = document.getElementById('hintPersonal');
+  const form = input.closest('form');
+  const hayArchivo = Array.from(form.querySelectorAll('input[type=file]')).some(f => f.files.length > 0);
+  btn.disabled = !hayArchivo;
+  hint.style.display = hayArchivo ? 'none' : '';
+}
+
+function marcarCambioContrato(input, contratoId) {
+  const btn = document.querySelector(`.btn-guardar-contrato-${contratoId}`);
+  const form = input.closest('form');
+  const hayArchivo = Array.from(form.querySelectorAll('input[type=file]')).some(f => f.files.length > 0);
+  btn.disabled = !hayArchivo;
+}
+</script>
 {% endblock %}

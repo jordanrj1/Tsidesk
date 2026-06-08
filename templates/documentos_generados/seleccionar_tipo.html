@@ -16,7 +16,7 @@
     <div class="row g-3">
       {% for tipo_val, tipo_label in tipo_choices %}
       <div class="col-md-4">
-        <a href="?tipo={{ tipo_val }}" class="text-decoration-none">
+        <a href="?tipo={{ tipo_val }}{% if request.GET.trabajador_rut %}&trabajador_rut={{ request.GET.trabajador_rut }}{% endif %}{% if request.GET.obra_id %}&obra_id={{ request.GET.obra_id }}{% endif %}" class="text-decoration-none">
           <div class="card border h-100 card-hover">
             <div class="card-body text-center py-4">
               {% if tipo_val == 'contrato_trabajo' %}<i class="bi bi-file-earmark-text-fill fs-1 text-primary mb-2 d-block"></i>
@@ -26,6 +26,37 @@
               {% elif tipo_val == 'acta_epp' %}<i class="bi bi-shield-fill-check fs-1 text-success mb-2 d-block"></i>
               {% else %}<i class="bi bi-journal-text fs-1 text-secondary mb-2 d-block"></i>{% endif %}
               <div class="fw-semibold">{{ tipo_label }}</div>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Documentos en Blanco ──────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header d-flex align-items-center gap-2 fw-semibold">
+    <i class="bi bi-printer text-secondary"></i>
+    Generar Documentación en Blanco
+    <span class="badge bg-secondary fw-normal ms-1">Sin datos de trabajador</span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Imprime la plantilla oficial vacía (sin datos de ningún trabajador). Útil para completar a mano.
+      Selecciona cuántas copias al abrir la vista de impresión.
+    </p>
+    <div class="row g-3">
+      {% for tipo_val, tipo_label in tipo_choices %}
+      <div class="col-md-4">
+        <a href="{% url 'doc_generado_blank_preview' %}?tipo={{ tipo_val }}{% if empresas %}&empresa_id={{ empresas.0.pk }}{% endif %}"
+           target="_blank" class="text-decoration-none">
+          <div class="card border border-secondary-subtle h-100 card-hover bg-light">
+            <div class="card-body text-center py-3">
+              <i class="bi bi-printer fs-2 text-secondary mb-2 d-block"></i>
+              <div class="fw-semibold small">{{ tipo_label }}</div>
+              <div class="text-muted" style="font-size:.75rem">En blanco</div>
             </div>
           </div>
         </a>

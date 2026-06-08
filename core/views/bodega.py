@@ -2,119 +2,141 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from ..models import Obra, BodegaObra, HistorialMaterial, CatalogoMaterial, Trabajador, Contrato
-from ..forms import DespachoMaterialForm, IngresoStockForm, AjusteUmbralForm
+from ..models import Obra, HistorialMaterial, CatalogoMaterial, Trabajador, Contrato
 
 
 @login_required
 def bodega_index(request):
-    obras = Obra.objects.filter(activo=True, estado__in=['Activa', 'Pausada'])
-    obra_id = request.GET.get('obra_id', '')
-    obra = None
-    bodega_items = []
-    historial = []
+    """Catálogo de materiales e insumos."""
+    q = request.GET.get('q', '')
+    cat = request.GET.get('cat', '')
+    materiales = CatalogoMaterial.objects.filter(activo=True)
+    if q:
+        materiales = materiales.filter(nombre__icontains=q)
+    if cat:
+        materiales = materiales.filter(categoria=cat)
 
-    if obra_id:
-        obra = get_object_or_404(Obra, pk=obra_id, activo=True)
-        bodega_items = BodegaObra.objects.filter(obra=obra).select_related('material').order_by('material__nombre')
-        historial = HistorialMaterial.objects.filter(obra=obra).select_related(
-            'material', 'trabajador_capataz'
-        ).order_by('-fecha_movimiento')[:50]
+    materiales = list(materiales.order_by('categoria', 'nombre'))
+    obras_activas = Obra.objects.filter(activo=True, estado__in=['Activa', 'Pausada']).order_by('nombre')
+    grupos_count = len(set(m.categoria for m in materiales))
 
     context = {
-        'obras': obras,
-        'obra': obra,
-        'obra_id': obra_id,
-        'bodega_items': bodega_items,
-        'historial': historial,
+        'materiales': materiales,
+        'obras_activas': obras_activas,
+        'categorias': CatalogoMaterial.CATEGORIA_CHOICES,
+        'unidades': CatalogoMaterial.UNIDAD_CHOICES,
+        'q': q,
+        'cat': cat,
+        'grupos_count': grupos_count,
     }
     return render(request, 'bodega/index.html', context)
 
 
 @login_required
-def bodega_despacho(request, obra_id):
-    obra = get_object_or_404(Obra, pk=obra_id, activo=True)
-    if request.method == 'POST':
-        material_id = request.POST.get('material_id')
-        capataz_rut = request.POST.get('capataz_rut')
-        cantidad = int(request.POST.get('cantidad', 0))
-        observacion = request.POST.get('observacion', '')
+def bodega_material_save(request):
+    """Crear o editar un material del catálogo."""
+    pk = request.POST.get('pk')
+    nombre = request.POST.get('nombre', '').strip()
+    descripcion = request.POST.get('descripcion', '').strip()
+    categoria = request.POST.get('categoria', 'OTROS')
+    unidad = request.POST.get('unidad_medida', 'unid')
 
-        item, _ = BodegaObra.objects.get_or_create(
-            obra=obra, material_id=material_id, defaults={'stock_actual': 0}
+    if not nombre:
+        messages.error(request, 'El nombre del material es obligatorio.')
+        return redirect('bodega_index')
+
+    if pk:
+        mat = get_object_or_404(CatalogoMaterial, pk=pk)
+        mat.nombre = nombre
+        mat.descripcion = descripcion
+        mat.categoria = categoria
+        mat.unidad_medida = unidad
+        mat.save()
+        messages.success(request, f'Material "{nombre}" actualizado.')
+    else:
+        if CatalogoMaterial.objects.filter(nombre__iexact=nombre).exists():
+            messages.error(request, f'Ya existe un material con el nombre "{nombre}".')
+            return redirect('bodega_index')
+        CatalogoMaterial.objects.create(
+            nombre=nombre, descripcion=descripcion,
+            categoria=categoria, unidad_medida=unidad,
         )
-        if cantidad > item.stock_actual:
-            messages.error(request, f'Stock insuficiente. Disponible: {item.stock_actual}')
-            return redirect(f'/bodega/?obra_id={obra_id}')
+        messages.success(request, f'Material "{nombre}" creado.')
+    return redirect('bodega_index')
 
-        item.stock_actual -= cantidad
-        item.save()
 
+@login_required
+def bodega_material_delete(request, pk):
+    """Desactiva (soft-delete) un material del catálogo."""
+    mat = get_object_or_404(CatalogoMaterial, pk=pk)
+    if request.method == 'POST':
+        mat.activo = False
+        mat.save()
+        messages.success(request, f'Material "{mat.nombre}" eliminado del catálogo.')
+    return redirect('bodega_index')
+
+
+@login_required
+def bodega_registrar_entrega(request):
+    """Registra la entrega de un material a una obra."""
+    if request.method == 'POST':
+        obra = get_object_or_404(Obra, pk=request.POST.get('obra_id'), activo=True)
+        mat = get_object_or_404(CatalogoMaterial, pk=request.POST.get('material_id'), activo=True)
+        cantidad = int(request.POST.get('cantidad', 0))
+        receptor_nombre = request.POST.get('receptor_nombre', '').strip()
+        obs = request.POST.get('observacion', '').strip()
+
+        if cantidad <= 0:
+            messages.error(request, 'La cantidad debe ser mayor a 0.')
+            return redirect('bodega_index')
+
+        # Try to match free-text receptor to a registered worker by name
         capataz = None
-        if capataz_rut:
+        if receptor_nombre:
             try:
-                capataz = Trabajador.objects.get(rut=capataz_rut)
+                capataz = Trabajador.objects.get(rut=receptor_nombre, activo=True)
             except Trabajador.DoesNotExist:
                 pass
 
         HistorialMaterial.objects.create(
             obra=obra,
-            material_id=material_id,
+            material=mat,
             trabajador_capataz=capataz,
+            receptor_libre=receptor_nombre,
             cantidad=cantidad,
             tipo_movimiento='ENTREGA_TERRENO',
-            observacion=observacion,
+            observacion=obs,
             usuario_registro=request.user.username,
         )
-        messages.success(request, f'Despacho registrado: {cantidad} unidades entregadas.')
-    return redirect(f'/bodega/?obra_id={obra_id}')
-
-
-@login_required
-def bodega_ingreso_stock(request, obra_id):
-    obra = get_object_or_404(Obra, pk=obra_id, activo=True)
-    if request.method == 'POST':
-        material_id = request.POST.get('material_id')
-        cantidad = int(request.POST.get('cantidad', 0))
-        observacion = request.POST.get('observacion', '')
-
-        item, _ = BodegaObra.objects.get_or_create(
-            obra=obra, material_id=material_id, defaults={'stock_actual': 0}
-        )
-        item.stock_actual += cantidad
-        item.save()
-
-        HistorialMaterial.objects.create(
-            obra=obra,
-            material_id=material_id,
-            cantidad=cantidad,
-            tipo_movimiento='INGRESO_STOCK',
-            observacion=observacion,
-            usuario_registro=request.user.username,
-        )
-        messages.success(request, f'Stock actualizado: +{cantidad} unidades ingresadas.')
-    return redirect(f'/bodega/?obra_id={obra_id}')
-
-
-@login_required
-def bodega_ajuste_umbral(request, bodega_item_id):
-    item = get_object_or_404(BodegaObra, pk=bodega_item_id)
-    if request.method == 'POST':
-        nuevo_minimo = int(request.POST.get('stock_minimo', 0))
-        item.material.stock_minimo = nuevo_minimo
-        item.material.save()
-        messages.success(request, f'Umbral actualizado a {nuevo_minimo} para {item.material.nombre}.')
-    return redirect(f'/bodega/?obra_id={item.obra_id}')
+        messages.success(request, f'{cantidad} {mat.get_unidad_medida_display()} de "{mat.nombre}" registrados en {obra.nombre}.')
+    return redirect('bodega_index')
 
 
 @login_required
 def bodega_capataces_ajax(request, obra_id):
     obra = get_object_or_404(Obra, pk=obra_id)
-    contratos = Contrato.objects.filter(
-        obra=obra, estado='Vigente', activo=True
-    ).select_related('trabajador')
-    data = [
-        {'rut': c.trabajador.rut, 'nombre': c.trabajador.nombre_completo}
-        for c in contratos
-    ]
+    contratos = Contrato.objects.filter(obra=obra, estado='Vigente', activo=True).select_related('trabajador')
+    data = [{'rut': c.trabajador.rut, 'nombre': c.trabajador.nombre_completo} for c in contratos]
     return JsonResponse({'capataces': data})
+
+
+# Compatibilidad con URLs antiguas
+@login_required
+def bodega_ingreso_central(request):
+    return redirect('bodega_index')
+
+@login_required
+def bodega_ajuste_umbral(request, bodega_item_id):
+    return redirect('bodega_index')
+
+@login_required
+def bodega_asignar_obra(request):
+    return bodega_registrar_entrega(request)
+
+@login_required
+def bodega_despacho(request, obra_id):
+    return redirect('bodega_index')
+
+@login_required
+def bodega_ingreso_stock(request, obra_id):
+    return redirect('bodega_index')

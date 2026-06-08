@@ -1,18 +1,58 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-import os, uuid
+import os, re, uuid
+
+
+def _safe_name(name, maxlen=50):
+    """Convierte un string a nombre seguro para carpetas del sistema de archivos."""
+    name = re.sub(r'[^\w\s\-\.]', '', name, flags=re.UNICODE)
+    name = re.sub(r'\s+', '_', name.strip())
+    return name[:maxlen] or 'sin_nombre'
 
 
 def documento_upload_path(instance, filename):
     ext = filename.split('.')[-1].lower()
-    ref = instance.trabajador_rut if instance.trabajador_rut else (
-        f"obra{instance.obra_id}" if instance.obra_id else f"contrato{instance.contrato_id}"
-    )
-    tipo = instance.tipo_documento.nombre.replace(' ', '_') if instance.tipo_documento else 'DOC'
-    ts = timezone.now().strftime('%Y%m%d%H%M%S')
-    new_name = f"{ref}_{tipo}_{ts}.{ext}"
-    return os.path.join('documentos', str(ref), new_name)
+    tipo = _safe_name(instance.tipo_documento.nombre) if instance.tipo_documento else 'DOC'
+    ts = timezone.now().strftime('%Y%m%d_%H%M%S')
+
+    if instance.contrato_id:
+        # Documento de contrato → obras/{nombre_obra}/trabajadores/{rut}/
+        try:
+            contrato = instance.contrato
+            obra_nombre = _safe_name(contrato.obra.nombre) if contrato.obra else f'obra_{instance.contrato.obra_id}'
+            rut = str(contrato.trabajador_id)
+        except Exception:
+            obra_nombre = 'sin_obra'
+            rut = 'sin_rut'
+        folder = os.path.join('documentos', 'obras', obra_nombre, 'trabajadores', rut)
+        new_name = f"{tipo}_{ts}.{ext}"
+
+    elif instance.obra_id and not instance.trabajador_rut:
+        # Documento de nivel Obra → obras/{nombre_obra}/carpeta/
+        try:
+            obra_nombre = _safe_name(instance.obra.nombre) if instance.obra else f'obra_{instance.obra_id}'
+        except Exception:
+            obra_nombre = f'obra_{instance.obra_id}'
+        folder = os.path.join('documentos', 'obras', obra_nombre, 'carpeta')
+        new_name = f"{tipo}_{ts}.{ext}"
+
+    else:
+        # Documento personal del trabajador → trabajadores/{rut}/
+        rut = instance.trabajador_rut or 'sin_rut'
+        folder = os.path.join('documentos', 'trabajadores', rut)
+        new_name = f"{tipo}_{ts}.{ext}"
+
+    return os.path.join(folder, new_name)
+
+
+def cierre_upload_path(instance, filename):
+    """Cierres mensuales → cierres/{nombre_obra}/{filename}"""
+    try:
+        obra_nombre = _safe_name(instance.obra.nombre) if instance.obra else f'obra_{instance.obra_id}'
+    except Exception:
+        obra_nombre = f'obra_{instance.obra_id}'
+    return os.path.join('cierres', obra_nombre, filename)
 
 
 # ---------------------------------------------------------------------------
@@ -51,17 +91,46 @@ class Especialidad(models.Model):
 
 
 class CatalogoMaterial(models.Model):
+    CATEGORIA_CHOICES = [
+        ('EPP', 'EPP / Protección Personal'),
+        ('ENFIERRADURA', 'Enfierradura'),
+        ('CONSTRUCCION', 'Materiales de Construcción'),
+        ('HERRAMIENTAS', 'Herramientas'),
+        ('ELECTRICO', 'Materiales Eléctricos'),
+        ('OTROS', 'Otros'),
+    ]
+    UNIDAD_CHOICES = [
+        ('unid', 'Unidad'),
+        ('par', 'Par'),
+        ('kg', 'Kilogramo'),
+        ('lts', 'Litros'),
+        ('m', 'Metro'),
+        ('m2', 'Metro cuadrado'),
+        ('m3', 'Metro cúbico'),
+        ('rollo', 'Rollo'),
+        ('caja', 'Caja'),
+        ('saco', 'Saco'),
+        ('gl', 'Galón'),
+    ]
     nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.CharField(max_length=200, blank=True, default='')
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='OTROS')
+    unidad_medida = models.CharField(max_length=10, choices=UNIDAD_CHOICES, default='unid')
+    stock_global = models.IntegerField(default=0)
     stock_minimo = models.IntegerField(default=0)
     activo = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = 'Material / Insumo'
         verbose_name_plural = 'Materiales / Insumos'
-        ordering = ['nombre']
+        ordering = ['categoria', 'nombre']
 
     def __str__(self):
         return self.nombre
+
+    @property
+    def bajo_stock_global(self):
+        return self.stock_global <= self.stock_minimo
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +210,7 @@ class Obra(models.Model):
     fecha_termino_real = models.DateField(null=True, blank=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Activa')
     observaciones = models.TextField(blank=True)
+    archivada = models.BooleanField(default=False)
     creado_el = models.DateTimeField(default=timezone.now)
     activo = models.BooleanField(default=True)
 
@@ -165,6 +235,8 @@ class Contrato(models.Model):
     ESTADO_CHOICES = [
         ('Pendiente de Firma', 'Pendiente de Firma'),
         ('Vigente', 'Vigente'),
+        ('En Licencia', 'En Licencia'),
+        ('Reactivado', 'Reactivado'),
         ('Finalizado', 'Finalizado'),
         ('Rescindido', 'Rescindido'),
         ('Trasladado', 'Trasladado'),
@@ -182,7 +254,10 @@ class Contrato(models.Model):
     fecha_inicio = models.DateField()
     fecha_termino_estimada = models.DateField(null=True, blank=True)
     fecha_termino_real = models.DateField(null=True, blank=True)
-    estado = models.CharField(max_length=25, choices=ESTADO_CHOICES, default='Pendiente de Firma')
+    estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='Pendiente de Firma')
+    fecha_inicio_licencia = models.DateField(null=True, blank=True)
+    fecha_fin_licencia = models.DateField(null=True, blank=True)
+    obs_licencia = models.TextField(blank=True, default='')
     creado_el = models.DateTimeField(default=timezone.now)
     activo = models.BooleanField(default=True)
 
@@ -345,10 +420,11 @@ class HistorialMaterial(models.Model):
         ('ENTREGA_TERRENO', 'Entrega en Terreno'),
         ('AJUSTE', 'Ajuste de Inventario'),
     ]
-    obra = models.ForeignKey(Obra, on_delete=models.PROTECT, related_name='historial_materiales')
+    obra = models.ForeignKey(Obra, on_delete=models.PROTECT, related_name='historial_materiales', null=True, blank=True)
     material = models.ForeignKey(CatalogoMaterial, on_delete=models.PROTECT, related_name='historial')
     trabajador_capataz = models.ForeignKey(Trabajador, on_delete=models.PROTECT, related_name='despachos_recibidos',
                                            to_field='rut', null=True, blank=True)
+    receptor_libre = models.CharField(max_length=150, blank=True, default='')
     cantidad = models.IntegerField()
     tipo_movimiento = models.CharField(max_length=20, choices=TIPO_CHOICES)
     observacion = models.TextField(blank=True)
@@ -372,15 +448,15 @@ class CierreMensual(models.Model):
     obra = models.ForeignKey(Obra, on_delete=models.PROTECT, related_name='cierres_mensuales')
     mes = models.IntegerField()
     anio = models.IntegerField()
+    descripcion = models.CharField(max_length=120, blank=True, default='')
     fecha_cierre = models.DateTimeField(default=timezone.now)
     usuario_cierre = models.CharField(max_length=100)
-    archivo_consolidado = models.FileField(upload_to='cierres_mensuales/', null=True, blank=True)
+    archivo_consolidado = models.FileField(upload_to=cierre_upload_path, null=True, blank=True)
 
     class Meta:
         verbose_name = 'Cierre Mensual'
         verbose_name_plural = 'Cierres Mensuales'
-        unique_together = [('obra', 'mes', 'anio')]
-        ordering = ['-anio', '-mes']
+        ordering = ['-anio', '-mes', '-fecha_cierre']
 
     def __str__(self):
         return f"Cierre {self.mes}/{self.anio} - {self.obra.nombre}"
@@ -445,6 +521,7 @@ class DocumentoGenerado(models.Model):
         ('pacto_horas_extras', 'Pacto Horas Extraordinarias'),
         ('acta_epp', 'Acta Entrega EPP'),
         ('acta_reglamento', 'Acta Entrega Reglamento Interno'),
+        ('acta_reactivacion', 'Acta de Reactivación Post-Licencia'),
     ]
     tipo = models.CharField(max_length=30, choices=TIPO_CHOICES)
     empresa = models.ForeignKey(ConfigEmpresa, on_delete=models.PROTECT, related_name='documentos_generados')

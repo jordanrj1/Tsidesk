@@ -3,8 +3,15 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="mb-0 fw-bold"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Nuevo Contrato</h2>
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Nuevo Contrato</h2>
+    {% if obra_obj %}<small class="text-muted">Para la obra: <strong>{{ obra_obj.nombre }}</strong></small>{% endif %}
+  </div>
+  {% if obra_obj %}
+  <a href="{% url 'obra_detail' obra_obj.pk %}?tab=dotacion" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver a Dotación</a>
+  {% else %}
   <a href="{% url 'contratos_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+  {% endif %}
 </div>
 
 {% if contratos_activos %}
@@ -55,7 +62,13 @@
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Obra <span class="text-danger">*</span></label>
+          {% if obra_obj %}
+          <input type="hidden" name="obra" value="{{ obra_obj.pk }}">
+          <input type="text" class="form-control bg-light" value="{{ obra_obj.nombre }}" disabled>
+          <small class="text-muted"><i class="bi bi-lock-fill me-1"></i>Asignada automáticamente</small>
+          {% else %}
           {{ form.obra }}
+          {% endif %}
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold">Especialidad <span class="text-danger">*</span></label>
@@ -89,7 +102,11 @@
       </div>
       <hr>
       <div class="d-flex gap-2 justify-content-end">
+        {% if obra_obj %}
+        <a href="{% url 'obra_detail' obra_obj.pk %}?tab=dotacion" class="btn btn-outline-secondary">Cancelar</a>
+        {% else %}
         <a href="{% url 'contratos_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+        {% endif %}
         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Crear Contrato</button>
       </div>
     </form>

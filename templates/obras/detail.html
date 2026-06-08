@@ -51,7 +51,8 @@
     <ul class="nav nav-tabs card-header-tabs">
       <li class="nav-item"><a class="nav-link {% if tab == 'resumen' %}active{% endif %}" href="?tab=resumen"><i class="bi bi-info-circle me-1"></i>Resumen</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'dotacion' %}active{% endif %}" href="?tab=dotacion"><i class="bi bi-people me-1"></i>Dotación</a></li>
-      <li class="nav-item"><a class="nav-link {% if tab == 'documentos' %}active{% endif %}" href="?tab=documentos"><i class="bi bi-folder2 me-1"></i>Documentos</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'carpeta' %}active{% endif %}" href="?tab=carpeta"><i class="bi bi-folder2-open me-1"></i>Carpeta de Obra <span class="badge bg-secondary ms-1">{{ documentos|length }}</span></a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'documentos' %}active{% endif %}" href="?tab=documentos"><i class="bi bi-folder2 me-1"></i>Docs. Trabajadores</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'bodega' %}active{% endif %}" href="?tab=bodega"><i class="bi bi-boxes me-1"></i>Inventario</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'cierres' %}active{% endif %}" href="?tab=cierres"><i class="bi bi-calendar-check me-1"></i>Cierres</a></li>
     </ul>
@@ -89,23 +90,50 @@
 
     {% elif tab == 'dotacion' %}
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h6 class="mb-0">Dotación de Obra <span class="badge bg-primary ms-1">{{ contratos|length }}</span></h6>
+      <h6 class="mb-0">Dotación de Obra <span class="badge bg-primary ms-1">{{ contratos_con_doc|length }}</span></h6>
       <div class="d-flex gap-2">
         <a href="{% url 'obra_traslado_masivo' obra.pk %}" class="btn btn-sm btn-warning">
           <i class="bi bi-arrow-right-circle-fill me-1"></i>Trasladar Personal
         </a>
-        <a href="{% url 'contrato_create' %}?obra_id={{ obra.pk }}" class="btn btn-sm btn-success"><i class="bi bi-person-plus me-1"></i>Agregar Trabajador</a>
+        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAgregarTrabajador">
+          <i class="bi bi-person-plus me-1"></i>Agregar Trabajador
+        </button>
       </div>
     </div>
+    {% if contratos_duplicados %}
+    <div class="alert alert-danger d-flex align-items-start gap-2 py-2 mb-2">
+      <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+      <div>
+        <strong>Contratos duplicados detectados.</strong>
+        El mismo trabajador aparece más de una vez en esta obra.
+        Elimina el duplicado de menor jerarquía para limpiar la dotación.
+        <ul class="mb-0 mt-1">
+          {% for c, doc_contrato in contratos_con_doc %}{% if c.trabajador_id in contratos_duplicados and c.estado == 'Pendiente de Firma' %}
+          <li>
+            {{ c.trabajador.nombre_completo }} — Contrato #{{ c.pk }}
+            ({{ c.estado }}, ${{ c.sueldo_base|floatformat:0 }}, inicio {{ c.fecha_inicio|date:"d/m/Y" }})
+            <form method="post" action="{% url 'obra_resolver_duplicado' obra.pk c.pk %}" class="d-inline ms-2">
+              {% csrf_token %}
+              <button type="button" class="btn btn-danger btn-sm py-0 px-2"
+                onclick="if(confirm('¿Eliminar contrato #{{ c.pk }}? Esta acción no se puede deshacer.')) this.closest('form').submit()">
+                <i class="bi bi-trash me-1"></i>Eliminar duplicado
+              </button>
+            </form>
+          </li>
+          {% endif %}{% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
     <div class="table-responsive">
       <table class="table table-hover align-middle">
         <thead class="table-light">
-          <tr><th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Sueldo Base</th><th>Inicio</th><th>Término</th><th>Estado</th><th></th></tr>
+          <tr><th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Sueldo Base</th><th>Inicio</th><th>Término</th><th>Estado</th><th>Contrato Doc.</th><th>Acciones</th></tr>
         </thead>
         <tbody>
-          {% for c in contratos %}
+          {% for c, doc_contrato in contratos_con_doc %}
           {% with otras=c.trabajador.contratos_vigentes %}
-          <tr {% if c.trabajador.en_lista_negra %}class="table-danger"{% endif %}>
+          <tr class="{% if c.trabajador.en_lista_negra %}table-danger{% elif c.estado == 'En Licencia' %}table-warning{% elif c.estado == 'Reactivado' %}table-info{% endif %}">
             <td>
               <a href="{% url 'trabajador_detail' c.trabajador.rut %}">{{ c.trabajador.nombre_completo }}</a>
               {% if c.trabajador.en_lista_negra %}<span class="badge bg-danger ms-1">Lista Negra</span>{% endif %}
@@ -114,18 +142,171 @@
                 <i class="bi bi-diagram-2-fill"></i> {{ otras.count }} obras
               </span>
               {% endif %}
+              {% if c.estado == 'En Licencia' and c.fecha_inicio_licencia %}
+              <div class="text-muted" style="font-size:.75rem"><i class="bi bi-hospital"></i> Lic. desde {{ c.fecha_inicio_licencia|date:"d/m/Y" }}</div>
+              {% endif %}
+              {% if c.estado == 'Reactivado' and c.fecha_fin_licencia %}
+              <div class="text-info" style="font-size:.75rem"><i class="bi bi-arrow-clockwise"></i> Reactivado {{ c.fecha_fin_licencia|date:"d/m/Y" }}</div>
+              {% endif %}
             </td>
             <td><code>{{ c.trabajador.rut }}</code></td>
             <td>{{ c.especialidad.nombre }}</td>
             <td>${{ c.sueldo_base|floatformat:0 }}</td>
             <td>{{ c.fecha_inicio|date:"d/m/Y" }}</td>
             <td>{{ c.fecha_termino_estimada|date:"d/m/Y"|default:"Indef." }}</td>
-            <td><span class="badge {% if c.estado == 'Vigente' %}bg-success{% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ c.estado }}</span></td>
-            <td><a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a></td>
+            <td>
+              <span class="badge
+                {% if c.estado == 'Vigente' %}bg-success
+                {% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark
+                {% elif c.estado == 'En Licencia' %}bg-orange text-dark" style="background:#fd7e14
+                {% elif c.estado == 'Reactivado' %}bg-info text-dark
+                {% else %}bg-secondary{% endif %}">{{ c.estado }}</span>
+            </td>
+            <td>
+              {% if doc_contrato %}
+              <a href="{% url 'doc_generado_preview' doc_contrato.pk %}" target="_blank"
+                 class="badge bg-success text-white text-decoration-none">
+                <i class="bi bi-file-text me-1"></i>Generado
+              </a>
+              {% else %}
+              <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&obra_id={{ obra.pk }}&contrato_id={{ c.pk }}"
+                 class="badge bg-warning text-dark text-decoration-none">
+                <i class="bi bi-file-earmark-plus me-1"></i>Generar
+              </a>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap">
+              {% if c.estado == 'Vigente' or c.estado == 'Pendiente de Firma' %}
+              <button class="btn btn-link btn-sm p-0 me-1 text-warning" title="Poner en Licencia"
+                onclick="abrirModalLicencia({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}')">
+                <i class="bi bi-hospital" style="font-size:.95rem"></i>
+              </button>
+              {% endif %}
+              {% if c.estado == 'En Licencia' %}
+              <button class="btn btn-link btn-sm p-0 me-1 text-info" title="Reactivar"
+                onclick="abrirModalReactivar({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{% if c.fecha_inicio_licencia %}{{ c.fecha_inicio_licencia|date:"d/m/Y" }}{% endif %}')">
+                <i class="bi bi-arrow-clockwise" style="font-size:.95rem"></i>
+              </button>
+              {% endif %}
+              {% if c.estado == 'Reactivado' %}
+              <form method="post" action="{% url 'obra_confirmar_reactivacion' obra.pk c.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link btn-sm p-0 me-1 text-success" title="Confirmar Reactivación">
+                  <i class="bi bi-check-circle" style="font-size:.95rem"></i>
+                </button>
+              </form>
+              {% endif %}
+              <button class="btn btn-link btn-sm p-0 text-danger" title="Quitar de obra"
+                onclick="abrirModalQuitar({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.estado }}')">
+                <i class="bi bi-person-dash" style="font-size:.95rem"></i>
+              </button>
+            </td>
           </tr>
           {% endwith %}
           {% empty %}
-          <tr><td colspan="8" class="text-center text-muted py-4">Sin personal asignado.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-4">Sin personal asignado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% elif tab == 'carpeta' %}
+    <!-- ══ CARPETA DE OBRA ══ -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0"><i class="bi bi-folder2-open text-warning me-2"></i>Carpeta de Obra</h6>
+      <div class="d-flex gap-2">
+        <a href="{% url 'obra_download_zip' obra.pk %}" class="btn btn-sm btn-dark" data-bs-toggle="tooltip" data-bs-title="Descarga todos los documentos de la obra (auditoría)">
+          <i class="bi bi-file-zip me-1"></i>Descargar Todo ZIP
+        </a>
+        <a href="{% url 'obra_upload_doc' obra.pk %}" class="btn btn-sm btn-primary">
+          <i class="bi bi-upload me-1"></i>Subir Documento
+        </a>
+      </div>
+    </div>
+
+    <!-- Filtro por tipo -->
+    <form method="get" class="row g-2 align-items-end mb-3">
+      <input type="hidden" name="tab" value="carpeta">
+      <div class="col-md-4">
+        <input type="text" name="q_carpeta" value="{{ q_carpeta }}" class="form-control form-control-sm" placeholder="Buscar por tipo o fecha...">
+      </div>
+      <div class="col-md-3">
+        <select name="tipo_carpeta" class="form-select form-select-sm">
+          <option value="">Todos los tipos</option>
+          {% for td in tipos_docs_obra %}
+          <option value="{{ td.pk }}" {% if tipo_carpeta == td.pk|stringformat:"s" %}selected{% endif %}>{{ td.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+        {% if q_carpeta or tipo_carpeta %}
+        <a href="?tab=carpeta" class="btn btn-sm btn-outline-secondary ms-1"><i class="bi bi-x-circle me-1"></i>Limpiar</a>
+        {% endif %}
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Tipo de Documento</th>
+            <th>Archivo</th>
+            <th>Fecha Carga</th>
+            <th>Vencimiento</th>
+            <th>Subido por</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documentos_carpeta %}
+          <tr {% if doc.esta_vencido %}class="table-danger"{% elif doc.estado_visual == 'proximo' %}class="table-warning"{% endif %}>
+            <td><span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span></td>
+            <td>
+              <a href="{{ doc.archivo.url }}" target="_blank" class="text-decoration-none">
+                <i class="bi bi-file-earmark me-1"></i>{{ doc.nombre_archivo }}
+              </a>
+            </td>
+            <td class="small text-muted">{{ doc.fecha_carga|date:"d/m/Y H:i" }}</td>
+            <td class="small">
+              {% if doc.fecha_vencimiento %}
+                {% if doc.esta_vencido %}
+                  <span class="badge bg-danger"><i class="bi bi-exclamation-circle me-1"></i>Vencido {{ doc.fecha_vencimiento|date:"d/m/Y" }}</span>
+                {% elif doc.estado_visual == 'proximo' %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Vence {{ doc.fecha_vencimiento|date:"d/m/Y" }}</span>
+                {% else %}
+                  <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ doc.fecha_vencimiento|date:"d/m/Y" }}</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">No vence</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">{{ doc.usuario_carga }}</td>
+            <td class="text-nowrap">
+              <a href="{{ doc.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2"
+                 data-bs-toggle="tooltip" data-bs-title="Ver documento"><i class="bi bi-eye"></i></a>
+              <a href="{% url 'documento_download' doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                 data-bs-toggle="tooltip" data-bs-title="Descargar"><i class="bi bi-download"></i></a>
+              <form method="post" action="{% url 'obra_doc_delete' doc.pk %}" class="d-inline"
+                    onsubmit="return confirm('¿Eliminar este documento?')">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger py-0 px-2"
+                        data-bs-toggle="tooltip" data-bs-title="Eliminar">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-5">
+              <i class="bi bi-folder2-open fs-2 d-block mb-2 text-muted"></i>
+              No hay documentos de obra cargados aún.<br>
+              <a href="{% url 'obra_upload_doc' obra.pk %}" class="btn btn-primary mt-2">
+                <i class="bi bi-upload me-1"></i>Subir primer documento
+              </a>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -133,90 +314,190 @@
 
     {% elif tab == 'documentos' %}
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h6 class="mb-0">Documentos de Trabajadores Activos</h6>
+      <h6 class="mb-0">Documentos de Trabajadores Activos <span class="badge bg-secondary ms-1">{{ docs_trabajadores|length }} trabajador(es)</span></h6>
       <a href="{% url 'obra_download_zip' obra.pk %}" class="btn btn-sm btn-dark"><i class="bi bi-file-zip me-1"></i>Descargar Todo ZIP</a>
     </div>
+
+    {% if docs_trabajadores %}
+    <div class="accordion" id="acordeonDocs">
+      {% for grupo in docs_trabajadores %}
+      <div class="accordion-item border mb-2 rounded">
+        <h2 class="accordion-header" id="hdr-{{ forloop.counter }}">
+          <button class="accordion-button collapsed py-2 px-3 rounded" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#col-{{ forloop.counter }}"
+                  aria-expanded="false" aria-controls="col-{{ forloop.counter }}">
+            <div class="d-flex align-items-center gap-3 w-100">
+              <div class="fw-semibold">{{ grupo.nombre }}</div>
+              <code class="text-muted small">{{ grupo.rut }}</code>
+              <span class="badge bg-primary ms-auto me-3">{{ grupo.docs|length }} doc{% if grupo.docs|length != 1 %}s{% endif %}</span>
+              <a href="{% url 'trabajador_detail' grupo.rut %}?tab=documentos"
+                 class="btn btn-sm btn-outline-secondary py-0 px-2"
+                 onclick="event.stopPropagation()"
+                 data-bs-toggle="tooltip" data-bs-title="Ver perfil del trabajador">
+                <i class="bi bi-person-lines-fill"></i>
+              </a>
+            </div>
+          </button>
+        </h2>
+        <div id="col-{{ forloop.counter }}" class="accordion-collapse collapse"
+             data-bs-parent="#acordeonDocs">
+          <div class="accordion-body p-0">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Tipo de Documento</th>
+                  <th>Contrato</th>
+                  <th>Fecha Carga</th>
+                  <th>Archivo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in grupo.docs %}
+                <tr>
+                  <td class="ps-3"><span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span></td>
+                  <td class="small text-muted">{% if doc.contrato %}#{{ doc.contrato.pk }}{% else %}—{% endif %}</td>
+                  <td class="small text-muted">{{ doc.fecha_carga|date:"d/m/Y H:i" }}</td>
+                  <td class="small">
+                    <i class="bi bi-file-earmark me-1 text-muted"></i>{{ doc.nombre_archivo }}
+                  </td>
+                  <td class="text-nowrap pe-3">
+                    <a href="{{ doc.archivo.url }}" target="_blank"
+                       class="btn btn-sm btn-outline-primary py-0 px-2"
+                       data-bs-toggle="tooltip" data-bs-title="Ver documento">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="{% url 'documento_download' doc.pk %}"
+                       class="btn btn-sm btn-outline-secondary py-0 px-2"
+                       data-bs-toggle="tooltip" data-bs-title="Descargar">
+                      <i class="bi bi-download"></i>
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-folder2-open fs-2 d-block mb-2"></i>
+      Sin documentos de trabajadores cargados para esta obra.
+    </div>
+    {% endif %}
+
+    {% elif tab == 'bodega' %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h6 class="mb-0 fw-bold">Entregas de Material en Obra</h6>
+        <small class="text-muted">Registro de materiales recibidos desde el almacén central</small>
+      </div>
+      <a href="{% url 'bodega_index' %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-boxes me-1"></i>Ir a Bodega Central
+      </a>
+    </div>
+
+    {% if historial_bodega %}
     <div class="table-responsive">
-      <table class="table table-sm table-hover align-middle">
-        <thead class="table-light">
+      <table class="table table-hover table-sm align-middle">
+        <thead class="table-dark">
           <tr>
-            <th><input type="checkbox" id="checkAll" class="form-check-input"></th>
-            <th>Trabajador</th>
-            <th>Tipo Documento</th>
-            <th>Contrato</th>
-            <th>Fecha Carga</th>
-            <th>Acciones</th>
+            <th>Fecha</th>
+            <th>Material</th>
+            <th class="text-center">Cantidad</th>
+            <th>Receptor</th>
+            <th>Registrado por</th>
+            <th>Comentario</th>
           </tr>
         </thead>
         <tbody>
-          {% for doc in docs_trabajadores %}
+          {% for h in historial_bodega %}
           <tr>
-            <td><input type="checkbox" class="form-check-input doc-check" value="{{ doc.pk }}"></td>
+            <td class="text-nowrap small">{{ h.fecha_movimiento|date:"d/m/Y H:i" }}</td>
             <td>
-              {% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}
-              {% elif doc.trabajador_rut %}<a href="{% url 'trabajador_detail' doc.trabajador_rut %}">{{ doc.trabajador_rut }}</a>
-              {% else %}&mdash;{% endif %}
+              <span class="fw-semibold">{{ h.material.nombre }}</span>
+              <span class="text-muted small ms-1">{{ h.material.get_unidad_medida_display }}</span>
             </td>
-            <td><span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span></td>
-            <td>{% if doc.contrato %}#{{ doc.contrato.pk }}{% else %}&mdash;{% endif %}</td>
-            <td class="small text-muted">{{ doc.fecha_carga|date:"d/m/Y H:i" }}</td>
+            <td class="text-center fw-bold text-primary">{{ h.cantidad }}</td>
             <td>
-              <a href="{{ doc.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1"><i class="bi bi-eye"></i></a>
-              <a href="{% url 'documento_download' doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-download"></i></a>
+              {% if h.trabajador_capataz %}
+              <span class="small">{{ h.trabajador_capataz.nombre_completo }}</span>
+              {% elif h.receptor_libre %}
+              <span class="small">{{ h.receptor_libre }}</span>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
             </td>
+            <td class="text-muted small">{{ h.usuario_registro }}</td>
+            <td class="text-muted small">{{ h.observacion|default:"—" }}</td>
           </tr>
-          {% empty %}
-          <tr><td colspan="6" class="text-center text-muted py-4">Sin documentos cargados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-
-    {% elif tab == 'bodega' %}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h6 class="mb-0">Inventario de Bodega</h6>
-      <a href="{% url 'bodega_index' %}?obra_id={{ obra.pk }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-boxes me-1"></i>Ir a Gestión de Bodega</a>
-    </div>
-    <div class="row g-3">
-      {% for item in bodega %}
-      <div class="col-md-4 col-sm-6">
-        <div class="card border-0 {% if item.bajo_stock %}border-danger border-2 bg-danger bg-opacity-10{% else %}shadow-sm{% endif %} h-100">
-          <div class="card-body text-center py-3">
-            <div class="fs-1 fw-bold {% if item.bajo_stock %}text-danger{% else %}text-primary{% endif %}">
-              {{ item.stock_actual }}
-            </div>
-            <div class="fw-semibold small">{{ item.material.nombre }}</div>
-            <div class="text-muted small">Mínimo: {{ item.material.stock_minimo }}</div>
-            {% if item.bajo_stock %}<span class="badge bg-danger mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Stock crítico</span>{% endif %}
-          </div>
-        </div>
+    {% else %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-boxes fs-1 text-secondary d-block mb-2"></i>
+        <h6 class="text-muted">Sin entregas registradas en esta obra</h6>
+        <a href="{% url 'bodega_index' %}" class="btn btn-primary btn-sm mt-2">
+          <i class="bi bi-send me-1"></i>Asignar material desde Bodega Central
+        </a>
       </div>
-      {% empty %}
-      <div class="col-12 text-center text-muted py-4">Sin artículos en bodega.</div>
-      {% endfor %}
     </div>
+    {% endif %}
 
     {% elif tab == 'cierres' %}
+
+    <!-- Historial de cierres mensuales -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h6 class="mb-0">Cierres Mensuales de Planilla</h6>
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalCierre">
-        <i class="bi bi-calendar-plus me-1"></i>Ejecutar Cierre Mensual
+      <h6 class="mb-0">Historial de Cierres Registrados</h6>
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalCierre">
+        <i class="bi bi-calendar-plus me-1"></i>Registrar Cierre Mensual
       </button>
     </div>
     <div class="table-responsive">
       <table class="table table-hover">
         <thead class="table-light">
-          <tr><th>Período</th><th>Fecha Cierre</th><th>Usuario</th></tr>
+          <tr>
+            <th>Período</th><th>Descripción</th><th>Fecha Cierre</th><th>Usuario</th><th>Planilla</th>
+            {% if request.user.is_superuser %}<th></th>{% endif %}
+          </tr>
         </thead>
         <tbody>
           {% for c in cierres %}
           <tr>
             <td><strong>{{ c.mes }}/{{ c.anio }}</strong></td>
+            <td>{% if c.descripcion %}<span class="badge bg-light text-dark border">{{ c.descripcion }}</span>{% else %}<span class="text-muted small">—</span>{% endif %}</td>
             <td>{{ c.fecha_cierre|date:"d/m/Y H:i" }}</td>
             <td>{{ c.usuario_cierre }}</td>
+            <td>
+              {% if c.archivo_consolidado %}
+              <a href="{{ c.archivo_consolidado.url }}" download
+                 class="btn btn-sm btn-outline-success" title="Descargar planilla Excel">
+                <i class="bi bi-file-earmark-excel me-1"></i>Descargar
+              </a>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            {% if request.user.is_superuser %}
+            <td>
+              <form method="post" action="{% url 'obra_cierre_eliminar' obra.pk c.pk %}"
+                    onsubmit="return confirm('¿Eliminar el cierre {{ c.mes }}/{{ c.anio }}? Esta acción no se puede deshacer.')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar cierre">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+            {% endif %}
           </tr>
           {% empty %}
-          <tr><td colspan="3" class="text-center text-muted py-4">Sin cierres registrados.</td></tr>
+          <tr><td colspan="{% if request.user.is_superuser %}6{% else %}5{% endif %}" class="text-center text-muted py-4">Sin cierres registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -231,57 +512,79 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Ejecutar Cierre Mensual</h5>
+        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Registrar Cierre Mensual</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="{% url 'obra_cierre_mensual' obra.pk %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descripción <span class="text-muted fw-normal">(opcional)</span></label>
+            <input type="text" name="descripcion" class="form-control" maxlength="120"
+                   placeholder="Ej: Quincena 1, Semana 3, Corrección mayo…">
+            <small class="text-muted">Se mostrará en el historial y en el nombre del archivo Excel.</small>
+          </div>
           <div class="row g-3 mb-3">
-            <div class="col-4">
-              <label class="form-label">Mes</label>
-              <select name="mes" id="cierreMes" class="form-select">
-                <option value="1">Enero</option><option value="2">Febrero</option>
-                <option value="3">Marzo</option><option value="4">Abril</option>
-                <option value="5">Mayo</option><option value="6">Junio</option>
-                <option value="7">Julio</option><option value="8">Agosto</option>
-                <option value="9">Septiembre</option><option value="10">Octubre</option>
-                <option value="11">Noviembre</option><option value="12">Diciembre</option>
-              </select>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Fecha inicio del período</label>
+              <input type="date" name="fecha_inicio" id="cierreFechaInicio" class="form-control" required>
             </div>
-            <div class="col-4">
-              <label class="form-label">Año</label>
-              <input type="number" name="anio" class="form-control" value="2026" min="2020" max="2035">
-            </div>
-            <div class="col-4">
-              <label class="form-label">Archivo Consolidado <small class="text-muted">(opcional)</small></label>
-              <input type="file" name="archivo_consolidado" class="form-control" accept=".pdf,.xlsx,.xls">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Fecha término del período</label>
+              <input type="date" name="fecha_fin" id="cierreFechaFin" class="form-control" required>
             </div>
           </div>
 
-          <!-- Preview dotación -->
-          <div id="dotacionPreview">
+          <!-- Preview nómina -->
+          <div id="nominaPreview" class="d-none">
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0 fw-bold">Dotación activa al momento del cierre</h6>
-              <span id="dotacionTotal" class="badge bg-primary"></span>
+              <h6 class="mb-0 fw-semibold">Nómina del período</h6>
+              <span id="nominaResumen" class="text-muted small"></span>
             </div>
-            <div class="table-responsive" style="max-height:260px;overflow-y:auto">
+            <div class="table-responsive" style="max-height:240px;overflow-y:auto">
               <table class="table table-sm table-bordered mb-0">
-                <thead class="table-dark sticky-top">
-                  <tr><th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Multiobra</th></tr>
+                <thead class="table-dark sticky-top" style="font-size:.8rem;">
+                  <tr>
+                    <th>Trabajador</th>
+                    <th>RUT</th>
+                    <th>Especialidad</th>
+                    <th class="text-center">Días</th>
+                    <th class="text-end">Sueldo Base</th>
+                    <th>Multiobra</th>
+                  </tr>
                 </thead>
-                <tbody id="dotacionBody">
-                  <tr><td colspan="4" class="text-center text-muted py-3">
-                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>Cargando dotación...
-                  </td></tr>
-                </tbody>
+                <tbody id="nominaBody"></tbody>
               </table>
             </div>
+            <!-- Totales -->
+            <div id="nominaTotales" class="d-flex gap-3 mt-2 justify-content-end small"></div>
+          </div>
+
+          <div id="nominaVacio" class="text-center text-muted py-3 small d-none">
+            <i class="bi bi-calendar-x fs-4 d-block mb-1 text-secondary"></i>
+            Sin contratos activos en ese período.
+          </div>
+
+          <div id="nominaCargando" class="text-center py-3 d-none">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+            <span class="text-muted small">Calculando nómina...</span>
+          </div>
+
+          <div id="nominaInicio" class="text-center text-muted py-3 small">
+            <i class="bi bi-calendar2-range fs-4 d-block mb-1 text-secondary"></i>
+            Selecciona las fechas para previsualizar la nómina del período.
+          </div>
+
+          <div class="alert alert-info py-2 small mt-3 mb-0">
+            <i class="bi bi-file-earmark-excel me-1"></i>
+            Al confirmar se generará automáticamente una planilla Excel (remuneraciones + checklist documental) que quedará adjunta al cierre.
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Confirmar Cierre</button>
+          <button type="submit" class="btn btn-primary" id="btnConfirmarCierreMensual" disabled>
+            <i class="bi bi-check-circle me-1"></i>Confirmar Cierre
+          </button>
         </div>
       </form>
     </div>
@@ -311,10 +614,209 @@
     </div>
   </div>
 </div>
+
+<!-- ── Modal Licencia Médica ──────────────────────────────────────────── -->
+<div class="modal fade" id="modalLicencia" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#fd7e14;color:#fff">
+        <h5 class="modal-title"><i class="bi bi-hospital me-2"></i>Poner en Licencia Médica</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formLicencia" action="">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="mb-3">Trabajador: <strong id="licNombre"></strong></p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Fecha inicio licencia *</label>
+            <input type="date" name="fecha_inicio_licencia" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Observaciones / motivo</label>
+            <textarea name="obs_licencia" class="form-control" rows="3" placeholder="Ej: Licencia médica por accidente laboral..."></textarea>
+          </div>
+          <div class="alert alert-warning py-2 mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            El trabajador seguirá visible en la obra. En el cierre mensual sus días se contarán hasta la fecha de inicio de licencia.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-warning text-dark"><i class="bi bi-hospital me-1"></i>Confirmar Licencia</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Reactivar Post-Licencia ─────────────────────────────────── -->
+<div class="modal fade" id="modalReactivar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-dark">
+        <h5 class="modal-title"><i class="bi bi-arrow-clockwise me-2"></i>Reactivar Post-Licencia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formReactivar" action="">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="mb-1">Trabajador: <strong id="reactNombre"></strong></p>
+          <p class="text-muted small mb-3">Licencia iniciada: <span id="reactFechaLic"></span></p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Fecha de retorno *</label>
+            <input type="date" name="fecha_retorno" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Observaciones</label>
+            <textarea name="obs_reactivacion" class="form-control" rows="3" placeholder="Ej: Alta médica, reincorpora labores..."></textarea>
+          </div>
+          <div class="alert alert-info py-2 mb-0">
+            <i class="bi bi-file-earmark-text me-1"></i>
+            Se generará un <strong>Acta de Reactivación Post-Licencia</strong> automáticamente.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-info text-dark"><i class="bi bi-arrow-clockwise me-1"></i>Reactivar y Generar Acta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Quitar Trabajador ───────────────────────────────────────── -->
+<div class="modal fade" id="modalQuitar" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-person-dash me-2"></i>Quitar Trabajador de la Obra</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Trabajador: <strong id="quitarNombre"></strong></p>
+        <hr>
+        <!-- Pendiente de Firma -->
+        <div id="quitarCasoPendiente">
+          <p class="fw-semibold text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Contrato en estado <em>Pendiente de Firma</em>.</p>
+          <p class="mb-3">¿El trabajador <strong>ya inició labores</strong> en esta obra?</p>
+          <div class="d-flex gap-2 flex-wrap mb-3">
+            <form method="post" id="formQuitarErroneo" action="">
+              {% csrf_token %}<input type="hidden" name="accion" value="eliminar_erroneo">
+              <button type="button" class="btn btn-danger btn-sm"
+                onclick="if(confirm('¿Eliminar registro? El trabajador no aparecerá en planilla.')) this.closest('form').submit()">
+                <i class="bi bi-trash me-1"></i>No inició — Ingreso erróneo, eliminar
+              </button>
+            </form>
+            <form method="post" id="formQuitarMantener" action="">
+              {% csrf_token %}<input type="hidden" name="accion" value="mantener">
+              <button type="submit" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-x me-1"></i>Mantener (cancelar)
+              </button>
+            </form>
+          </div>
+          <hr>
+          <p class="fw-semibold mb-2">¿Ya inició labores y solo necesita corregir el contrato?</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <form method="post" id="formQuitarActualizar" action="">
+              {% csrf_token %}<input type="hidden" name="accion" value="actualizar_contrato">
+              <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil me-1"></i>Editar documento de contrato
+              </button>
+            </form>
+            <form method="post" id="formQuitarEliminarDoc" action="">
+              {% csrf_token %}<input type="hidden" name="accion" value="eliminar_doc_contrato">
+              <button type="button" class="btn btn-outline-warning text-dark btn-sm"
+                onclick="if(confirm('¿Eliminar el documento de contrato generado?')) this.closest('form').submit()">
+                <i class="bi bi-file-x me-1"></i>Eliminar documento de contrato
+              </button>
+            </form>
+          </div>
+        </div>
+        <!-- Vigente / otros -->
+        <div id="quitarCasoVigente" style="display:none">
+          <div class="alert alert-info mb-3 py-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Contrato en estado <strong id="quitarEstadoLabel"></strong>.
+            <strong>¿Aclaración:</strong> Si el trabajador está de licencia o se ausentará temporalmente, usa el icono
+            <i class="bi bi-hospital text-warning"></i> directamente en la fila — no es necesario "quitarlo".
+          </div>
+          <p class="mb-2 fw-semibold">¿Qué deseas hacer?</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-warning text-dark btn-sm" data-bs-dismiss="modal" id="btnIrLicencia">
+              <i class="bi bi-hospital me-1"></i>Poner en Licencia (sigue en esta obra)
+            </button>
+            <a href="" id="quitarLinkFiniquito" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-file-earmark-x me-1"></i>Finiquito (retiro definitivo con documento)
+            </a>
+            <form method="post" id="formQuitarRescindirVigente" action="">
+              {% csrf_token %}<input type="hidden" name="accion" value="eliminar_erroneo">
+              <button type="button" class="btn btn-danger btn-sm"
+                onclick="if(confirm('¿Rescindir contrato y quitar al trabajador de esta obra? El trabajador quedará activo en el sistema y podrá asignarse a otra obra.')) this.closest('form').submit()">
+                <i class="bi bi-arrow-right-circle me-1"></i>Quitar de esta obra (para reasignar a otra)
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _quitarContratoId = null;
+let _quitarNombre = null;
+
+function abrirModalLicencia(contratoId, nombre) {
+  document.getElementById('licNombre').textContent = nombre;
+  document.getElementById('formLicencia').action = `/obras/{{ obra.pk }}/contrato/${contratoId}/licencia/`;
+  new bootstrap.Modal(document.getElementById('modalLicencia')).show();
+}
+
+function abrirModalReactivar(contratoId, nombre, fechaLic) {
+  document.getElementById('reactNombre').textContent = nombre;
+  document.getElementById('reactFechaLic').textContent = fechaLic || '—';
+  document.getElementById('formReactivar').action = `/obras/{{ obra.pk }}/contrato/${contratoId}/reactivar/`;
+  new bootstrap.Modal(document.getElementById('modalReactivar')).show();
+}
+
+function abrirModalQuitar(contratoId, nombre, estado) {
+  _quitarContratoId = contratoId;
+  _quitarNombre = nombre;
+  document.getElementById('quitarNombre').textContent = nombre;
+  document.getElementById('quitarEstadoLabel').textContent = estado;
+  const baseUrl = `/obras/{{ obra.pk }}/contrato/${contratoId}/quitar/`;
+  document.getElementById('formQuitarErroneo').action = baseUrl;
+  document.getElementById('formQuitarMantener').action = baseUrl;
+  document.getElementById('formQuitarActualizar').action = baseUrl;
+  document.getElementById('formQuitarEliminarDoc').action = baseUrl;
+  document.getElementById('formQuitarRescindirVigente').action = baseUrl;
+  document.getElementById('quitarLinkFiniquito').href =
+    `{% url 'doc_generado_create' %}?tipo=finiquito&obra_id={{ obra.pk }}&contrato_id=${contratoId}`;
+  document.getElementById('btnIrLicencia').onclick = function() {
+    bootstrap.Modal.getInstance(document.getElementById('modalQuitar')).hide();
+    setTimeout(() => abrirModalLicencia(contratoId, nombre), 400);
+  };
+  const esPendiente = (estado === 'Pendiente de Firma');
+  document.getElementById('quitarCasoPendiente').style.display = esPendiente ? '' : 'none';
+  document.getElementById('quitarCasoVigente').style.display = esPendiente ? 'none' : '';
+  new bootstrap.Modal(document.getElementById('modalQuitar')).show();
+}
+</script>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+    new bootstrap.Tooltip(el, { trigger: 'hover' });
+  });
+});
+
 // Check all docs
 const checkAll = document.getElementById('checkAll');
 if (checkAll) {
@@ -323,40 +825,100 @@ if (checkAll) {
   });
 }
 
-// Cargar dotación al abrir modal de cierre mensual
+// Modal cierre mensual — preview de nómina en vivo
 const modalCierre = document.getElementById('modalCierre');
 if (modalCierre) {
-  modalCierre.addEventListener('show.bs.modal', cargarDotacion);
+  modalCierre.addEventListener('show.bs.modal', function() {
+    const hoy = new Date();
+    const primerDia = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    const fmt = d => d.toISOString().slice(0, 10);
+    const fi = document.getElementById('cierreFechaInicio');
+    const ff = document.getElementById('cierreFechaFin');
+    if (fi && !fi.value) fi.value = fmt(primerDia);
+    if (ff && !ff.value) ff.value = fmt(ultimoDia);
+    actualizarMesLabel();
+    cargarNomina();
+  });
+
+  ['cierreFechaInicio', 'cierreFechaFin'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => {
+      actualizarMesLabel();
+      clearTimeout(el._t);
+      el._t = setTimeout(cargarNomina, 350);
+    });
+  });
 }
 
-function cargarDotacion() {
-  fetch('{% url "obra_cierre_dotacion_ajax" obra.pk %}')
+function actualizarBotonCierre() {
+  const fi  = document.getElementById('cierreFechaInicio')?.value;
+  const ff  = document.getElementById('cierreFechaFin')?.value;
+  const btn = document.getElementById('btnConfirmarCierreMensual');
+  if (btn) btn.disabled = !(fi && ff && fi <= ff);
+}
+
+function cargarNomina() {
+  const fi = document.getElementById('cierreFechaInicio')?.value;
+  const ff = document.getElementById('cierreFechaFin')?.value;
+  const preview = document.getElementById('nominaPreview');
+  const vacio   = document.getElementById('nominaVacio');
+  const carg    = document.getElementById('nominaCargando');
+  const inicio  = document.getElementById('nominaInicio');
+
+  if (!fi || !ff || fi > ff) {
+    preview.classList.add('d-none');
+    vacio.classList.add('d-none');
+    carg.classList.add('d-none');
+    inicio.classList.remove('d-none');
+    return;
+  }
+
+  inicio.classList.add('d-none');
+  vacio.classList.add('d-none');
+  preview.classList.add('d-none');
+  carg.classList.remove('d-none');
+
+  fetch(`{% url "obra_cierre_nomina_ajax" obra.pk %}?fecha_inicio=${fi}&fecha_fin=${ff}`)
     .then(r => r.json())
     .then(data => {
-      const body = document.getElementById('dotacionBody');
-      const total = document.getElementById('dotacionTotal');
-      total.textContent = `${data.total} trabajador(es)`;
-      if (data.dotacion.length === 0) {
-        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sin dotación activa.</td></tr>';
+      carg.classList.add('d-none');
+      if (!data.filas || data.filas.length === 0) {
+        vacio.classList.remove('d-none');
         return;
       }
-      body.innerHTML = data.dotacion.map(d => {
-        const multiobra = d.otras_obras.length > 0
-          ? `<span class="badge bg-warning text-dark"><i class="bi bi-diagram-2-fill"></i> ${d.otras_obras.join(', ')}</span>`
-          : '<span class="text-muted small">—</span>';
-        return `<tr>
-          <td>${d.nombre}</td>
-          <td><code>${d.rut}</code></td>
-          <td>${d.especialidad}</td>
+      const fmt$ = n => '$' + Number(n).toLocaleString('es-CL');
+      document.getElementById('nominaResumen').textContent =
+        `${data.filas.length} trabajador${data.filas.length !== 1 ? 'es' : ''}`;
+      document.getElementById('nominaBody').innerHTML = data.filas.map((f, i) => {
+        const multiobra = f.otras_obras && f.otras_obras.length > 0
+          ? `<span class="badge bg-warning text-dark" style="font-size:.7rem">${f.otras_obras.join(', ')}</span>`
+          : '<span class="text-muted">—</span>';
+        return `<tr style="font-size:.82rem;background:${i%2===0?'#f9fafb':'#fff'}">
+          <td class="fw-semibold">${f.nombre}</td>
+          <td><code style="font-size:.78rem">${f.rut}</code></td>
+          <td>${f.especialidad}</td>
+          <td class="text-center fw-bold">${f.dias}</td>
+          <td class="text-end">${fmt$(f.sueldo_base)}</td>
           <td>${multiobra}</td>
         </tr>`;
       }).join('');
+      document.getElementById('nominaTotales').innerHTML =
+        `<span class="badge bg-secondary">${data.filas.length} trabajadores</span>
+         <span class="badge bg-success">Suma sueldos base: ${fmt$(data.total_sueldo)}</span>
+         <span class="badge bg-primary">Días promedio: ${data.promedio_dias}</span>`;
+      preview.classList.remove('d-none');
     })
     .catch(() => {
-      document.getElementById('dotacionBody').innerHTML =
-        '<tr><td colspan="4" class="text-center text-muted">No se pudo cargar la dotación.</td></tr>';
+      carg.classList.add('d-none');
+      vacio.classList.remove('d-none');
     });
 }
+
+['cierreFechaInicio', 'cierreFechaFin'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => { actualizarBotonCierre(); cargarNomina(); });
+});
 
 // Cierre de obra
 const btnCerrar = document.getElementById('btnCerrarObra');
@@ -392,4 +954,138 @@ if (btnCerrar) {
   });
 }
 </script>
+
+<!-- ══ Modal: Asignar Trabajador a Obra ══════════════════════════════════ -->
+<div class="modal fade" id="modalAgregarTrabajador" tabindex="-1" aria-labelledby="modalAgregarTrabajadorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'obra_asignar_trabajador' obra.pk %}" id="formAsignarTrabajador">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalAgregarTrabajadorLabel">
+            <i class="bi bi-person-plus me-2"></i>Asignar Trabajador
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <!-- Selección de trabajador -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Trabajador *</label>
+            <select class="form-select" name="trabajador" id="selectTrabajadorModal" required>
+              <option value="">— Seleccionar trabajador —</option>
+              {% for t in trabajadores_disponibles %}
+              <option value="{{ t.rut }}">{{ t.nombre_completo }} ({{ t.rut }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Alerta: contrato vigente en otra obra -->
+          <div id="alertaVigenteModal" class="alert alert-warning d-none mb-3">
+            <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Contrato vigente en otra obra:</strong>
+            <span id="alertaObrasNombres" class="fw-semibold"></span>
+            <div class="small text-muted mt-1">¿Qué deseas hacer?</div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <a id="btnTrasladoModal" href="{% url 'obra_traslado_masivo' obra.pk %}"
+                 class="btn btn-sm btn-warning">
+                <i class="bi bi-arrow-right-circle-fill me-1"></i>Es un traslado
+                <span class="d-block" style="font-size:.7rem;font-weight:normal">Cierra contrato anterior</span>
+              </a>
+              <button type="button" id="btnIngresarIgualModal" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-files me-1"></i>Contrato paralelo
+                <span class="d-block" style="font-size:.7rem;font-weight:normal">Trabaja en ambas obras</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Campos del contrato -->
+          <div id="camposContratoModal">
+            <div class="row g-2 mb-2">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Especialidad *</label>
+                <select class="form-select form-select-sm" name="especialidad" required>
+                  <option value="">— Seleccionar —</option>
+                  {% for esp in especialidades %}
+                  <option value="{{ esp.pk }}">{{ esp.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Tipo Contrato *</label>
+                <select class="form-select form-select-sm" name="tipo_contrato">
+                  <option value="Plazo Fijo">Plazo Fijo</option>
+                  <option value="Por Obra o Faena">Por Obra o Faena</option>
+                  <option value="Indefinido">Indefinido</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-12">
+                <label class="form-label small fw-semibold">Fecha Inicio *</label>
+                <input type="date" class="form-control form-control-sm" name="fecha_inicio" required>
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Fecha Término Estimada</label>
+                <input type="date" class="form-control form-control-sm" name="fecha_termino_estimada">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <a href="{% url 'trabajador_create' %}" class="btn btn-outline-secondary btn-sm me-auto" target="_blank">
+            <i class="bi bi-person-plus me-1"></i>Crear nuevo trabajador
+          </a>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success btn-sm" id="btnSubmitAsignar" disabled>
+            <i class="bi bi-check-lg me-1"></i>Asignar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const select = document.getElementById('selectTrabajadorModal');
+  const alerta = document.getElementById('alertaVigenteModal');
+  const obrasList = document.getElementById('alertaObrasNombres');
+  const btnSubmit = document.getElementById('btnSubmitAsignar');
+  const btnIgual = document.getElementById('btnIngresarIgualModal');
+
+  select.addEventListener('change', function () {
+    alerta.classList.add('d-none');
+    btnSubmit.disabled = true;
+    const rut = this.value;
+    if (!rut) return;
+
+    fetch('{% url "obra_check_trabajador" obra.pk %}?rut=' + encodeURIComponent(rut))
+      .then(r => r.json())
+      .then(data => {
+        if (data.vigente_otras_obras.length > 0) {
+          obrasList.textContent = data.vigente_otras_obras.map(o => o.obra_nombre).join(', ');
+          alerta.classList.remove('d-none');
+        } else {
+          btnSubmit.disabled = false;
+        }
+      })
+      .catch(() => { btnSubmit.disabled = false; });
+  });
+
+  btnIgual.addEventListener('click', function () {
+    alerta.classList.add('d-none');
+    btnSubmit.disabled = false;
+  });
+
+  document.getElementById('modalAgregarTrabajador').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('formAsignarTrabajador').reset();
+    alerta.classList.add('d-none');
+    btnSubmit.disabled = true;
+  });
+}());
+</script>
+
 {% endblock %}

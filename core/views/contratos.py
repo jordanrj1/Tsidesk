@@ -130,10 +130,19 @@ def contrato_create(request):
         except Trabajador.DoesNotExist:
             pass
 
+    obra_obj = None
+    if obra_id:
+        try:
+            obra_obj = Obra.objects.get(pk=obra_id)
+        except Obra.DoesNotExist:
+            pass
+
     context = {
         'form': form,
         'trabajador': trabajador,
         'contratos_activos': contratos_activos,
+        'obra_id': obra_id,
+        'obra_obj': obra_obj,
     }
     return render(request, 'contratos/form.html', context)
 

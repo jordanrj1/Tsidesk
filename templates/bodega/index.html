@@ -2,216 +2,379 @@
 {% block title %}Bodega / Materiales | TsDesk{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="mb-0 fw-bold"><i class="bi bi-boxes text-primary me-2"></i>Gestión de Bodega</h2>
+
+<!-- Encabezado -->
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-boxes text-primary me-2"></i>Bodega / Materiales</h4>
+    <small class="text-muted">Catálogo de materiales e insumos · registro de entregas en obra</small>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalMaterial"
+            onclick="resetModalMaterial()">
+      <i class="bi bi-plus-lg me-1"></i>Nuevo Material
+    </button>
+    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalEntrega"
+            onclick="resetEntrega()">
+      <i class="bi bi-send me-1"></i>Registrar Entrega en Obra
+    </button>
+  </div>
 </div>
 
-<!-- Selector de obra -->
+<!-- Barra de resumen -->
 <div class="card border-0 shadow-sm mb-3">
-  <div class="card-body py-2">
-    <form method="get" class="row g-2 align-items-end">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex align-items-center gap-4 flex-wrap" style="font-size:.85rem">
+      <span class="text-muted">
+        <i class="bi bi-boxes me-1 text-primary"></i>
+        <strong class="text-dark">{{ materiales|length }}</strong> material{{ materiales|length|pluralize:"es" }} en catálogo
+      </span>
+      <span class="text-muted">
+        <i class="bi bi-tag me-1"></i>
+        <strong class="text-dark">{{ grupos_count }}</strong> categoría{{ grupos_count|pluralize:"s" }}
+      </span>
+      <span class="text-muted">
+        <i class="bi bi-building me-1"></i>
+        <strong class="text-dark">{{ obras_activas|length }}</strong> obra{{ obras_activas|length|pluralize:"s" }} activa{{ obras_activas|length|pluralize:"s" }}
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-2 px-3">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" name="q" value="{{ q }}" class="form-control border-start-0"
+                 placeholder="Buscar material...">
+        </div>
+      </div>
       <div class="col-md-4">
-        <label class="form-label small fw-semibold mb-1">Seleccionar Obra</label>
-        <select name="obra_id" class="form-select" onchange="this.form.submit()">
-          <option value="">-- Seleccione una obra --</option>
-          {% for o in obras %}
-          <option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.nombre }}</option>
+        <select name="cat" class="form-select form-select-sm">
+          <option value="">Todas las categorías</option>
+          {% for val, label in categorias %}
+          <option value="{{ val }}" {% if cat == val %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary btn-sm flex-grow-1">Filtrar</button>
+        {% if q or cat %}<a href="{% url 'bodega_index' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x"></i></a>{% endif %}
       </div>
     </form>
   </div>
 </div>
 
-{% if obra %}
+<!-- Catálogo agrupado por categoría -->
+{% regroup materiales by get_categoria_display as grupos_cat %}
 
-<!-- Formulario de despacho lateral -->
-<div class="row g-3">
-  <div class="col-lg-8">
-    <h5 class="fw-bold mb-3">Inventario: {{ obra.nombre }}</h5>
-    <div class="row g-2" id="inventario">
-      {% for item in bodega_items %}
-      <div class="col-md-4 col-sm-6">
-        <div class="card border-0 h-100 {% if item.bajo_stock %}border-danger border-2 stock-critico{% else %}shadow-sm{% endif %}">
-          <div class="card-body text-center py-3 position-relative">
-            {% if item.bajo_stock %}
-            <span class="position-absolute top-0 end-0 m-1 badge bg-danger pulse"><i class="bi bi-exclamation-triangle"></i></span>
-            {% endif %}
-            <div class="fs-1 fw-bold {% if item.bajo_stock %}text-danger{% else %}text-success{% endif %}">
-              {{ item.stock_actual }}
+{% for grupo in grupos_cat %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-2 border-bottom pb-1">
+    <span class="cat-bg-{{ grupo.list.0.categoria }}"
+          style="width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">
+      {% if grupo.list.0.categoria == 'EPP' %}<i class="bi bi-shield-fill"></i>
+      {% elif grupo.list.0.categoria == 'ENFIERRADURA' %}<i class="bi bi-tools"></i>
+      {% elif grupo.list.0.categoria == 'CONSTRUCCION' %}<i class="bi bi-bricks"></i>
+      {% elif grupo.list.0.categoria == 'HERRAMIENTAS' %}<i class="bi bi-wrench-adjustable"></i>
+      {% elif grupo.list.0.categoria == 'ELECTRICO' %}<i class="bi bi-lightning-fill"></i>
+      {% else %}<i class="bi bi-box-seam"></i>{% endif %}
+    </span>
+    <span class="fw-semibold text-dark">{{ grupo.grouper }}</span>
+    <span class="badge bg-light text-secondary border" style="font-size:.72rem">{{ grupo.list|length }}</span>
+  </div>
+
+  <div class="row g-3">
+    {% for m in grupo.list %}
+    <div class="col-sm-6 col-md-4 col-xl-3">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body p-3">
+
+          <!-- Ícono + nombre -->
+          <div class="d-flex align-items-start gap-2 mb-3">
+            <div class="cat-bg-{{ m.categoria }} flex-shrink-0"
+                 style="width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.15rem">
+              {% if m.categoria == 'EPP' %}<i class="bi bi-shield-fill"></i>
+              {% elif m.categoria == 'ENFIERRADURA' %}<i class="bi bi-tools"></i>
+              {% elif m.categoria == 'CONSTRUCCION' %}<i class="bi bi-bricks"></i>
+              {% elif m.categoria == 'HERRAMIENTAS' %}<i class="bi bi-wrench-adjustable"></i>
+              {% elif m.categoria == 'ELECTRICO' %}<i class="bi bi-lightning-fill"></i>
+              {% else %}<i class="bi bi-box-seam"></i>{% endif %}
             </div>
-            <div class="fw-semibold small">{{ item.material.nombre }}</div>
-            <div class="text-muted small">Mín: {{ item.material.stock_minimo }}</div>
-            {% if item.bajo_stock %}
-            <div class="mt-2 d-flex gap-1 justify-content-center flex-wrap">
-              <button class="btn btn-danger btn-sm" onclick="abrirIngreso({{ item.material.pk }}, '{{ item.material.nombre }}')">
-                <i class="bi bi-plus-lg"></i> Ingresar
-              </button>
-              <button class="btn btn-outline-warning btn-sm" onclick="abrirUmbral({{ item.pk }}, {{ item.material.stock_minimo }})">
-                <i class="bi bi-gear"></i> Umbral
-              </button>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold small text-truncate" title="{{ m.nombre }}">{{ m.nombre }}</div>
+              <div class="text-muted" style="font-size:.72rem">
+                {% if m.descripcion %}{{ m.descripcion }}{% else %}{{ m.get_categoria_display }}{% endif %}
+              </div>
             </div>
-            {% else %}
-            <div class="mt-2 d-flex gap-1 justify-content-center">
-              <button class="btn btn-outline-primary btn-sm" onclick="abrirIngreso({{ item.material.pk }}, '{{ item.material.nombre }}')">
-                <i class="bi bi-plus-lg"></i>
+          </div>
+
+          <!-- Unidad -->
+          <div class="d-flex align-items-center gap-1 mb-3 px-1">
+            <i class="bi bi-rulers text-muted" style="font-size:.8rem"></i>
+            <span class="text-muted small">{{ m.get_unidad_medida_display }}</span>
+          </div>
+
+          <!-- Acciones -->
+          <div class="d-flex gap-1 pt-2 border-top">
+            <button class="btn btn-success btn-sm flex-fill py-1"
+                    onclick="abrirEntrega({{ m.pk }}, '{{ m.nombre|escapejs }}', '{{ m.get_unidad_medida_display }}')"
+                    title="Registrar entrega en obra">
+              <i class="bi bi-send me-1" style="font-size:.8rem"></i><span style="font-size:.78rem">Entregar</span>
+            </button>
+            <button class="btn btn-outline-secondary btn-sm px-2 py-1"
+                    title="Editar material"
+                    onclick="abrirEditar({{ m.pk }}, '{{ m.nombre|escapejs }}', '{{ m.descripcion|escapejs }}', '{{ m.categoria }}', '{{ m.unidad_medida }}')">
+              <i class="bi bi-pencil" style="font-size:.8rem"></i>
+            </button>
+            <form method="post" action="{% url 'bodega_material_delete' m.pk %}" class="d-inline"
+                  onsubmit="return confirm('¿Eliminar {{ m.nombre|escapejs }} del catálogo?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm px-2 py-1" title="Eliminar material">
+                <i class="bi bi-trash" style="font-size:.8rem"></i>
               </button>
-              <button class="btn btn-outline-secondary btn-sm" onclick="abrirDespacho({{ item.material.pk }}, '{{ item.material.nombre }}', {{ item.stock_actual }})">
-                <i class="bi bi-arrow-right-circle"></i>
-              </button>
-            </div>
-            {% endif %}
+            </form>
           </div>
         </div>
       </div>
-      {% empty %}
-      <div class="col-12 text-muted text-center py-4">No hay materiales configurados. Configure el catálogo primero.</div>
-      {% endfor %}
     </div>
-  </div>
-
-  <!-- Panel despacho -->
-  <div class="col-lg-4">
-    <div class="card border-0 shadow-sm mb-3" id="panelDespacho" style="display:none">
-      <div class="card-header bg-primary text-white">
-        <i class="bi bi-arrow-right-circle me-2"></i><strong>Despacho a Terreno</strong>
-      </div>
-      <div class="card-body">
-        <form method="post" action="{% url 'bodega_despacho' obra.pk %}">
-          {% csrf_token %}
-          <input type="hidden" name="material_id" id="despachoMaterialId">
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Material</label>
-            <input type="text" id="despachoMaterialNombre" class="form-control" readonly>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Capataz Receptor <span class="text-danger">*</span></label>
-            <select name="capataz_rut" class="form-select" id="selectCapataz">
-              <option value="">Cargando...</option>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Cantidad <span class="text-danger">*</span></label>
-            <input type="number" name="cantidad" min="1" class="form-control" id="despachoMaximo">
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Observación</label>
-            <textarea name="observacion" class="form-control" rows="2"></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check2 me-1"></i>Confirmar Despacho</button>
-        </form>
-      </div>
-    </div>
-
-    <div class="card border-0 shadow-sm mb-3" id="panelIngreso" style="display:none">
-      <div class="card-header bg-success text-white">
-        <i class="bi bi-plus-lg me-2"></i><strong>Ingreso de Stock</strong>
-      </div>
-      <div class="card-body">
-        <form method="post" action="{% url 'bodega_ingreso_stock' obra.pk %}">
-          {% csrf_token %}
-          <input type="hidden" name="material_id" id="ingresoMaterialId">
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Material</label>
-            <input type="text" id="ingresoMaterialNombre" class="form-control" readonly>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Cantidad a Ingresar <span class="text-danger">*</span></label>
-            <input type="number" name="cantidad" min="1" class="form-control">
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Observación</label>
-            <textarea name="observacion" class="form-control" rows="2"></textarea>
-          </div>
-          <button type="submit" class="btn btn-success w-100"><i class="bi bi-check2 me-1"></i>Registrar Ingreso</button>
-        </form>
-      </div>
-    </div>
-
-    <!-- Historial -->
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-dark text-white"><strong><i class="bi bi-clock-history me-2"></i>Últimos Movimientos</strong></div>
-      <div class="list-group list-group-flush" style="max-height:400px;overflow-y:auto">
-        {% for h in historial %}
-        <div class="list-group-item list-group-item-action py-2">
-          <div class="d-flex justify-content-between">
-            <span class="badge {% if h.tipo_movimiento == 'INGRESO_STOCK' %}bg-success{% elif h.tipo_movimiento == 'ENTREGA_TERRENO' %}bg-primary{% else %}bg-warning text-dark{% endif %} small">
-              {{ h.tipo_movimiento }}
-            </span>
-            <small class="text-muted">{{ h.fecha_movimiento|date:"d/m H:i" }}</small>
-          </div>
-          <div class="small fw-semibold">{{ h.material.nombre }} &times;{{ h.cantidad }}</div>
-          {% if h.trabajador_capataz %}<small class="text-muted">Capataz: {{ h.trabajador_capataz.nombre_completo }}</small>{% endif %}
-        </div>
-        {% empty %}
-        <div class="list-group-item text-muted text-center py-3">Sin movimientos.</div>
-        {% endfor %}
-      </div>
-    </div>
+    {% endfor %}
   </div>
 </div>
-
-{% else %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-boxes fs-1 d-block mb-2"></i>
-  <h5>Seleccione una obra para ver el inventario</h5>
+{% empty %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-boxes fs-1 text-secondary d-block mb-2"></i>
+    <h6 class="text-muted mb-3">Sin materiales en el catálogo</h6>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalMaterial"
+            onclick="resetModalMaterial()">
+      <i class="bi bi-plus-lg me-1"></i>Agregar primer material
+    </button>
+  </div>
 </div>
-{% endif %}
+{% endfor %}
 
-<!-- Modal umbral -->
-<div class="modal fade" id="modalUmbral" tabindex="-1">
-  <div class="modal-dialog modal-sm">
+
+<style>
+.cat-bg-EPP          { background:#DCFCE7; color:#16A34A; }
+.cat-bg-ENFIERRADURA { background:#FEF3C7; color:#D97706; }
+.cat-bg-CONSTRUCCION { background:#E0F2FE; color:#0284C7; }
+.cat-bg-HERRAMIENTAS { background:#F3F4F6; color:#374151; }
+.cat-bg-ELECTRICO    { background:#FEF9C3; color:#CA8A04; }
+.cat-bg-OTROS        { background:#EDE9FE; color:#7C3AED; }
+</style>
+
+
+<!-- ── MODALES ─────────────────────────────────────────────────────── -->
+
+<!-- Modal: Agregar / Editar material -->
+<div class="modal fade" id="modalMaterial" tabindex="-1">
+  <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header"><h6 class="modal-title">Ajustar Umbral Mínimo</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <form method="post" id="formUmbral">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" id="modalMaterialTitulo">
+          <i class="bi bi-box me-2 text-primary"></i>Nuevo Material
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'bodega_material_save' %}">
         {% csrf_token %}
+        <input type="hidden" name="pk" id="matPk">
         <div class="modal-body">
-          <label class="form-label">Nuevo stock mínimo</label>
-          <input type="number" name="stock_minimo" id="umbralValor" class="form-control" min="0">
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Nombre <span class="text-danger">*</span></label>
+            <input type="text" name="nombre" id="matNombre" class="form-control" required
+                   placeholder="Ej: Cemento Portland">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Descripción <span class="text-muted fw-normal">(opcional)</span></label>
+            <input type="text" name="descripcion" id="matDescripcion" class="form-control"
+                   maxlength="200" placeholder="Ej: Saco 25kg, uso estructural">
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold small">Categoría</label>
+              <select name="categoria" id="matCategoria" class="form-select">
+                {% for val, label in categorias %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold small">Unidad de medida</label>
+              <select name="unidad_medida" id="matUnidad" class="form-select">
+                {% for val, label in unidades %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-warning btn-sm">Guardar</button>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<!-- Modal: Registrar entrega en obra -->
+<div class="modal fade" id="modalEntrega" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">
+          <i class="bi bi-send me-2 text-success"></i>Registrar Entrega en Obra
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'bodega_registrar_entrega' %}">
+        {% csrf_token %}
+        <div class="modal-body">
+
+          <!-- Material (selector libre) -->
+          <div class="mb-3" id="entregaMatSelectorBox">
+            <label class="form-label fw-semibold small">Material <span class="text-danger">*</span></label>
+            <select name="material_id" id="entregaMatId" class="form-select" required>
+              <option value="">Selecciona un material...</option>
+              {% for m in materiales %}
+              <option value="{{ m.pk }}" data-unidad="{{ m.get_unidad_medida_display }}">
+                {{ m.nombre }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <!-- Material fijo (desde card) -->
+          <div class="mb-3 d-none" id="entregaMatFijoBox">
+            <label class="form-label fw-semibold small">Material</label>
+            <div class="fw-semibold ps-1 py-1" id="entregaMatFijoLabel"></div>
+            <input type="hidden" name="material_id" id="entregaMatIdFijo" disabled>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Obra <span class="text-danger">*</span></label>
+            <select name="obra_id" id="entregaObraId" class="form-select" required
+                    onchange="cargarReceptores(this.value)">
+              <option value="">Selecciona una obra...</option>
+              {% for o in obras_activas %}
+              <option value="{{ o.pk }}">{{ o.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-5">
+              <label class="form-label fw-semibold small">Cantidad <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="number" name="cantidad" id="entregaCantidad" class="form-control" min="1" required>
+                <span class="input-group-text" id="entregaUnidadLabel" style="font-size:.8rem">unid.</span>
+              </div>
+            </div>
+            <div class="col-7">
+              <label class="form-label fw-semibold small">Receptor</label>
+              <input type="text" name="receptor_nombre" id="entregaReceptor"
+                     class="form-control" list="datalistReceptores"
+                     placeholder="Nombre del receptor (opcional)" autocomplete="off">
+              <datalist id="datalistReceptores"></datalist>
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label fw-semibold small">Observación</label>
+            <input type="text" name="observacion" class="form-control"
+                   placeholder="Ej: Para sector A, entrega de turno mañana">
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Registrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function abrirDespacho(matId, matNombre, stockMax) {
-  document.getElementById('panelDespacho').style.display = 'block';
-  document.getElementById('panelIngreso').style.display = 'none';
-  document.getElementById('despachoMaterialId').value = matId;
-  document.getElementById('despachoMaterialNombre').value = matNombre;
-  document.getElementById('despachoMaximo').max = stockMax;
+/* ── Registrar entrega ───────────────────────────────────────────── */
+function resetEntrega() {
+  // Muestra selector de material
+  document.getElementById('entregaMatSelectorBox').classList.remove('d-none');
+  const sel = document.getElementById('entregaMatId');
+  sel.disabled = false;
+  sel.value = '';
+  document.getElementById('entregaMatFijoBox').classList.add('d-none');
+  document.getElementById('entregaMatIdFijo').disabled = true;
+  document.getElementById('entregaUnidadLabel').textContent = 'unid.';
+  document.getElementById('entregaCantidad').value = '';
+  document.getElementById('entregaObraId').value = '';
+  document.getElementById('entregaReceptor').innerHTML = '<option value="">Selecciona una obra primero...</option>';
+}
 
-  // Cargar capataces via AJAX
-  fetch('/bodega/{{ obra.pk }}/capataces/')
+function abrirEntrega(matId, matNombre, matUnidad) {
+  // Oculta selector, muestra etiqueta fija
+  document.getElementById('entregaMatSelectorBox').classList.add('d-none');
+  document.getElementById('entregaMatId').disabled = true;
+  const fijoBox = document.getElementById('entregaMatFijoBox');
+  fijoBox.classList.remove('d-none');
+  document.getElementById('entregaMatFijoLabel').textContent = matNombre;
+  const fijoInput = document.getElementById('entregaMatIdFijo');
+  fijoInput.value = matId;
+  fijoInput.disabled = false;
+  document.getElementById('entregaUnidadLabel').textContent = matUnidad || 'unid.';
+  document.getElementById('entregaCantidad').value = '';
+  document.getElementById('entregaObraId').value = '';
+  document.getElementById('entregaReceptor').innerHTML = '<option value="">Selecciona una obra primero...</option>';
+  new bootstrap.Modal(document.getElementById('modalEntrega')).show();
+}
+
+// Actualiza unidad al cambiar material en selector libre
+document.getElementById('entregaMatId').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  document.getElementById('entregaUnidadLabel').textContent = opt?.dataset?.unidad || 'unid.';
+});
+
+function cargarReceptores(obraId) {
+  const dl = document.getElementById('datalistReceptores');
+  dl.innerHTML = '';
+  if (!obraId) return;
+  fetch(`/bodega/${obraId}/capataces/`)
     .then(r => r.json())
     .then(d => {
-      const sel = document.getElementById('selectCapataz');
-      sel.innerHTML = '<option value="">-- Seleccione capataz --</option>';
       d.capataces.forEach(c => {
-        sel.innerHTML += `<option value="${c.rut}">${c.nombre} (${c.rut})</option>`;
+        const opt = document.createElement('option');
+        opt.value = c.nombre;
+        dl.appendChild(opt);
       });
     });
 }
 
-function abrirIngreso(matId, matNombre) {
-  document.getElementById('panelIngreso').style.display = 'block';
-  document.getElementById('panelDespacho').style.display = 'none';
-  document.getElementById('ingresoMaterialId').value = matId;
-  document.getElementById('ingresoMaterialNombre').value = matNombre;
+/* ── Crear / Editar material ─────────────────────────────────────── */
+function resetModalMaterial() {
+  document.getElementById('modalMaterialTitulo').innerHTML = '<i class="bi bi-box me-2 text-primary"></i>Nuevo Material';
+  document.getElementById('matPk').value = '';
+  document.getElementById('matNombre').value = '';
+  document.getElementById('matDescripcion').value = '';
+  const cat = document.getElementById('matCategoria');
+  const uni = document.getElementById('matUnidad');
+  if (cat) cat.value = 'OTROS';
+  if (uni) uni.value = 'unid';
 }
 
-function abrirUmbral(itemId, valorActual) {
-  document.getElementById('formUmbral').action = `/bodega/umbral/${itemId}/`;
-  document.getElementById('umbralValor').value = valorActual;
-  new bootstrap.Modal(document.getElementById('modalUmbral')).show();
+function abrirEditar(pk, nombre, descripcion, cat, unidad) {
+  document.getElementById('modalMaterialTitulo').innerHTML = '<i class="bi bi-pencil me-2 text-secondary"></i>Editar Material';
+  document.getElementById('matPk').value = pk;
+  document.getElementById('matNombre').value = nombre;
+  document.getElementById('matDescripcion').value = descripcion;
+  document.getElementById('matCategoria').value = cat;
+  document.getElementById('matUnidad').value = unidad;
+  new bootstrap.Modal(document.getElementById('modalMaterial')).show();
 }
 </script>
 {% endblock %}

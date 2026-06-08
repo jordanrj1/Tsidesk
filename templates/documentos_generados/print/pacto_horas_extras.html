@@ -22,6 +22,18 @@
 </style>
 </head>
 <body>
+{% if is_blank %}
+<div class="print-bar">
+  <strong>Plantilla en Blanco — {{ tipo_label }}</strong>
+  <span style="display:flex;align-items:center;gap:6px;margin-left:12px">
+    <label style="font-size:12px;white-space:nowrap">Copias:</label>
+    <input type="number" id="copiasInput" value="1" min="1" max="20"
+           style="width:55px;padding:3px 6px;border-radius:4px;border:none;font-size:13px">
+  </span>
+  <button onclick="imprimirCopias()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-weight:bold;">Imprimir</button>
+  <a href="{% url 'doc_generado_create' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
+</div>
+{% else %}
 <div class="print-bar">
   <strong>Pacto Horas Extras — {{ doc.trabajador.nombre_completo }}</strong>
   <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
@@ -29,6 +41,7 @@
   <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
   <a href="{% url 'doc_generado_list' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
 </div>
+{% endif %}
 
 <div class="page" style="margin-top:45px">
   <h1 class="titulo">PACTO HORAS EXTRAORDINARIAS</h1>
@@ -62,5 +75,22 @@
     <div class="firma-box"><div class="firma-linea">Firma del Trabajador<br>Rut: {{ doc.trabajador.rut }}</div></div>
   </div>
 </div>
+{% if is_blank %}
+<script>
+function imprimirCopias() {
+  const copies = Math.max(1, parseInt(document.getElementById('copiasInput').value) || 1);
+  const page = document.querySelector('.page');
+  document.querySelectorAll('.page-extra-copy').forEach(el => el.remove());
+  for (let i = 1; i < copies; i++) {
+    const clone = page.cloneNode(true);
+    clone.classList.add('page-extra-copy');
+    clone.style.pageBreakBefore = 'always';
+    page.parentNode.appendChild(clone);
+  }
+  window.print();
+  setTimeout(() => document.querySelectorAll('.page-extra-copy').forEach(el => el.remove()), 1500);
+}
+</script>
+{% endif %}
 </body>
 </html>

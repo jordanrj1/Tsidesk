@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Acta Reactivación — {{ doc.trabajador.nombre_completo }}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
+  .page { width:210mm; min-height:297mm; margin:0 auto; padding:15mm 18mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  h1.titulo { font-size:13px; font-weight:bold; text-align:center; margin-bottom:4px; text-transform:uppercase; }
+  h2.subtitulo { font-size:11px; text-align:center; margin-bottom:14px; }
+  .empresa-data { margin-bottom:10px; }
+  .label { font-weight:bold; display:inline-block; width:150px; }
+  .valor { border-bottom:1px solid #000; min-width:160px; display:inline-block; padding:0 3px; }
+  .cuerpo { margin: 8px 0; text-align:justify; line-height:1.6; }
+  .highlight { border-bottom:1px solid #000; min-width:100px; display:inline-block; padding:0 3px; }
+  .firma-section { display:flex; justify-content:space-between; margin-top:50px; }
+  .firma-box { text-align:center; width:45%; }
+  .firma-linea { border-top:1px solid #000; margin-top:60px; padding-top:4px; font-size:10px; }
+  .obs-box { border:1px solid #ccc; padding:8px; margin-top:10px; background:#f9f9f9; }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <strong>Acta de Reactivación — {{ doc.trabajador.nombre_completo }}</strong>
+  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
+  <button onclick="window.print()" style="background:#198754;color:white;padding:6px 14px;border-radius:4px;border:none;cursor:pointer;">Imprimir</button>
+  <a href="{% url 'doc_generado_list' %}" style="color:#adb5bd;margin-left:auto;">← Volver</a>
+</div>
+
+<div class="page" style="margin-top:50px;">
+
+  <h1 class="titulo">ACTA DE REACTIVACIÓN POST-LICENCIA MÉDICA</h1>
+  <h2 class="subtitulo">{{ empresa_print.nombre|default:"" }}</h2>
+
+  <div class="empresa-data" style="margin-bottom:14px;">
+    <div><span class="label">Empresa:</span> <span class="valor">{{ empresa_print.nombre|default:"" }}</span></div>
+    <div><span class="label">RUT Empresa:</span> <span class="valor">{{ empresa_print.rut_empresa|default:"" }}</span></div>
+    <div><span class="label">Representante Legal:</span> <span class="valor">{{ empresa_print.nombre_representante|default:"" }}</span></div>
+    <div><span class="label">Dirección:</span> <span class="valor">{{ empresa_print.direccion|default:"" }}</span></div>
+  </div>
+
+  <p class="cuerpo">
+    En <span class="highlight">{% if doc.obra %}{{ doc.obra.ciudad|default:"___________" }}{% else %}___________{% endif %}</span>,
+    a <span class="highlight">{{ d.fecha_retorno|date:"d \d\e F \d\e Y"|default:"___________________" }}</span>,
+    entre <strong>{{ empresa_print.nombre|default:"_______________" }}</strong>, representada por
+    <strong>{{ empresa_print.nombre_representante|default:"_______________" }}</strong>,
+    en adelante el <strong>Empleador</strong>, y don/doña
+    <strong>{{ doc.trabajador.nombre_completo }}</strong>, RUT <strong>{{ doc.trabajador.rut }}</strong>,
+    en adelante el <strong>Trabajador</strong>, se deja constancia de lo siguiente:
+  </p>
+
+  <p class="cuerpo" style="margin-top:10px;">
+    <strong>1.-</strong> Que el Trabajador se encontraba en uso de <strong>Licencia Médica</strong>
+    desde el <span class="highlight">{{ d.fecha_inicio_licencia|default:"___________________" }}</span>.
+  </p>
+
+  <p class="cuerpo">
+    <strong>2.-</strong> Que con fecha <span class="highlight">{{ d.fecha_retorno|date:"d/m/Y"|default:"___________________" }}</span>
+    el Trabajador se presenta a reincorporarse a sus labores habituales en la obra
+    <strong>{% if doc.obra %}{{ doc.obra.nombre }}{% else %}_______________{% endif %}</strong>,
+    contando con el alta médica correspondiente.
+  </p>
+
+  <p class="cuerpo">
+    <strong>3.-</strong> Que las partes acuerdan la reactivación del vínculo laboral en los mismos
+    términos y condiciones pactadas en el contrato de trabajo vigente, sin perjuicio de las
+    modificaciones que las partes puedan acordar mediante anexo de contrato.
+  </p>
+
+  {% if d.obs_reactivacion %}
+  <div class="obs-box">
+    <strong>Observaciones:</strong><br>
+    {{ d.obs_reactivacion }}
+  </div>
+  {% endif %}
+
+  <div class="firma-section" style="margin-top:50px;">
+    <div class="firma-box">
+      <div class="firma-linea">
+        Firma del Empleador<br>
+        {{ empresa_print.nombre|default:"" }}<br>
+        RUT: {{ empresa_print.rut_empresa|default:"" }}
+      </div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-linea">
+        Firma del Trabajador<br>
+        {{ doc.trabajador.nombre_completo }}<br>
+        RUT: {{ doc.trabajador.rut }}
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -4,8 +4,22 @@ from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponse
 from ..models import ConfigEmpresa, DocumentoGenerado, Trabajador, Obra, Contrato
-from ..forms import (ConfigEmpresaForm, ContratoTrabajoForm, AnexoContratoForm,
-                     FiniquitoForm, PactoHorasExtrasForm, ActaEPPForm, ActaReglamentoForm)
+from ..forms import (ConfigEmpresaForm, ContratoTrabajoForm, ContratoTrabajoCreateForm,
+                     AnexoContratoForm, FiniquitoForm, PactoHorasExtrasForm,
+                     ActaEPPForm, ActaReglamentoForm)
+
+import datetime as _dt
+
+def _serializable(data):
+    """Convert cleaned_data dict to JSON-safe values (date → ISO string)."""
+    result = {}
+    for k, v in data.items():
+        if isinstance(v, (_dt.date, _dt.datetime)):
+            result[k] = v.isoformat()
+        else:
+            result[k] = v
+    return result
+
 
 # Mapa: tipo → (FormClass, label)
 TIPO_FORMS = {
@@ -61,21 +75,62 @@ def empresa_delete(request, pk):
 
 @login_required
 def doc_generado_list(request):
-    q = request.GET.get('q', '')
+    from django.shortcuts import redirect
+    return redirect('doc_generado_create')
+    # histórico desactivado — lista sin uso mientras no haya documentos generados
+
+@login_required
+def _doc_generado_list_historico(request):
+    q = request.GET.get('q', '').strip()
     tipo = request.GET.get('tipo', '')
-    trabajador_rut = request.GET.get('trabajador_rut', '')
-    qs = DocumentoGenerado.objects.filter(activo=True).select_related('trabajador', 'obra', 'empresa')
+    empresa_id = request.GET.get('empresa_id', '')
+    obra_id = request.GET.get('obra_id', '')
+    fecha_desde = request.GET.get('fecha_desde', '').strip()
+    fecha_hasta = request.GET.get('fecha_hasta', '').strip()
+
+    qs = DocumentoGenerado.objects.filter(activo=True).select_related(
+        'trabajador', 'obra', 'empresa'
+    ).order_by('-creado_el')
+
     if q:
-        qs = qs.filter(Q(trabajador__nombres__icontains=q) | Q(trabajador__apellidos__icontains=q) | Q(trabajador__rut__icontains=q))
+        qs = qs.filter(
+            Q(trabajador__nombres__icontains=q) |
+            Q(trabajador__apellidos__icontains=q) |
+            Q(trabajador__rut__icontains=q)
+        )
     if tipo:
         qs = qs.filter(tipo=tipo)
-    if trabajador_rut:
-        qs = qs.filter(trabajador_id=trabajador_rut)
+    if empresa_id:
+        qs = qs.filter(empresa_id=empresa_id)
+    if obra_id:
+        qs = qs.filter(obra_id=obra_id)
+    if fecha_desde:
+        try:
+            import datetime
+            qs = qs.filter(creado_el__date__gte=datetime.date.fromisoformat(fecha_desde))
+        except ValueError:
+            pass
+    if fecha_hasta:
+        try:
+            import datetime
+            qs = qs.filter(creado_el__date__lte=datetime.date.fromisoformat(fecha_hasta))
+        except ValueError:
+            pass
+
+    empresas = ConfigEmpresa.objects.filter(activo=True)
+    obras = Obra.objects.filter(activo=True).order_by('nombre')
+
     return render(request, 'documentos_generados/list.html', {
         'documentos': qs,
         'q': q,
         'tipo': tipo,
+        'empresa_id': empresa_id,
+        'obra_id': obra_id,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
         'tipo_choices': DocumentoGenerado.TIPO_CHOICES,
+        'empresas': empresas,
+        'obras': obras,
     })
 
 
@@ -111,6 +166,21 @@ def doc_generado_create(request):
     if trabajador_rut:
         try:
             trabajador_obj = Trabajador.objects.get(rut=trabajador_rut)
+            if tipo == 'contrato_trabajo':
+                if trabajador_obj.estado_civil:
+                    initial['estado_civil'] = trabajador_obj.estado_civil
+                if trabajador_obj.nacionalidad:
+                    initial['nacionalidad'] = trabajador_obj.nacionalidad
+                if trabajador_obj.procedencia:
+                    initial['procedencia'] = trabajador_obj.procedencia
+                if trabajador_obj.prevision:
+                    initial['prevision'] = trabajador_obj.prevision
+                if hasattr(trabajador_obj, 'salud') and trabajador_obj.salud:
+                    initial['salud'] = trabajador_obj.salud
+                if trabajador_obj.direccion:
+                    initial['domicilio_trabajador'] = trabajador_obj.direccion
+                if trabajador_obj.ciudad:
+                    initial['ciudad_trabajador'] = trabajador_obj.ciudad
         except Trabajador.DoesNotExist:
             pass
 
@@ -161,11 +231,12 @@ def doc_generado_create(request):
         empresa_unica = empresas.first()
 
     if request.method == 'POST':
-        form = FormClass(request.POST)
+        if tipo == 'contrato_trabajo':
+            form = ContratoTrabajoCreateForm(request.POST)
+        else:
+            form = FormClass(request.POST)
         empresa_id = request.POST.get('empresa_id')
         trabajador_rut_post = request.POST.get('trabajador_rut_post', trabajador_rut)
-        obra_id_post = request.POST.get('obra_id_post', obra_id)
-        contrato_id_post = request.POST.get('contrato_id_post', contrato_id)
 
         if form.is_valid() and empresa_id and trabajador_rut_post:
             try:
@@ -175,23 +246,67 @@ def doc_generado_create(request):
                 messages.error(request, 'Empresa o trabajador no válidos.')
                 return redirect(request.path + f'?tipo={tipo}')
 
-            doc = DocumentoGenerado(
-                tipo=tipo,
-                empresa=empresa,
-                trabajador=trab,
-                datos=form.cleaned_data,
-                usuario=request.user.username,
-            )
-            if obra_id_post:
-                try:
-                    doc.obra = Obra.objects.get(pk=obra_id_post)
-                except Obra.DoesNotExist:
-                    pass
-            if contrato_id_post:
-                try:
-                    doc.contrato = Contrato.objects.get(pk=contrato_id_post)
-                except Contrato.DoesNotExist:
-                    pass
+            if tipo == 'contrato_trabajo':
+                cd = form.cleaned_data
+                # Reusar contrato existente (cualquier estado activo) para evitar duplicados
+                contrato_existente = Contrato.objects.filter(
+                    trabajador=trab,
+                    obra=cd['obra_contrato'],
+                    estado__in=('Pendiente de Firma', 'Vigente', 'En Licencia', 'Reactivado'),
+                    activo=True,
+                ).order_by('-creado_el').first()
+                if contrato_existente:
+                    contrato_nuevo = contrato_existente
+                    contrato_nuevo.especialidad = cd['especialidad_contrato']
+                    contrato_nuevo.tipo_contrato = cd['tipo_contrato']
+                    contrato_nuevo.sueldo_base = cd['sueldo_base']
+                    contrato_nuevo.fecha_inicio = cd['fecha_inicio_contrato']
+                    contrato_nuevo.fecha_termino_estimada = cd.get('fecha_termino_contrato')
+                    contrato_nuevo.save()
+                    messages.info(request, f'Se vinculó al contrato existente #{contrato_existente.pk} (el trabajador ya había sido asignado a esta obra).')
+                else:
+                    contrato_nuevo = Contrato.objects.create(
+                        trabajador=trab,
+                        obra=cd['obra_contrato'],
+                        especialidad=cd['especialidad_contrato'],
+                        tipo_contrato=cd['tipo_contrato'],
+                        sueldo_base=cd['sueldo_base'],
+                        fecha_inicio=cd['fecha_inicio_contrato'],
+                        fecha_termino_estimada=cd.get('fecha_termino_contrato'),
+                        estado='Pendiente de Firma',
+                    )
+                seccion_a_keys = {'obra_contrato', 'especialidad_contrato', 'tipo_contrato',
+                                  'sueldo_base', 'fecha_inicio_contrato', 'fecha_termino_contrato'}
+                doc_datos = _serializable({k: v for k, v in cd.items() if k not in seccion_a_keys})
+                doc = DocumentoGenerado(
+                    tipo=tipo,
+                    empresa=empresa,
+                    trabajador=trab,
+                    contrato=contrato_nuevo,
+                    obra=contrato_nuevo.obra,
+                    datos=doc_datos,
+                    usuario=request.user.username,
+                )
+            else:
+                obra_id_post = request.POST.get('obra_id_post', obra_id)
+                contrato_id_post = request.POST.get('contrato_id_post', contrato_id)
+                doc = DocumentoGenerado(
+                    tipo=tipo,
+                    empresa=empresa,
+                    trabajador=trab,
+                    datos=_serializable(form.cleaned_data),
+                    usuario=request.user.username,
+                )
+                if obra_id_post:
+                    try:
+                        doc.obra = Obra.objects.get(pk=obra_id_post)
+                    except Obra.DoesNotExist:
+                        pass
+                if contrato_id_post:
+                    try:
+                        doc.contrato = Contrato.objects.get(pk=contrato_id_post)
+                    except Contrato.DoesNotExist:
+                        pass
             doc.save()
             messages.success(request, f'{label} creado y guardado.')
             return redirect('doc_generado_preview', pk=doc.pk)
@@ -201,7 +316,10 @@ def doc_generado_create(request):
             if not trabajador_rut_post:
                 messages.error(request, 'Debe seleccionar un trabajador.')
     else:
-        form = FormClass(initial=initial)
+        if tipo == 'contrato_trabajo':
+            form = ContratoTrabajoCreateForm(initial=initial)
+        else:
+            form = FormClass(initial=initial)
 
     return render(request, 'documentos_generados/form.html', {
         'form': form,
@@ -232,7 +350,7 @@ def doc_generado_edit(request, pk):
         form = FormClass(request.POST)
         empresa_id = request.POST.get('empresa_id', doc.empresa_id)
         if form.is_valid():
-            doc.datos = form.cleaned_data
+            doc.datos = _serializable(form.cleaned_data)
             if empresa_id:
                 try:
                     doc.empresa = ConfigEmpresa.objects.get(pk=empresa_id)
@@ -313,9 +431,21 @@ def doc_generado_preview(request, pk):
         'pacto_horas_extras': 'documentos_generados/print/pacto_horas_extras.html',
         'acta_epp': 'documentos_generados/print/acta_epp.html',
         'acta_reglamento': 'documentos_generados/print/acta_reglamento.html',
+        'acta_reactivacion': 'documentos_generados/print/acta_reactivacion.html',
     }
     template = template_map.get(doc.tipo, 'documentos_generados/print/contrato_trabajo.html')
-    d = doc.datos
+
+    # Convert ISO date strings back to date objects so |date: filter works in templates
+    import datetime as _preview_dt
+    d = {}
+    for k, v in doc.datos.items():
+        if isinstance(v, str) and len(v) == 10:
+            try:
+                d[k] = _preview_dt.date.fromisoformat(v)
+            except ValueError:
+                d[k] = v
+        else:
+            d[k] = v
 
     ctx = {'doc': doc, 'd': d}
 
@@ -342,12 +472,74 @@ def doc_generado_preview(request, pk):
 
 
 @login_required
+def doc_generado_blank_preview(request):
+    """Render a blank (empty-data) version of a document template for printing."""
+    from types import SimpleNamespace
+    tipo = request.GET.get('tipo', '')
+    template_map = {
+        'contrato_trabajo': 'documentos_generados/print/contrato_trabajo.html',
+        'anexo_contrato': 'documentos_generados/print/anexo_contrato.html',
+        'finiquito': 'documentos_generados/print/finiquito.html',
+        'pacto_horas_extras': 'documentos_generados/print/pacto_horas_extras.html',
+        'acta_epp': 'documentos_generados/print/acta_epp.html',
+        'acta_reglamento': 'documentos_generados/print/acta_reglamento.html',
+    }
+    tipo_labels = dict(DocumentoGenerado.TIPO_CHOICES)
+    if tipo not in template_map:
+        return redirect('doc_generado_create')
+
+    empresa_id = request.GET.get('empresa_id', '')
+    empresa = None
+    if empresa_id:
+        try:
+            empresa = ConfigEmpresa.objects.get(pk=int(empresa_id), activo=True)
+        except (ConfigEmpresa.DoesNotExist, ValueError):
+            pass
+    if not empresa:
+        empresa = ConfigEmpresa.objects.filter(activo=True).first()
+
+    doc_mock = SimpleNamespace(
+        pk=None,
+        tipo=tipo,
+        trabajador=SimpleNamespace(
+            nombre_completo='', rut='',
+            fecha_nacimiento=None,
+            direccion='', telefono='', correo='',
+        ),
+        empresa=empresa,
+        contrato=None,
+        contrato_id=None,
+        get_tipo_display=lambda: tipo_labels.get(tipo, tipo),
+    )
+
+    ctx = {
+        'doc': doc_mock,
+        'd': {},
+        'is_blank': True,
+        'tipo_label': tipo_labels.get(tipo, tipo),
+        'empresa_print': empresa,
+    }
+    return render(request, template_map[tipo], ctx)
+
+
+@login_required
 def doc_generado_delete(request, pk):
     doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
     if request.method == 'POST':
         doc.activo = False
         doc.save()
         messages.success(request, 'Documento eliminado.')
+    return redirect('doc_generado_list')
+
+
+@login_required
+def doc_generado_firmar(request, pk):
+    """Marca el contrato asociado como Vigente (confirma firma)."""
+    doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
+    if request.method == 'POST' and doc.contrato and doc.contrato.estado == 'Pendiente de Firma':
+        doc.contrato.estado = 'Vigente'
+        doc.contrato.save(update_fields=['estado'])
+        messages.success(request, f'Contrato #{doc.contrato.pk} marcado como Vigente.')
     return redirect('doc_generado_list')
 
 

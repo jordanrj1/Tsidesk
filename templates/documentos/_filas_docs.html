@@ -1,0 +1,108 @@
+{% comment %}Parámetro: docs (lista de Documento){% endcomment %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle mb-0">
+    <thead class="table-light">
+      <tr style="font-size:.76rem;color:#6B7280">
+        <th class="ps-3" style="width:210px">Persona / Origen</th>
+        <th>Tipo de documento</th>
+        <th style="width:130px">Labor / Especialidad</th>
+        <th class="text-center" style="width:95px">Cargado</th>
+        <th class="text-center" style="width:110px">Vencimiento</th>
+        <th class="text-center" style="width:90px">Estado</th>
+        <th class="text-end pe-3" style="width:90px">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in docs %}
+      {% with ev=doc.estado_visual %}
+      <tr class="{% if ev == 'vencido' %}table-danger{% elif ev == 'proximo' %}table-warning{% endif %}"
+          style="font-size:.82rem">
+
+        <!-- Persona -->
+        <td class="ps-3">
+          {% if doc.contrato and doc.contrato.trabajador %}
+            <a href="{% url 'trabajador_detail' doc.contrato.trabajador.rut %}?tab=documentos"
+               class="fw-semibold text-decoration-none text-dark">
+              {{ doc.contrato.trabajador.nombre_completo }}
+            </a>
+            <div class="text-muted" style="font-size:.7rem">{{ doc.contrato.trabajador.rut }}</div>
+          {% elif doc.trab_personal %}
+            <a href="{% url 'trabajador_detail' doc.trab_personal.rut %}?tab=documentos"
+               class="fw-semibold text-decoration-none text-dark">
+              {{ doc.trab_personal.nombre_completo }}
+            </a>
+            <div class="text-muted" style="font-size:.7rem">{{ doc.trab_personal.rut }}</div>
+          {% elif doc.trabajador_rut %}
+            <a href="{% url 'trabajador_detail' doc.trabajador_rut %}?tab=documentos"
+               class="text-decoration-none text-dark">{{ doc.trabajador_rut }}</a>
+          {% else %}
+            <span class="text-muted"><i class="bi bi-building me-1"></i>Documento de obra</span>
+          {% endif %}
+        </td>
+
+        <!-- Tipo -->
+        <td class="fw-semibold">{{ doc.tipo_documento.nombre }}</td>
+
+        <!-- Labor / Especialidad -->
+        <td>
+          {% if doc.contrato and doc.contrato.especialidad %}
+            <span class="badge bg-light text-secondary border" style="font-size:.7rem">
+              {{ doc.contrato.especialidad.nombre }}
+            </span>
+          {% elif doc.contrato %}
+            <span class="text-muted" style="font-size:.75rem">—</span>
+          {% else %}
+            <span class="text-muted" style="font-size:.75rem">Personal</span>
+          {% endif %}
+        </td>
+
+        <!-- Cargado -->
+        <td class="text-center text-muted">{{ doc.fecha_carga|date:"d/m/Y" }}</td>
+
+        <!-- Vencimiento -->
+        <td class="text-center">
+          {% if doc.fecha_vencimiento %}
+            {{ doc.fecha_vencimiento|date:"d/m/Y" }}
+            {% if doc.dias_para_vencer is not None and doc.dias_para_vencer <= 30 and not doc.esta_vencido %}
+              <div class="badge bg-warning text-dark" style="font-size:.62rem">{{ doc.dias_para_vencer }}d</div>
+            {% endif %}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+
+        <!-- Estado -->
+        <td class="text-center">
+          {% if ev == 'ok' %}<span class="badge bg-success">Vigente</span>
+          {% elif ev == 'vencido' %}<span class="badge bg-danger">Vencido</span>
+          {% elif ev == 'proximo' %}<span class="badge bg-warning text-dark">Por vencer</span>
+          {% else %}<span class="badge bg-secondary">—</span>{% endif %}
+        </td>
+
+        <!-- Acciones -->
+        <td class="text-end pe-3 text-nowrap">
+          {% if doc.archivo %}
+          <button type="button"
+                  onclick="previewDoc('{{ doc.archivo.url }}','{{ doc.tipo_documento.nombre }}','{{ doc.extension }}')"
+                  class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver">
+            <i class="bi bi-eye"></i>
+          </button>
+          <a href="{% url 'documento_download' doc.pk %}"
+             class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar">
+            <i class="bi bi-download"></i>
+          </a>
+          {% endif %}
+          <form method="post" action="{% url 'documento_delete' doc.pk %}"
+                class="d-inline" onsubmit="return confirm('¿Eliminar este documento?')">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

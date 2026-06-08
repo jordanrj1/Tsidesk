@@ -1,0 +1,55 @@
+{% comment %}
+  Parámetros: titulo, grupos (lista de {obra, docs}), icono, color, empty_msg
+{% endcomment %}
+{% if grupos %}
+<div class="mb-4">
+  <!-- Sección de agrupación -->
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <i class="{{ icono }}" style="color:{{ color }};font-size:.95rem"></i>
+    <span class="fw-bold text-dark" style="font-size:.9rem">{{ titulo }}</span>
+    <span class="badge bg-light text-secondary border" style="font-size:.72rem">
+      {{ grupos|length }} obra{{ grupos|length|pluralize }}
+    </span>
+  </div>
+
+  {% for grupo in grupos %}
+  <div class="card border-0 shadow-sm mb-3">
+    <!-- Cabecera de obra -->
+    <div class="card-header py-2 px-3 d-flex align-items-center gap-2 bg-white border-bottom"
+         style="border-left:3px solid {{ color }} !important;">
+      <i class="bi bi-building text-muted" style="font-size:.85rem"></i>
+      <span class="fw-semibold small">{{ grupo.obra.nombre }}</span>
+      <span class="badge bg-light text-secondary border ms-1" style="font-size:.7rem">
+        {{ grupo.docs|length }} doc{{ grupo.docs|length|pluralize }}
+      </span>
+      <!-- Badges de alerta -->
+      {% for doc in grupo.docs %}
+        {% if doc.estado_visual == 'vencido' and not forloop.parentloop %}
+      {% endif %}
+      {% endfor %}
+      {% with vencidos=0 proximos=0 %}
+      {% for doc in grupo.docs %}
+        {% if doc.estado_visual == 'vencido' %}
+          <span class="badge bg-danger ms-1" style="font-size:.65rem">Vencido</span>
+          {% comment %}break{% endcomment %}
+        {% endif %}
+      {% endfor %}
+      {% for doc in grupo.docs %}
+        {% if doc.estado_visual == 'proximo' %}
+          <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Por vencer</span>
+          {% comment %}break{% endcomment %}
+        {% endif %}
+      {% endfor %}
+      {% endwith %}
+      <a href="{% url 'obra_detail' grupo.obra.pk %}?tab=carpeta"
+         class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" title="Ir a carpeta de obra"
+         style="font-size:.75rem">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+    </div>
+    <!-- Tabla de documentos -->
+    {% include "documentos/_filas_docs.html" with docs=grupo.docs %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
