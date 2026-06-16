@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Configuración de Remuneraciones{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0"><i class="bi bi-sliders me-2"></i>Tasas AFP / Salud / Seguro</h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaConfig">
+    <i class="bi bi-plus-circle me-1"></i>Nueva Configuración
+  </button>
+</div>
+
+{% if messages %}
+  {% for m in messages %}
+    <div class="alert alert-{{ m.tags }} alert-dismissible fade show py-2">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Nombre</th>
+          <th>Vigente desde</th>
+          <th class="text-center">AFP Empleado</th>
+          <th class="text-center">Salud Empleado</th>
+          <th class="text-center">Cesantía (fijo)</th>
+          <th class="text-center">Cesantía (indef.)</th>
+          <th class="text-center">Cesantía Empl.</th>
+          <th class="text-center">Mutual/Accid.</th>
+          <th class="text-center">Activo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in configs %}
+        <tr>
+          <td>{{ c.nombre }}</td>
+          <td>{{ c.vigente_desde }}</td>
+          <td class="text-center">{{ c.tasa_afp_empleado }}%</td>
+          <td class="text-center">{{ c.tasa_salud_empleado }}%</td>
+          <td class="text-center">{{ c.tasa_cesantia_empleado_plazo_fijo }}%</td>
+          <td class="text-center">{{ c.tasa_cesantia_empleado_indefinido }}%</td>
+          <td class="text-center">{{ c.tasa_cesantia_empleador }}%</td>
+          <td class="text-center">{{ c.tasa_mutual_accidentes }}%</td>
+          <td class="text-center">
+            {% if c.activo %}<span class="badge bg-success">Activa</span>
+            {% else %}<span class="badge bg-secondary">Inactiva</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <button class="btn btn-link btn-sm p-0"
+                    onclick="editarConfig({{ c.pk }},'{{ c.nombre }}','{{ c.vigente_desde }}',
+                      {{ c.tasa_afp_empleado }},{{ c.tasa_salud_empleado }},
+                      {{ c.tasa_cesantia_empleado_plazo_fijo }},{{ c.tasa_cesantia_empleado_indefinido }},
+                      {{ c.tasa_cesantia_empleador }},{{ c.tasa_mutual_accidentes }},
+                      {{ c.activo|yesno:'true,false' }},'{{ c.notas }}')"
+                    title="Editar"><i class="bi bi-pencil"></i></button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10" class="text-center text-muted py-4">No hay configuraciones registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nueva/editar config -->
+<div class="modal fade" id="modalNuevaConfig" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'config_remuneraciones_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="pk" id="cfgPk" value="">
+        <div class="modal-header py-2">
+          <h5 class="modal-title fs-6">Configuración de Tasas</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label form-label-sm">Nombre</label>
+              <input type="text" name="nombre" id="cfgNombre" class="form-control form-control-sm"
+                     value="Configuración General" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">Vigente desde</label>
+              <input type="date" name="vigente_desde" id="cfgDesde" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-6 d-flex align-items-end">
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" name="activo" id="cfgActivo" checked>
+                <label class="form-check-label form-label-sm" for="cfgActivo">Activa</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">AFP Empleado (%)</label>
+              <input type="number" name="tasa_afp_empleado" id="cfgAfp" class="form-control form-control-sm"
+                     step="0.01" value="10.58" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">Salud Empleado (%)</label>
+              <input type="number" name="tasa_salud_empleado" id="cfgSalud" class="form-control form-control-sm"
+                     step="0.01" value="7.00" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">Cesantía Empleado Plazo Fijo (%)</label>
+              <input type="number" name="tasa_cesantia_empleado_plazo_fijo" id="cfgCesFijo"
+                     class="form-control form-control-sm" step="0.01" value="0.60" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">Cesantía Empleado Indefinido (%)</label>
+              <input type="number" name="tasa_cesantia_empleado_indefinido" id="cfgCesIndef"
+                     class="form-control form-control-sm" step="0.01" value="0.60" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">Cesantía Empleador (%)</label>
+              <input type="number" name="tasa_cesantia_empleador" id="cfgCesEmpr"
+                     class="form-control form-control-sm" step="0.01" value="2.40" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm">Mutual/Accidentes (%)</label>
+              <input type="number" name="tasa_mutual_accidentes" id="cfgMutual"
+                     class="form-control form-control-sm" step="0.01" value="0.93" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label form-label-sm">Notas</label>
+              <textarea name="notas" id="cfgNotas" class="form-control form-control-sm" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editarConfig(pk, nombre, desde, afp, salud, cesFijo, cesIndef, cesEmpr, mutual, activo, notas) {
+  document.getElementById('cfgPk').value = pk;
+  document.getElementById('cfgNombre').value = nombre;
+  document.getElementById('cfgDesde').value = desde;
+  document.getElementById('cfgAfp').value = afp;
+  document.getElementById('cfgSalud').value = salud;
+  document.getElementById('cfgCesFijo').value = cesFijo;
+  document.getElementById('cfgCesIndef').value = cesIndef;
+  document.getElementById('cfgCesEmpr').value = cesEmpr;
+  document.getElementById('cfgMutual').value = mutual;
+  document.getElementById('cfgActivo').checked = activo;
+  document.getElementById('cfgNotas').value = notas;
+  new bootstrap.Modal(document.getElementById('modalNuevaConfig')).show();
+}
+</script>
+{% endblock %}

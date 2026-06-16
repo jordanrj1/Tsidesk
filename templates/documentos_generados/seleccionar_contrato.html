@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo Contrato — {{ trabajador_obj.nombre_completo }} | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Nuevo Contrato de Trabajo</h2>
+    <small class="text-muted">{{ trabajador_obj.nombre_completo }} · {{ trabajador_obj.rut }}</small>
+  </div>
+  <a href="{% url 'trabajador_detail' trabajador_obj.rut %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Volver al trabajador
+  </a>
+</div>
+
+{% if messages %}
+{% for m in messages %}
+<div class="alert alert-{{ m.tags|default:'info' }} alert-dismissible fade show">{{ m }}</div>
+{% endfor %}
+{% endif %}
+
+{% if contratos_para_pdf %}
+<!-- ── CASO A: tiene contratos activos → generar PDF ── -->
+<div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+  <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+  <div>
+    <strong>{{ trabajador_obj.nombre_completo }}</strong> ya tiene
+    {{ contratos_para_pdf|length }} contrato{% if contratos_para_pdf|length != 1 %}s{% endif %} activo{% if contratos_para_pdf|length != 1 %}s{% endif %}.
+    Selecciona para cuál deseas generar o reimprimir el documento PDF.
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-folder2-open me-2 text-primary"></i>Contratos activos — selecciona uno
+  </div>
+  <div class="list-group list-group-flush">
+    {% for c in contratos_para_pdf %}
+    <div class="list-group-item d-flex align-items-center gap-3 py-3">
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ c.obra.nombre }}</div>
+        <div class="small text-muted">
+          {{ c.especialidad.nombre }}
+          <span class="mx-1 opacity-50">·</span>
+          desde {{ c.fecha_inicio|date:"d/m/Y" }}
+          {% if c.fecha_termino_estimada %} hasta {{ c.fecha_termino_estimada|date:"d/m/Y" }}{% endif %}
+        </div>
+      </div>
+      <span class="badge
+        {% if c.estado == 'Vigente' %}bg-success
+        {% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark
+        {% elif c.estado == 'En Licencia' %}bg-warning text-dark
+        {% elif c.estado == 'Reactivado' %}bg-info text-dark
+        {% else %}bg-secondary{% endif %}">
+        {{ c.estado }}
+      </span>
+      <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ trabajador_obj.rut }}&contrato_id={{ c.pk }}"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-file-earmark-text me-1"></i>Generar PDF
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="text-center text-muted small mb-2">
+  ¿Deseas agregar este trabajador a una obra nueva en lugar de generar un PDF?
+</div>
+<div class="d-flex flex-wrap gap-2 justify-content-center">
+  {% for o in obras_disponibles %}
+  <a href="{% url 'obra_detail' o.pk %}?tab=dotacion" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-building me-1"></i>{{ o.nombre }}
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ── CASO B: sin contratos activos → dirigir a obra ── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-file-earmark-x fs-1 text-muted d-block mb-3"></i>
+    <h5 class="fw-bold">{{ trabajador_obj.nombre_completo }} no tiene contratos activos</h5>
+    <p class="text-muted mb-4">
+      Para crear un contrato debes primero asignarlo a una obra desde la sección de
+      <strong>Dotación</strong>. Eso garantiza que las alertas, re-contrataciones y
+      documentos queden correctamente vinculados.
+    </p>
+    <div class="fw-semibold mb-3 text-muted" style="font-size:.85rem">OBRAS DISPONIBLES</div>
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
+      {% for o in obras_disponibles %}
+      <a href="{% url 'obra_detail' o.pk %}?tab=dotacion" class="btn btn-outline-primary">
+        <i class="bi bi-building me-1"></i>{{ o.nombre }}
+      </a>
+      {% empty %}
+      <span class="text-muted small">Sin obras activas disponibles.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

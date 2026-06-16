@@ -109,7 +109,7 @@
                data-bs-toggle="tooltip" data-bs-title="Descargar Word (.docx)">
               <i class="bi bi-file-word me-1"></i>Word
             </a>
-            {% if doc.contrato and doc.contrato.estado == 'Pendiente de Firma' %}
+            {% if doc.tipo == 'contrato_trabajo' and doc.contrato and doc.contrato.estado == 'Pendiente de Firma' %}
             <form method="post" action="{% url 'doc_generado_firmar' doc.pk %}"
                   class="d-inline" onsubmit="return confirm('¿Confirmar que el contrato fue firmado? El estado pasará a Vigente.')">
               {% csrf_token %}

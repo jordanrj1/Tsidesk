@@ -48,7 +48,7 @@ _OBS_PLACEHOLDER = (
 
 class TrabajadorForm(forms.ModelForm):
     fecha_nacimiento = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
         required=False,
     )
 
@@ -89,6 +89,17 @@ class TrabajadorForm(forms.ModelForm):
         self.fields['salud'].widget = forms.Select(choices=_SALUD_CHOICES, attrs={'class': 'form-select'})
         self.fields['salud'].required = False
 
+    def clean_fecha_nacimiento(self):
+        fecha = self.cleaned_data.get('fecha_nacimiento')
+        if fecha:
+            from datetime import date
+            hoy = date.today()
+            edad = (hoy.year - fecha.year) - ((hoy.month, hoy.day) < (fecha.month, fecha.day))
+            if edad < 18:
+                raise forms.ValidationError('El trabajador debe ser mayor de 18 años (edad calculada: %(edad)s).',
+                                            params={'edad': edad})
+        return fecha
+
     def clean(self):
         cleaned_data = super().clean()
         tipo = cleaned_data.get('tipo_identificacion', 'RUT')
@@ -96,9 +107,14 @@ class TrabajadorForm(forms.ModelForm):
         if tipo == 'RUT':
             import re
             rut_clean = re.sub(r'[\.\-\s]', '', str(rut)).upper()
-            # Only validate format: digits + optional K as last char, min 7 chars total
-            if not re.match(r'^\d{6,8}[0-9Kk]$', rut_clean):
-                self.add_error('rut', 'Formato de RUT inválido. Use: 12.345.678-9 o 12345678-K')
+            if not re.match(r'^\d{6,8}[0-9K]$', rut_clean):
+                self.add_error('rut', 'RUT inválido. Puedes escribirlo como 12345678K, 12.345.678-K o 12345678-K')
+            else:
+                # Normalizar siempre al formato XX.XXX.XXX-X (DV es advertencia, no bloqueo)
+                cuerpo = rut_clean[:-1]
+                dv = rut_clean[-1]
+                cuerpo_fmt = '{:,}'.format(int(cuerpo)).replace(',', '.')
+                cleaned_data['rut'] = f'{cuerpo_fmt}-{dv}'
         else:
             import re
             clean_id = re.sub(r'[\s\-\.]', '', rut)
@@ -109,7 +125,7 @@ class TrabajadorForm(forms.ModelForm):
 
 class TrabajadorEditForm(forms.ModelForm):
     fecha_nacimiento = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
         required=False,
     )
 
@@ -141,6 +157,16 @@ class TrabajadorEditForm(forms.ModelForm):
         self.fields['prevision'].required = False
         self.fields['salud'].widget = forms.Select(choices=_SALUD_CHOICES, attrs={'class': 'form-select'})
         self.fields['salud'].required = False
+
+    def clean_fecha_nacimiento(self):
+        fecha = self.cleaned_data.get('fecha_nacimiento')
+        if fecha:
+            from datetime import date
+            hoy = date.today()
+            edad = (hoy.year - fecha.year) - ((hoy.month, hoy.day) < (fecha.month, fecha.day))
+            if edad < 18:
+                raise forms.ValidationError('El trabajador debe ser mayor de 18 años.')
+        return fecha
 
 
 # ---------------------------------------------------------------------------
@@ -245,18 +271,90 @@ class ContratoForm(forms.ModelForm):
         return cleaned_data
 
 
+def _parse_sueldo(raw_str):
+    """Convierte '700.000', '700000' o '700000.00' a Decimal entero.
+
+    Regla: si el último segmento tras un punto tiene 1-2 dígitos → punto decimal
+           si tiene 3 dígitos → separador de miles chileno.
+    """
+    import decimal
+    raw = (raw_str or '').strip().replace('\xa0', '').replace(' ', '')
+    if not raw:
+        raise forms.ValidationError('Este campo es obligatorio.')
+
+    if ',' in raw:
+        # Coma como separador decimal: '700.000,50' → quitar puntos, reemplazar coma
+        raw = raw.replace('.', '').replace(',', '.')
+        raw = raw.split('.')[0]          # descartar centavos
+    else:
+        parts = raw.split('.')
+        if len(parts) > 1:
+            if len(parts[-1]) <= 2:
+                # Punto decimal: '700000.00' → ['700000', '00'] → unir partes enteras
+                raw = ''.join(parts[:-1])
+            else:
+                # Todos los puntos son miles: '100.000' o '1.500.000'
+                raw = raw.replace('.', '')
+
+    try:
+        result = decimal.Decimal(raw)
+    except decimal.InvalidOperation:
+        raise forms.ValidationError('Ingresa un número válido (ej: 700000 o 700.000).')
+    if result < 0:
+        raise forms.ValidationError('El sueldo no puede ser negativo.')
+    return result.quantize(decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP)
+
+
+def _fmt_sueldo(value):
+    """Formatea un Decimal/int como '700.000' para mostrar en el campo."""
+    if value is None:
+        return ''
+    return f'{int(value):,}'.replace(',', '.')
+
+
 class ContratoEditForm(forms.ModelForm):
-    fecha_termino_estimada = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), required=False)
-    fecha_termino_real = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), required=False)
+    fecha_inicio = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
+        required=True,
+        label='Fecha de Inicio',
+    )
+    fecha_termino_estimada = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
+        required=False,
+        help_text='Dejar vacío para contratos indefinidos o por obra/faena sin fecha definida.',
+    )
+    sueldo_base = forms.CharField(
+        label='Sueldo Base',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 700.000 o 700000'}),
+    )
+
+    def clean_sueldo_base(self):
+        return _parse_sueldo(self.cleaned_data.get('sueldo_base', ''))
 
     class Meta:
         model = Contrato
-        fields = ['tipo_contrato', 'sueldo_base', 'fecha_termino_estimada', 'fecha_termino_real', 'estado']
+        fields = ['especialidad', 'tipo_contrato', 'sueldo_base', 'fecha_inicio',
+                  'fecha_termino_estimada']
         widgets = {
+            'especialidad': forms.Select(attrs={'class': 'form-select'}),
             'tipo_contrato': forms.Select(attrs={'class': 'form-select'}),
-            'sueldo_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
-            'estado': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import Especialidad
+        self.fields['especialidad'].queryset = Especialidad.objects.filter(activo=True)
+        # Mostrar sueldo con puntos de miles al cargar (ej: 700.000)
+        if self.instance and self.instance.pk and self.instance.sueldo_base:
+            self.initial['sueldo_base'] = _fmt_sueldo(self.instance.sueldo_base)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fi = cleaned_data.get('fecha_inicio')
+        ft = cleaned_data.get('fecha_termino_estimada')
+        if fi and ft and ft < fi:
+            self.add_error('fecha_termino_estimada', 'La fecha de término no puede ser anterior al inicio.')
+        return cleaned_data
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +717,7 @@ _DIAS_CHOICES = [
     ('Lunes a Viernes y sábados alternos', 'Lunes a Viernes y sábados alternos'),
 ]
 _HORAS_CHOICES = [
-    ('', '--- Seleccionar ---'),
+    ('', '--- Dejar en blanco (se completará a mano) ---'),
     ('40 hrs semanales con 1 hr de colación', '40 horas semanales'),
     ('44 hrs semanales con 1 hr de colación', '44 horas semanales'),
     ('45 hrs semanales con 1 hr de colación', '45 horas semanales'),
@@ -690,30 +788,24 @@ class ContratoTrabajoCreateForm(ContratoTrabajoForm):
         label='Tipo de Contrato',
         widget=forms.Select(attrs=_SEL),
     )
-    sueldo_base = forms.DecimalField(
+    sueldo_base = forms.CharField(
         label='Sueldo Base',
-        max_digits=12,
-        decimal_places=2,
-        localize=False,
-        widget=forms.NumberInput(attrs={**_NUM, 'step': '1', 'min': '0'}),
+        widget=forms.TextInput(attrs={**_NUM, 'placeholder': 'Ej: 700.000 o 700000'}),
     )
 
     def clean_sueldo_base(self):
-        val = self.cleaned_data.get('sueldo_base')
-        if val is not None:
-            import decimal
-            return val.quantize(decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP)
-        return val
+        return _parse_sueldo(self.cleaned_data.get('sueldo_base', ''))
+
     fecha_inicio_contrato = forms.DateField(
         label='Fecha de Inicio',
-        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
-        widget=forms.TextInput(attrs={**_INP, 'placeholder': 'dd/mm/aaaa'}),
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'],
+        widget=forms.DateInput(attrs={**_INP, 'type': 'date'}, format='%Y-%m-%d'),
     )
     fecha_termino_contrato = forms.DateField(
         label='Fecha de Término Estimada',
-        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'],
         required=False,
-        widget=forms.TextInput(attrs={**_INP, 'placeholder': 'dd/mm/aaaa (opcional)'}),
+        widget=forms.DateInput(attrs={**_INP, 'type': 'date'}, format='%Y-%m-%d'),
     )
 
     def __init__(self, *args, **kwargs):
@@ -723,12 +815,24 @@ class ContratoTrabajoCreateForm(ContratoTrabajoForm):
             activo=True, estado__in=['Activa', 'Pausada']
         )
         self.fields['especialidad_contrato'].queryset = Especialidad.objects.filter(activo=True)
+        # Formatear sueldo pre-llenado con puntos de miles (ej: 700.000)
+        if self.initial.get('sueldo_base'):
+            self.initial['sueldo_base'] = _fmt_sueldo(self.initial['sueldo_base'])
 
 
 class AnexoContratoForm(forms.Form):
     ciudad_documento        = forms.ChoiceField(label='Ciudad', choices=_CIUDAD_CHOICES, widget=forms.Select(attrs=_SEL))
     fecha_documento         = forms.DateField(label='Fecha del documento', widget=forms.DateInput(attrs=_DATE))
-    fecha_contrato_original = forms.DateField(label='Fecha del contrato original', widget=forms.DateInput(attrs=_DATE))
+    fecha_contrato_original = forms.DateField(label='Fecha del contrato original', widget=forms.DateInput(attrs=_DATE),
+                                              help_text='Fecha de inicio del contrato original (cláusula 2).')
+    fecha_vigencia_anexo    = forms.DateField(label='Vigencia del anexo (cláusula 1)', required=False,
+                                              widget=forms.DateInput(attrs=_DATE),
+                                              help_text='Desde cuándo rige este anexo. Déjelo en blanco si aún no está definido.')
+    nueva_fecha_vigencia    = forms.DateField(
+        label='Nueva fecha de vigencia (extensión)',
+        widget=forms.DateInput(attrs=_DATE),
+        help_text='Fecha hasta la que se extiende la vigencia del contrato. El contrato original no se modifica.',
+    )
     monto_colacion          = forms.IntegerField(label='Asignación de Colación ($)', initial=90000, widget=forms.NumberInput(attrs=_NUM))
     monto_movilizacion      = forms.IntegerField(label='Asignación de Movilización ($)', initial=60000, widget=forms.NumberInput(attrs=_NUM))
     monto_herramientas      = forms.IntegerField(label='Desgaste Herramientas ($)', initial=45000, widget=forms.NumberInput(attrs=_NUM))

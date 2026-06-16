@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 1.2cm 1.5cm 1.2cm 1.5cm; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #000; }
+
+  .titulo-bloque { text-align: center; margin-bottom: 4px; }
+  .titulo-bloque .titulo { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
+  .titulo-bloque .subtipo { font-size: 9pt; text-transform: uppercase; margin-top: 1px; }
+  .titulo-bloque .fecha-lugar { font-size: 8pt; text-align: right; margin-top: 3px; }
+
+  .tbl { width: 100%; border-collapse: collapse; margin-bottom: 3px; font-size: 8pt; }
+  .tbl td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; line-height: 1.25; }
+  .tbl .hdr { font-weight: bold; padding: 2px 4px; border: 1px solid #000; }
+  .tbl .lbl { font-weight: bold; width: 22%; }
+  .tbl .val { width: 28%; }
+
+  .obs-red { background: #c00; color: #fff; font-weight: bold; font-size: 7.5pt;
+    padding: 1px 5px; margin: 2px 0; display: inline-block; }
+
+  .cuerpo { margin: 2px 0; font-size: 8pt; text-align: justify; line-height: 1.35; }
+  .cnum { font-weight: bold; }
+  .hl { font-weight: bold; }
+
+  /* Firmas con tabla para evitar flexbox (no soportado por xhtml2pdf) */
+  .firmas-tbl { width: 100%; border: none; margin-top: 30px; }
+  .firmas-tbl td { border: none; text-align: center; width: 50%; padding: 0 10px; }
+  .firma-linea { border-bottom: 1px solid #000; height: 28px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+  <!-- TÍTULO -->
+  <div class="titulo-bloque">
+    <div class="titulo">CONTRATO DE TRABAJO</div>
+    <div class="subtipo">{% if doc.contrato %}{{ doc.contrato.tipo_contrato|upper }}{% else %}POR OBRA O FAENA{% endif %}</div>
+    <div class="fecha-lugar">
+      En {{ d.ciudad_documento|default:"_______________" }},
+      a {{ d.fecha_documento|date:"d \d\e F \d\e Y"|default:"___________" }}
+    </div>
+  </div>
+
+  <!-- TRABAJADOR -->
+  <table class="tbl">
+    <tr><td colspan="4" class="hdr">INDIVIDUALIZACIÓN DEL TRABAJADOR:</td></tr>
+    <tr>
+      <td class="lbl">Nombre del Trabajador:</td><td class="val">{{ doc.trabajador.nombre_completo }}</td>
+      <td class="lbl">Nacionalidad:</td><td class="val">{{ d.nacionalidad|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Cédula de Identidad:</td><td class="val">{{ doc.trabajador.rut }}</td>
+      <td class="lbl">Estado Civil:</td><td class="val">{{ d.estado_civil|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Fecha de Nacimiento:</td><td class="val">{{ doc.trabajador.fecha_nacimiento|date:"d/m/Y"|default:"" }}</td>
+      <td class="lbl">Procedencia:</td><td class="val">{{ d.procedencia|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Domicilio:</td><td class="val">{{ d.domicilio_trabajador|default:doc.trabajador.direccion|default:"" }}</td>
+      <td class="lbl">Ciudad:</td><td class="val">{{ d.ciudad_trabajador|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Previsión:</td><td class="val">{{ d.prevision|default:"" }}</td>
+      <td class="lbl">Salud:</td><td class="val">{{ d.salud|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Teléfono:</td><td class="val">{{ doc.trabajador.telefono|default:"" }}</td>
+      <td class="lbl">Correo:</td><td class="val">{{ doc.trabajador.correo|default:"" }}</td>
+    </tr>
+  </table>
+
+  <!-- EMPLEADOR -->
+  <table class="tbl">
+    <tr><td colspan="4" class="hdr">INDIVIDUALIZACIÓN DEL EMPLEADOR:</td></tr>
+    <tr>
+      <td class="lbl">Nombre del Empleador:</td><td class="val">{{ empresa_print.nombre|default:"" }}</td>
+      <td class="lbl">RUT N°</td><td class="val">{{ empresa_print.rut_empresa|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Dirección:</td><td class="val">{{ empresa_print.direccion|default:"" }}</td>
+      <td class="lbl">Ciudad:</td><td class="val">{{ empresa_print.ciudad|default:"" }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Representante Legal:</td><td class="val">{{ empresa_print.nombre_representante|default:"" }}</td>
+      <td class="lbl">RUT N°</td><td class="val">{{ empresa_print.rut_representante|default:"" }}</td>
+    </tr>
+  </table>
+
+  <p class="cuerpo" style="margin-top:4px;">
+    Entre las partes arriba individualizadas se suscribe el presente contrato de trabajo, para cuyo efecto, los contratantes convienen en denominarse <strong>Trabajador y Empleador</strong>, respectivamente.
+  </p>
+
+  <p class="cuerpo"><span class="cnum">1.-</span> El Trabajador se compromete a ejecutar la labor de
+    <span class="hl">{% if doc.contrato %}{{ doc.contrato.especialidad.nombre }}{% else %}_______________{% endif %}</span>
+    en la obra denominada <span class="hl">{% if doc.contrato %}{{ doc.contrato.obra.nombre }}{% else %}_______________{% endif %}</span>
+    ubicada en <span class="hl">{% if doc.contrato and doc.contrato.obra.direccion %}{{ doc.contrato.obra.direccion }}{% else %}_______________{% endif %}</span>;
+    el trabajo se efectuará fundamentalmente en la obra mencionada, sin perjuicio de la facultad del Empleador para trasladar al trabajador a cualquier Obra dentro de la ciudad.
+  </p>
+
+  <p class="cuerpo"><span class="cnum">2.-</span> La jornada de trabajo se ejecutará de
+    <span class="hl">{{ d.dias_laborales|default:"Lunes a Viernes" }}</span>
+    con <span class="hl">{% if d.horas_semanales %}{{ d.horas_semanales }}{% else %}___ hrs semanales con ___ hr de colación{% endif %}</span>
+    la que no se considerará laborada para ningún efecto legal.
+  </p>
+  <div><span class="obs-red">OBS: HORARIO SERÁ SEGÚN LO ESTIPULADO POR OBRA</span></div>
+  <table class="tbl" style="width:60%; margin:2px 0 3px;">
+    <tr>
+      <td class="lbl" style="text-align:center;">LUNES A JUEVES</td>
+      <td>Desde</td><td>{{ d.inicio_am|default:"08:00 HRS" }}</td><td>A</td><td>{{ d.termino_am|default:"13:00 HRS" }}</td>
+    </tr>
+    <tr><td></td><td>Desde</td><td>{{ d.inicio_pm|default:"14:00 HRS" }}</td><td>A</td><td>{{ d.termino_lj|default:"18:00 HRS" }}</td></tr>
+    <tr>
+      <td class="lbl" style="text-align:center;">VIERNES</td>
+      <td>Desde</td><td>{{ d.inicio_am|default:"08:00 HRS" }}</td><td>A</td><td>{{ d.termino_am|default:"13:00 HRS" }}</td>
+    </tr>
+    <tr><td></td><td>Desde</td><td>{{ d.inicio_pm|default:"14:00 HRS" }}</td><td>A</td><td>{{ d.termino_v|default:"17:00 HRS" }}</td></tr>
+    {% if d.dias_laborales == "Lunes a Sábado" %}
+    <tr>
+      <td class="lbl" style="text-align:center;">SÁBADO</td>
+      <td>Desde</td><td>{{ d.inicio_am|default:"08:00 HRS" }}</td><td>A</td><td>{{ d.termino_am|default:"13:00 HRS" }}</td>
+    </tr>
+    <tr><td></td><td colspan="4" style="text-align:center; font-style:italic;">Tarde libre</td></tr>
+    {% endif %}
+  </table>
+
+  <p class="cuerpo"><span class="cnum">3.-</span> El trabajo se ejecutará por:
+    <span class="hl">{% if doc.contrato %}{{ doc.contrato.tipo_contrato|upper }}{% else %}_______________{% endif %}</span>
+  </p>
+
+  <p class="cuerpo"><span class="cnum">4.-</span> El Empleador se compromete a remunerar al trabajador, por mes efectivamente trabajado en jornada completa, la suma de: $<span class="hl">{% if sueldo_formateado %}{{ sueldo_formateado }}{% else %}_______________________________{% endif %}</span>
+    pesos.-) El tiempo extraordinario se pagará con el recargo legal y se cancelará conjuntamente con el respectivo sueldo, dentro de los cinco primeros días del mes siguiente.
+  </p>
+
+  <p class="cuerpo"><span class="cnum">5.-</span> El presente contrato durará hasta el:
+    {% if doc.contrato and doc.contrato.fecha_termino_estimada %}<span class="hl">{{ doc.contrato.fecha_termino_estimada|date:"d \d\e F \d\e Y" }}</span>
+    {% else %}___________________________________{% endif %}
+    , sin embargo, podrá ponérsele término cuando concurran causas justificadas.
+  </p>
+
+  <p class="cuerpo"><span class="cnum">6.-</span> Este contrato podrá expirar paulatina y anticipadamente al término de la obra. También terminará cuando el trabajador incurra en causales del artículo 160 del Código del Trabajo, o si el dueño de la obra termina unilateralmente el contrato con el empleador (Art. 159 N°5 – Conclusión del trabajo).</p>
+
+  <p class="cuerpo"><span class="cnum">7.-</span> Se deja constancia que el trabajador: <strong>{{ doc.trabajador.nombre_completo }}</strong> ingresó al servicio el
+    <span class="hl">{% if doc.contrato %}{{ doc.contrato.fecha_inicio|date:"d \d\e F \d\e Y" }}{% else %}_______________{% endif %}</span>
+  </p>
+
+  <p class="cuerpo"><span class="cnum">8.-</span> Se entienden incorporadas al presente contrato todas las disposiciones legales que se dicten con posterioridad y las cláusulas adicionales estipuladas en el <strong>ANEXO DE CONTRATO DE TRABAJO</strong>. -</p>
+
+  <p class="cuerpo"><span class="cnum">9.-</span> El presente contrato se firma en tres ejemplares del mismo tenor, dejando expresa constancia que en este acto el Trabajador recibe uno de ellos.</p>
+
+  {% if d.observaciones %}<p class="cuerpo"><em>{{ d.observaciones }}</em></p>{% endif %}
+
+  <!-- FIRMAS con tabla en lugar de flexbox -->
+  <table class="firmas-tbl">
+    <tr>
+      <td>
+        <div class="firma-linea"></div>
+        <strong>Firma del Empleador</strong><br>
+        <span style="font-size:8pt;">{{ empresa_print.nombre|default:"" }}</span><br>
+        <span style="font-size:8pt;">RUT: {{ empresa_print.rut_empresa|default:"" }}</span>
+      </td>
+      <td>
+        <div class="firma-linea"></div>
+        <strong>Firma del Trabajador</strong><br>
+        <span style="font-size:8pt;">{{ doc.trabajador.nombre_completo }}</span><br>
+        <span style="font-size:8pt;">RUT: {{ doc.trabajador.rut }}</span>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

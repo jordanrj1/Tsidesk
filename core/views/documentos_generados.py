@@ -1,21 +1,25 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponse
-from ..models import ConfigEmpresa, DocumentoGenerado, Trabajador, Obra, Contrato
+from ..models import ConfigEmpresa, DocumentoGenerado, Trabajador, Obra, Contrato, Documento
 from ..forms import (ConfigEmpresaForm, ContratoTrabajoForm, ContratoTrabajoCreateForm,
                      AnexoContratoForm, FiniquitoForm, PactoHorasExtrasForm,
                      ActaEPPForm, ActaReglamentoForm)
 
 import datetime as _dt
+from decimal import Decimal as _Decimal
 
 def _serializable(data):
-    """Convert cleaned_data dict to JSON-safe values (date → ISO string)."""
+    """Convert cleaned_data dict to JSON-safe values (date → ISO string, Decimal → float)."""
     result = {}
     for k, v in data.items():
         if isinstance(v, (_dt.date, _dt.datetime)):
             result[k] = v.isoformat()
+        elif isinstance(v, _Decimal):
+            result[k] = float(v)
         else:
             result[k] = v
     return result
@@ -25,7 +29,7 @@ def _serializable(data):
 TIPO_FORMS = {
     'contrato_trabajo': (ContratoTrabajoForm, 'Contrato de Trabajo'),
     'anexo_contrato': (AnexoContratoForm, 'Anexo Contrato de Trabajo'),
-    'finiquito': (FiniquitoForm, 'Finiquito de Trabajo'),
+    'finiquito': (FiniquitoForm, 'Finiquito Legalizado'),
     'pacto_horas_extras': (PactoHorasExtrasForm, 'Pacto Horas Extraordinarias'),
     'acta_epp': (ActaEPPForm, 'Acta Entrega EPP'),
     'acta_reglamento': (ActaReglamentoForm, 'Acta Entrega Reglamento Interno'),
@@ -140,6 +144,7 @@ def doc_generado_create(request):
     trabajador_rut = request.GET.get('trabajador_rut', '')
     obra_id = request.GET.get('obra_id', '')
     contrato_id = request.GET.get('contrato_id', '')
+    next_url = request.GET.get('next', '') or request.POST.get('next', '')
 
     if tipo not in TIPO_FORMS:
         # Show type selection page
@@ -190,9 +195,23 @@ def doc_generado_create(request):
         except Obra.DoesNotExist:
             pass
 
+    # Pre-fill obra en el formulario cuando se viene desde la página masiva
+    if obra_obj and tipo == 'contrato_trabajo' and 'obra_contrato' not in initial:
+        initial['obra_contrato'] = obra_obj
+
     if contrato_id:
         try:
             contrato_obj = Contrato.objects.get(pk=contrato_id)
+            # Pre-fill labor data from contrato record
+            if tipo == 'contrato_trabajo':
+                initial['obra_contrato'] = contrato_obj.obra
+                initial['especialidad_contrato'] = contrato_obj.especialidad
+                initial['tipo_contrato'] = contrato_obj.tipo_contrato
+                if contrato_obj.sueldo_base:
+                    initial['sueldo_base'] = contrato_obj.sueldo_base
+                initial['fecha_inicio_contrato'] = contrato_obj.fecha_inicio
+                if contrato_obj.fecha_termino_estimada:
+                    initial['fecha_termino_contrato'] = contrato_obj.fecha_termino_estimada
             # Pre-fill personal data from trabajador profile
             if tipo == 'contrato_trabajo' and contrato_obj.trabajador:
                 trab = contrato_obj.trabajador
@@ -212,14 +231,62 @@ def doc_generado_create(request):
                     initial['ciudad_trabajador'] = trab.ciudad
             # For non-contrato_trabajo forms, pre-fill dates/labor from contrato
             if tipo in ('finiquito', 'anexo_contrato'):
-                initial['especialidad'] = contrato_obj.especialidad.nombre
+                initial['especialidad'] = contrato_obj.especialidad.nombre if contrato_obj.especialidad else ''
                 initial['fecha_inicio_contrato'] = contrato_obj.fecha_inicio
                 if contrato_obj.fecha_termino_real:
                     initial['fecha_termino_contrato'] = contrato_obj.fecha_termino_real
                 elif contrato_obj.fecha_termino_estimada:
                     initial['fecha_termino_contrato'] = contrato_obj.fecha_termino_estimada
+            if tipo == 'anexo_contrato':
+                initial['fecha_contrato_original'] = contrato_obj.fecha_inicio
+                initial['fecha_documento'] = _dt.date.today()
+                if contrato_obj.fecha_termino_estimada:
+                    initial['nueva_fecha_vigencia'] = contrato_obj.fecha_termino_estimada
+            if tipo == 'finiquito':
+                if contrato_obj.obra:
+                    initial['nombre_obra'] = contrato_obj.obra.nombre
+                initial['fecha_documento'] = _dt.date.today()
+                _CAUSAL_MAP = {
+                    'Mutuo acuerdo': 'Art. 159 N°1 – Mutuo acuerdo',
+                    'Despido por necesidades': 'Art. 161 – Necesidades de la empresa',
+                    'Término de obra o faena': 'Art. 159 N°5 – Conclusión del trabajo',
+                    'Vencimiento plazo': 'Art. 159 N°5 – Conclusión del trabajo',
+                }
+                if contrato_obj.tipo_termino:
+                    initial['causal'] = _CAUSAL_MAP.get(contrato_obj.tipo_termino, '')
         except Contrato.DoesNotExist:
             pass
+
+    # ── Intercepción inteligente: tipo=contrato_trabajo + rut sin contrato_id ──
+    # Evita bypasear validaciones (lista negra, re-contratación, finiquito pendiente)
+    # Se omite cuando ya viene obra_id (el usuario ya eligió la obra, p.ej. desde imprimir-masivo)
+    if tipo == 'contrato_trabajo' and trabajador_obj and not contrato_id and not obra_id and request.method == 'GET':
+        if trabajador_obj.en_lista_negra:
+            messages.error(
+                request,
+                f'{trabajador_obj.nombre_completo} está en lista negra y no puede recibir nuevos contratos. '
+                f'Motivo: {trabajador_obj.motivo_lista_negra or "sin detalle"}.'
+            )
+            return redirect('trabajador_detail', rut=trabajador_rut)
+        contratos_para_pdf = Contrato.objects.filter(
+            trabajador=trabajador_obj,
+            estado__in=('Pendiente de Firma', 'Vigente', 'En Licencia', 'Reactivado'),
+            activo=True,
+        ).select_related('obra', 'especialidad').order_by('-creado_el')
+        if contratos_para_pdf.count() == 1:
+            from django.urls import reverse
+            return redirect(
+                reverse('doc_generado_create') +
+                f'?tipo=contrato_trabajo&trabajador_rut={trabajador_rut}&contrato_id={contratos_para_pdf.first().pk}'
+            )
+        obras_disponibles = Obra.objects.filter(
+            activo=True, archivada=False
+        ).exclude(estado='Cerrada').order_by('nombre')
+        return render(request, 'documentos_generados/seleccionar_contrato.html', {
+            'trabajador_obj': trabajador_obj,
+            'contratos_para_pdf': contratos_para_pdf,
+            'obras_disponibles': obras_disponibles,
+        })
 
     # Auto-select empresa: from obra.empresa → then singleton fallback
     empresa_unica = None
@@ -247,6 +314,14 @@ def doc_generado_create(request):
                 return redirect(request.path + f'?tipo={tipo}')
 
             if tipo == 'contrato_trabajo':
+                # Bloqueo lista negra
+                if trab.en_lista_negra:
+                    messages.error(
+                        request,
+                        f'{trab.nombre_completo} está en lista negra y no puede recibir nuevos contratos. '
+                        f'Motivo: {trab.motivo_lista_negra or "sin detalle"}.'
+                    )
+                    return redirect(request.path + f'?tipo={tipo}&trabajador_rut={trab.rut}')
                 cd = form.cleaned_data
                 # Reusar contrato existente (cualquier estado activo) para evitar duplicados
                 contrato_existente = Contrato.objects.filter(
@@ -265,6 +340,13 @@ def doc_generado_create(request):
                     contrato_nuevo.save()
                     messages.info(request, f'Se vinculó al contrato existente #{contrato_existente.pk} (el trabajador ya había sido asignado a esta obra).')
                 else:
+                    _ESTADOS_TERMINO = ('Finalizado', 'Finiquitado', 'Rescindido', 'Trasladado')
+                    contrato_previo = Contrato.objects.filter(
+                        trabajador=trab,
+                        obra=cd['obra_contrato'],
+                        estado__in=_ESTADOS_TERMINO,
+                        activo=True,
+                    ).order_by('-creado_el').first()
                     contrato_nuevo = Contrato.objects.create(
                         trabajador=trab,
                         obra=cd['obra_contrato'],
@@ -274,7 +356,27 @@ def doc_generado_create(request):
                         fecha_inicio=cd['fecha_inicio_contrato'],
                         fecha_termino_estimada=cd.get('fecha_termino_contrato'),
                         estado='Pendiente de Firma',
+                        es_recontratacion=bool(contrato_previo),
+                        contrato_anterior=contrato_previo,
                     )
+                    if contrato_previo:
+                        tiene_finiquito = Documento.objects.filter(
+                            contrato=contrato_previo,
+                            tipo_documento__nombre='Finiquito Legalizado',
+                            activo=True,
+                        ).exists()
+                        if not tiene_finiquito:
+                            messages.warning(
+                                request,
+                                f'Re-contratación registrada para {trab.nombre_completo}. '
+                                f'El contrato anterior (#{contrato_previo.pk}, {contrato_previo.estado}) '
+                                f'no tiene finiquito subido.'
+                            )
+                        else:
+                            messages.info(
+                                request,
+                                f'{trab.nombre_completo} re-contratado/a. Contrato previo en {cd["obra_contrato"].nombre} ya tiene finiquito.'
+                            )
                 seccion_a_keys = {'obra_contrato', 'especialidad_contrato', 'tipo_contrato',
                                   'sueldo_base', 'fecha_inicio_contrato', 'fecha_termino_contrato'}
                 doc_datos = _serializable({k: v for k, v in cd.items() if k not in seccion_a_keys})
@@ -307,9 +409,41 @@ def doc_generado_create(request):
                         doc.contrato = Contrato.objects.get(pk=contrato_id_post)
                     except Contrato.DoesNotExist:
                         pass
+            # Validación finiquito: solo contratos Finalizados
+            if tipo == 'finiquito' and doc.contrato:
+                if doc.contrato.estado not in ('Finalizado', 'Rescindido'):
+                    messages.error(
+                        request,
+                        f'No se puede generar finiquito para un contrato en estado "{doc.contrato.estado}". '
+                        'El contrato debe estar Finalizado o Rescindido primero.'
+                    )
+                    return redirect(request.path + f'?tipo={tipo}')
+            # Desactivar versiones anteriores del mismo tipo para el mismo contrato/trabajador
+            _prev = DocumentoGenerado.objects.filter(tipo=tipo, trabajador=trab, activo=True)
+            if doc.contrato:
+                _prev = _prev.filter(contrato=doc.contrato)
+            _prev.update(activo=False)
             doc.save()
-            messages.success(request, f'{label} creado y guardado.')
-            return redirect('doc_generado_preview', pk=doc.pk)
+            # Anexo de contrato: actualizar fecha_extension en el contrato vinculado
+            ext_param = ''
+            if tipo == 'anexo_contrato' and doc.contrato:
+                nueva_fecha = form.cleaned_data.get('nueva_fecha_vigencia')
+                if nueva_fecha:
+                    doc.contrato.fecha_extension = nueva_fecha
+                    doc.contrato.save(update_fields=['fecha_extension'])
+                    ext_param = f'&ext={nueva_fecha.strftime("%d/%m/%Y")}'
+                    if next_url:
+                        messages.success(
+                            request,
+                            f'{label} generado. Vigencia extendida hasta {nueva_fecha.strftime("%d/%m/%Y")}. '
+                            f'El contrato original no fue modificado.'
+                        )
+            else:
+                if next_url:
+                    messages.success(request, f'{label} creado y guardado.')
+            if next_url:
+                return redirect(next_url)
+            return redirect(f'/documentos-empresa/{doc.pk}/preview/?saved=1{ext_param}')
         else:
             if not empresa_id:
                 messages.error(request, 'Debe seleccionar una empresa.')
@@ -335,6 +469,7 @@ def doc_generado_create(request):
         'trabajador_rut': trabajador_rut,
         'obra_id': obra_id,
         'contrato_id': contrato_id,
+        'next_url': next_url,
     })
 
 
@@ -342,9 +477,16 @@ def doc_generado_create(request):
 def doc_generado_edit(request, pk):
     doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
     FormClass, label = TIPO_FORMS[doc.tipo]
+    # Para contratos vinculados, el label aclara qué se puede editar aquí
+    if doc.tipo == 'contrato_trabajo' and doc.contrato:
+        label = 'Ajustar datos del PDF — Contrato de Trabajo'
     empresas = ConfigEmpresa.objects.filter(activo=True)
     trabajadores = Trabajador.objects.filter(activo=True)
     obras = Obra.objects.filter(activo=True)
+
+    next_url = request.GET.get('next', '') or request.POST.get('next', '')
+    if not next_url and doc.trabajador:
+        next_url = f'/trabajadores/{doc.trabajador.rut}/?tab=contratos'
 
     if request.method == 'POST':
         form = FormClass(request.POST)
@@ -358,11 +500,9 @@ def doc_generado_edit(request, pk):
                     pass
             doc.save()
             messages.success(request, f'{label} actualizado.')
-            return redirect('doc_generado_preview', pk=doc.pk)
+            return redirect(next_url) if next_url else redirect('doc_generado_borradores')
     else:
-        # Reconstruct form from stored JSON datos
         initial = doc.datos.copy()
-        # Convert date strings back to date objects
         import datetime
         for key, val in initial.items():
             if isinstance(val, str) and len(val) == 10:
@@ -381,6 +521,7 @@ def doc_generado_edit(request, pk):
         'trabajadores': trabajadores,
         'obras': obras,
         'edit_mode': True,
+        'next_url': next_url,
     })
 
 
@@ -421,6 +562,7 @@ def _monto_en_palabras(n):
     return ' '.join(partes)
 
 
+@xframe_options_exempt
 @login_required
 def doc_generado_preview(request, pk):
     doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
@@ -447,14 +589,18 @@ def doc_generado_preview(request, pk):
         else:
             d[k] = v
 
-    ctx = {'doc': doc, 'd': d}
+    # URL de retorno: parámetro explícito, o inferido del trabajador/obra del doc
+    back_url = request.GET.get('next', '')
+    if not back_url and doc.trabajador:
+        back_url = f'/trabajadores/{doc.trabajador.rut}/?tab=contratos'
+
+    ctx = {'doc': doc, 'd': d, 'back_url': back_url}
 
     if doc.tipo == 'contrato_trabajo' and doc.contrato:
         c = doc.contrato
         sueldo = int(c.sueldo_base)
         ctx['sueldo_formateado'] = f"{sueldo:,}".replace(",", ".")
         ctx['sueldo_palabras'] = _monto_en_palabras(sueldo).capitalize()
-        # Empresa: prefer obra.empresa → fallback to doc.empresa
         ctx['empresa_print'] = (c.obra.empresa if c.obra and c.obra.empresa else doc.empresa)
     else:
         ctx['empresa_print'] = doc.empresa
@@ -523,24 +669,238 @@ def doc_generado_blank_preview(request):
 
 
 @login_required
+def doc_generado_borradores(request):
+    tipo_f = request.GET.get('tipo', '')
+    obra_f = request.GET.get('obra_id', '')
+
+    # Limpieza automática de duplicados: conserva solo el más reciente por tipo+contrato
+    from django.db.models import Max
+    for tipo_val, _ in DocumentoGenerado.TIPO_CHOICES:
+        grupos = (
+            DocumentoGenerado.objects
+            .filter(activo=True, tipo=tipo_val, contrato__isnull=False)
+            .values('contrato_id')
+            .annotate(max_id=Max('id'))
+        )
+        for g in grupos:
+            DocumentoGenerado.objects.filter(
+                tipo=tipo_val, contrato_id=g['contrato_id'], activo=True
+            ).exclude(pk=g['max_id']).update(activo=False)
+
+    qs = (
+        DocumentoGenerado.objects
+        .filter(activo=True)
+        .select_related('trabajador', 'obra', 'contrato', 'contrato__obra', 'empresa')
+        .order_by('contrato__obra__nombre', 'obra__nombre', 'trabajador__apellidos', '-creado_el')
+    )
+    if tipo_f:
+        qs = qs.filter(tipo=tipo_f)
+    if obra_f:
+        from django.db.models import Q
+        qs = qs.filter(Q(obra_id=obra_f) | Q(contrato__obra_id=obra_f))
+
+    obras = Obra.objects.filter(activo=True).order_by('nombre')
+
+    # Agrupar por obra para el template
+    grupos = {}
+    for doc in qs:
+        obra_nombre = (
+            doc.contrato.obra.nombre if doc.contrato and doc.contrato.obra
+            else doc.obra.nombre if doc.obra
+            else 'Sin obra asignada'
+        )
+        if obra_nombre not in grupos:
+            grupos[obra_nombre] = []
+        grupos[obra_nombre].append(doc)
+
+    return render(request, 'documentos_generados/borradores.html', {
+        'grupos': grupos,
+        'tipo_choices': DocumentoGenerado.TIPO_CHOICES,
+        'tipo_f': tipo_f,
+        'obra_f': obra_f,
+        'obras': obras,
+        'total': sum(len(v) for v in grupos.values()),
+    })
+
+
+@login_required
 def doc_generado_delete(request, pk):
     doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
     if request.method == 'POST':
         doc.activo = False
         doc.save()
-        messages.success(request, 'Documento eliminado.')
-    return redirect('doc_generado_list')
+        # Al eliminar un Anexo, revertir la extensión del contrato si no quedan otros Anexos activos
+        if doc.tipo == 'anexo_contrato' and doc.contrato:
+            otros_anexos = DocumentoGenerado.objects.filter(
+                tipo='anexo_contrato', contrato=doc.contrato, activo=True
+            ).exists()
+            if not otros_anexos:
+                doc.contrato.fecha_extension = None
+                doc.contrato.save(update_fields=['fecha_extension'])
+        messages.success(request, 'Borrador eliminado.')
+        next_url = request.POST.get('next', '')
+        return redirect(next_url) if next_url else redirect('doc_generado_borradores')
+    return redirect('doc_generado_borradores')
+
+
+@login_required
+def doc_generado_imprimir_masivo(request):
+    obras = Obra.objects.filter(activo=True).order_by('nombre')
+    trabajadores = Trabajador.objects.filter(activo=True).order_by('apellidos', 'nombres')
+    obra_id = request.GET.get('obra_id', '') or request.POST.get('obra_id', '')
+    obra_obj = None
+    borradores = []
+    sin_borrador = []
+    borrador_trabajador_ids = set()
+
+    if obra_id:
+        try:
+            obra_obj = Obra.objects.get(pk=obra_id)
+            borradores = list(
+                DocumentoGenerado.objects
+                .filter(activo=True, tipo='contrato_trabajo')
+                .filter(Q(obra_id=obra_id) | Q(contrato__obra_id=obra_id))
+                .select_related('trabajador', 'contrato', 'contrato__obra', 'empresa')
+                .order_by('trabajador__apellidos')
+            )
+            borrador_trabajador_ids = set(b.trabajador_id for b in borradores if b.trabajador_id)
+            # Trabajadores en dotación sin borrador generado
+            borrador_contrato_ids = set(b.contrato_id for b in borradores if b.contrato_id)
+            from ..models import Contrato as _Contrato
+            sin_borrador = (
+                _Contrato.objects
+                .filter(obra_id=obra_id, estado='Pendiente de Firma', activo=True)
+                .exclude(pk__in=borrador_contrato_ids)
+                .select_related('trabajador', 'especialidad')
+                .order_by('trabajador__apellidos')
+            )
+        except Obra.DoesNotExist:
+            pass
+
+    if request.method == 'POST':
+        pks = request.POST.getlist('doc_ids')
+        if not pks:
+            messages.error(request, 'Seleccione al menos un borrador para imprimir.')
+            return redirect(f'/documentos-empresa/imprimir-masivo/?obra_id={obra_id}')
+
+        docs_qs = (
+            DocumentoGenerado.objects
+            .filter(pk__in=pks, activo=True, tipo='contrato_trabajo')
+            .select_related('trabajador', 'contrato', 'contrato__obra', 'empresa')
+        )
+
+        import datetime as _preview_dt
+        docs_list = []
+        for doc in docs_qs:
+            d = {}
+            for k, v in doc.datos.items():
+                if isinstance(v, str) and len(v) == 10:
+                    try:
+                        d[k] = _preview_dt.date.fromisoformat(v)
+                    except ValueError:
+                        d[k] = v
+                else:
+                    d[k] = v
+
+            c = doc.contrato
+            sueldo_formateado = ''
+            sueldo_palabras = ''
+            if c and c.sueldo_base:
+                sueldo_int = int(c.sueldo_base)
+                sueldo_formateado = f"{sueldo_int:,}".replace(",", ".")
+                sueldo_palabras = _monto_en_palabras(sueldo_int).capitalize()
+
+            empresa_print = (c.obra.empresa if c and c.obra and c.obra.empresa else doc.empresa)
+
+            docs_list.append({
+                'doc': doc,
+                'd': d,
+                'sueldo_formateado': sueldo_formateado,
+                'sueldo_palabras': sueldo_palabras,
+                'empresa_print': empresa_print,
+            })
+
+        return render(request, 'documentos_generados/print/masivo_contratos.html', {
+            'docs_list': docs_list,
+            'obra_obj': obra_obj,
+        })
+
+    return render(request, 'documentos_generados/imprimir_masivo.html', {
+        'obras': obras,
+        'trabajadores': trabajadores,
+        'obra_obj': obra_obj,
+        'obra_id': obra_id,
+        'borradores': borradores,
+        'sin_borrador': sin_borrador,
+        'borrador_trabajador_ids': borrador_trabajador_ids,
+    })
 
 
 @login_required
 def doc_generado_firmar(request, pk):
-    """Marca el contrato asociado como Vigente (confirma firma)."""
+    """Marca el contrato asociado como Vigente (confirma firma). Solo válido para contrato_trabajo."""
     doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
-    if request.method == 'POST' and doc.contrato and doc.contrato.estado == 'Pendiente de Firma':
+    if request.method == 'POST' and doc.tipo == 'contrato_trabajo' and doc.contrato and doc.contrato.estado == 'Pendiente de Firma':
         doc.contrato.estado = 'Vigente'
         doc.contrato.save(update_fields=['estado'])
         messages.success(request, f'Contrato #{doc.contrato.pk} marcado como Vigente.')
+    else:
+        messages.error(request, 'Esta acción solo está disponible para borradores de Contrato de Trabajo.')
     return redirect('doc_generado_list')
+
+
+@login_required
+def doc_generado_pdf_download(request, pk):
+    """Genera y descarga el contrato como PDF individual usando xhtml2pdf."""
+    from xhtml2pdf import pisa
+    from django.template.loader import render_to_string
+    from io import BytesIO
+    import datetime as _dt
+
+    doc = get_object_or_404(DocumentoGenerado, pk=pk, activo=True)
+    if doc.tipo != 'contrato_trabajo':
+        messages.error(request, 'La descarga PDF solo está disponible para Contratos de Trabajo.')
+        return redirect('doc_generado_preview', pk=pk)
+
+    d = {}
+    for k, v in doc.datos.items():
+        if isinstance(v, str) and len(v) == 10:
+            try:
+                d[k] = _dt.date.fromisoformat(v)
+            except ValueError:
+                d[k] = v
+        else:
+            d[k] = v
+
+    c = doc.contrato
+    sueldo_formateado = ''
+    if c and c.sueldo_base:
+        sueldo_formateado = f"{int(c.sueldo_base):,}".replace(",", ".")
+    empresa_print = (c.obra.empresa if c and c.obra and c.obra.empresa else doc.empresa)
+
+    ctx = {
+        'doc': doc,
+        'd': d,
+        'sueldo_formateado': sueldo_formateado,
+        'empresa_print': empresa_print,
+    }
+
+    html = render_to_string('documentos_generados/print/pdf_contrato_trabajo.html', ctx, request=request)
+
+    buffer = BytesIO()
+    status = pisa.CreatePDF(html.encode('utf-8'), dest=buffer, encoding='utf-8')
+    if status.err:
+        messages.error(request, 'Error al generar el PDF.')
+        return redirect('doc_generado_preview', pk=pk)
+
+    buffer.seek(0)
+    apellidos = doc.trabajador.apellidos.replace(' ', '_') if doc.trabajador else 'Trabajador'
+    nombres = doc.trabajador.nombres.replace(' ', '_') if doc.trabajador else ''
+    nombre_archivo = f"Contrato_{apellidos}_{nombres}.pdf"
+
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    return response
 
 
 @login_required

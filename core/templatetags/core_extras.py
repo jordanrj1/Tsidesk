@@ -5,7 +5,17 @@ register = template.Library()
 
 @register.filter
 def get_item(dictionary, key):
-    """Permite acceder a un dict con variable como clave: dict|get_item:variable"""
     if isinstance(dictionary, dict):
         return dictionary.get(key)
     return None
+
+
+@register.filter
+def pesos_cl(value):
+    """Formatea un número como peso chileno: 100000 → 100.000"""
+    if value is None or value == '':
+        return '0'
+    try:
+        return f'{int(value):,}'.replace(',', '.')
+    except (ValueError, TypeError):
+        return str(value)

@@ -36,6 +36,7 @@
         <div class="col-md-4">
           <label class="form-label fw-semibold">Fecha de Nacimiento</label>
           {{ form.fecha_nacimiento }}
+          {% if form.fecha_nacimiento.errors %}<div class="text-danger small mt-1">{{ form.fecha_nacimiento.errors }}</div>{% endif %}
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold">Nombres <span class="text-danger">*</span></label>
@@ -170,7 +171,7 @@ function actualizarUI() {
   if (tipo === 'RUT') {
     labelRut.innerHTML = 'RUT <span class="text-danger">*</span>';
     rutInput.placeholder = 'Ej: 12.345.678-9';
-    hintRut.textContent = 'Formato: 12.345.678-9  |  El dígito verificador puede ser 0-9 o K';
+    hintRut.textContent = 'Escribe el RUT con o sin puntos/guión — se formatea solo. El verificador puede ser 0-9 o K.';
   } else if (tipo === 'PASAPORTE') {
     labelRut.innerHTML = 'N° Pasaporte <span class="text-danger">*</span>';
     rutInput.placeholder = 'Ej: AA123456';
@@ -189,11 +190,22 @@ function actualizarUI() {
 
   if (tipo === 'RUT') {
     const esValido = validarRutModulo11(val);
+    let dvMsg = document.getElementById('dvWarning');
+    if (dvMsg) dvMsg.remove();
     if (esValido) {
       rutInput.classList.add('border-success');
-    } else {
-      // Just neutral — no block, no red. Server only checks format.
+      rutInput.classList.remove('border-warning');
+    } else if (val.replace(/[^0-9kK]/g, '').length >= 8) {
       rutInput.classList.remove('border-success');
+      rutInput.classList.add('border-warning');
+      const hint = document.getElementById('hintRut');
+      const w = document.createElement('small');
+      w.id = 'dvWarning';
+      w.className = 'text-warning fw-semibold d-block mt-1';
+      w.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>El dígito verificador no cuadra — verifique el documento antes de guardar.';
+      hint.insertAdjacentElement('afterend', w);
+    } else {
+      rutInput.classList.remove('border-success', 'border-warning');
     }
   } else {
     // Pasaporte/DNI: solo alfanumérico, mínimo 4 chars
@@ -211,26 +223,68 @@ if (tipoSelect) tipoSelect.addEventListener('change', () => {
   actualizarUI();
 });
 
+function formatearRut(valor) {
+  // Acepta cualquier formato: 111241684, 11.124.168-4, 11124168-4, etc.
+  // Devuelve siempre: XX.XXX.XXX-X
+  let v = valor.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (v.length < 2) return v;
+  const dv = v.slice(-1);
+  const cuerpo = v.slice(0, -1);
+  if (!cuerpo) return dv;
+  // Insertar puntos cada 3 dígitos desde la derecha
+  let resultado = '';
+  for (let i = 0; i < cuerpo.length; i++) {
+    if (i > 0 && (cuerpo.length - i) % 3 === 0) resultado += '.';
+    resultado += cuerpo[i];
+  }
+  return resultado + '-' + dv;
+}
+
 if (rutInput) {
-  rutInput.addEventListener('blur', () => {
-    actualizarUI();
+  rutInput.addEventListener('keyup', () => {
     if (getTipo() !== 'RUT') return;
-    const rut = rutInput.value.trim();
+    // Solo auto-formatear si el usuario ya tiene suficientes chars para que tenga sentido
+    const raw = rutInput.value.replace(/[^0-9kK]/g, '');
+    if (raw.length >= 2) {
+      const formatted = formatearRut(rutInput.value);
+      rutInput.value = formatted;
+    }
     clearTimeout(timer);
     alertBox.className = 'd-none mb-3';
     alertBox.innerHTML = '';
-    if (rut.length < 8) return;
-    timer = setTimeout(() => checkRut(rut), 300);
+    actualizarUI();
+    const rut = rutInput.value.trim();
+    if (rut.replace(/[^0-9kK]/g, '').length >= 8) {
+      timer = setTimeout(() => checkRut(rut), 600);
+    }
   });
-  rutInput.addEventListener('input', () => {
-    clearTimeout(timer);
-    alertBox.className = 'd-none mb-3';
-    alertBox.innerHTML = '';
+
+  rutInput.addEventListener('blur', () => {
+    if (getTipo() === 'RUT' && rutInput.value.trim()) {
+      rutInput.value = formatearRut(rutInput.value);
+    }
     actualizarUI();
     if (getTipo() !== 'RUT') return;
     const rut = rutInput.value.trim();
-    if (rut.length < 8) return;
-    timer = setTimeout(() => checkRut(rut), 600);
+    clearTimeout(timer);
+    alertBox.className = 'd-none mb-3';
+    alertBox.innerHTML = '';
+    if (rut.replace(/[^0-9kK]/g, '').length >= 8) {
+      timer = setTimeout(() => checkRut(rut), 300);
+    }
+  });
+
+  rutInput.addEventListener('paste', (e) => {
+    if (getTipo() !== 'RUT') return;
+    e.preventDefault();
+    const pegado = (e.clipboardData || window.clipboardData).getData('text');
+    rutInput.value = formatearRut(pegado);
+    actualizarUI();
+    const rut = rutInput.value.trim();
+    if (rut.replace(/[^0-9kK]/g, '').length >= 8) {
+      clearTimeout(timer);
+      timer = setTimeout(() => checkRut(rut), 400);
+    }
   });
 }
 

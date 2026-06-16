@@ -98,9 +98,54 @@ def contrato_create(request):
         form = ContratoForm(request.POST, trabajador_rut=trabajador_rut, obra_id=obra_id)
         if form.is_valid():
             contrato = form.save(commit=False)
+            # Bloqueo lista negra
+            if contrato.trabajador.en_lista_negra:
+                messages.error(
+                    request,
+                    f'{contrato.trabajador.nombre_completo} está en lista negra y no puede recibir nuevos contratos. '
+                    f'Motivo: {contrato.trabajador.motivo_lista_negra or "sin detalle"}.'
+                )
+                return redirect(request.path + (f'?trabajador_rut={trabajador_rut}' if trabajador_rut else ''))
+            # Bloqueo contrato activo en misma obra
+            _ESTADOS_ACTIVOS = ('Pendiente de Firma', 'Vigente', 'En Licencia', 'Reactivado')
+            contrato_activo_mismo = Contrato.objects.filter(
+                trabajador=contrato.trabajador, obra=contrato.obra,
+                estado__in=_ESTADOS_ACTIVOS, activo=True,
+            ).first()
+            if contrato_activo_mismo:
+                messages.error(
+                    request,
+                    f'{contrato.trabajador.nombre_completo} ya tiene un contrato activo en {contrato.obra.nombre} '
+                    f'(#{contrato_activo_mismo.pk}, {contrato_activo_mismo.estado}). '
+                    f'Para generar el PDF, usa "Generar Documento" desde la carpeta digital del trabajador.'
+                )
+                return redirect(request.path + (f'?trabajador_rut={trabajador_rut}' if trabajador_rut else ''))
+            # Re-contratación detection
+            _ESTADOS_TERMINO = ('Finalizado', 'Finiquitado', 'Rescindido', 'Trasladado')
+            contrato_previo = Contrato.objects.filter(
+                trabajador=contrato.trabajador, obra=contrato.obra,
+                estado__in=_ESTADOS_TERMINO, activo=True,
+            ).order_by('-creado_el').first()
             contrato.estado = 'Pendiente de Firma'
+            contrato.es_recontratacion = bool(contrato_previo)
+            contrato.contrato_anterior = contrato_previo
             contrato.save()
-            messages.success(request, f'Contrato #{contrato.pk} generado. Estado: Pendiente de Firma.')
+            if contrato_previo:
+                tiene_finiquito = Documento.objects.filter(
+                    contrato=contrato_previo,
+                    tipo_documento__nombre='Finiquito Legalizado',
+                    activo=True,
+                ).exists()
+                if not tiene_finiquito:
+                    messages.warning(
+                        request,
+                        f'Re-contratación registrada. El contrato anterior (#{contrato_previo.pk}) '
+                        f'no tiene finiquito subido aún.'
+                    )
+                else:
+                    messages.success(request, f'Contrato #{contrato.pk} creado. Re-contratación detectada (contrato previo finiquitado).')
+            else:
+                messages.success(request, f'Contrato #{contrato.pk} generado. Estado: Pendiente de Firma.')
             return redirect('contrato_wizard', pk=contrato.pk)
     else:
         form = ContratoForm(trabajador_rut=trabajador_rut, obra_id=obra_id)
@@ -156,15 +201,29 @@ def contrato_wizard(request, pk):
 @login_required
 def contrato_edit(request, pk):
     contrato = get_object_or_404(Contrato, pk=pk, activo=True)
+    next_url = request.GET.get('next') or ''
     if request.method == 'POST':
+        next_url = request.POST.get('next') or ''
+        especialidad_anterior = contrato.especialidad
         form = ContratoEditForm(request.POST, instance=contrato)
         if form.is_valid():
-            form.save()
+            contrato_guardado = form.save()
+            # Historial de cambio de especialidad
+            from ..models import ContratoHistorial
+            nueva_especialidad = form.cleaned_data.get('especialidad') or contrato_guardado.especialidad
+            if nueva_especialidad and nueva_especialidad.pk != especialidad_anterior.pk:
+                ContratoHistorial.objects.create(
+                    contrato=contrato_guardado,
+                    estado_anterior=contrato_guardado.estado,
+                    estado_nuevo=contrato_guardado.estado,
+                    descripcion=f'Cambio de especialidad: "{especialidad_anterior.nombre}" → "{nueva_especialidad.nombre}".',
+                    usuario=request.user.username,
+                )
             messages.success(request, 'Contrato actualizado.')
-            return redirect('contratos_list')
+            return redirect(next_url) if next_url else redirect('contratos_list')
     else:
         form = ContratoEditForm(instance=contrato)
-    return render(request, 'contratos/edit.html', {'form': form, 'contrato': contrato})
+    return render(request, 'contratos/edit.html', {'form': form, 'contrato': contrato, 'next_url': next_url})
 
 
 @login_required
@@ -187,6 +246,10 @@ def contrato_upload_firmado(request, pk):
             )
             contrato.estado = 'Vigente'
             contrato.save()
+            from ..models import DocumentoGenerado
+            DocumentoGenerado.objects.filter(
+                contrato=contrato, tipo='contrato_trabajo', activo=True
+            ).update(activo=False)
             messages.success(request, 'Contrato firmado cargado. Estado actualizado a Vigente.')
             return JsonResponse({'ok': True})
         return JsonResponse({'ok': False, 'error': 'No se recibió archivo'})
@@ -240,42 +303,3 @@ CIUDADES_VIII = [
 ]
 
 
-@login_required
-def contrato_pdf(request, pk):
-    from ..models import ConfigEmpresa
-    import datetime as dt
-    contrato = get_object_or_404(Contrato, pk=pk, activo=True)
-
-    ciudad = request.GET.get('ciudad', '').strip()
-    fecha_str = request.GET.get('fecha_doc', '').strip()
-
-    # If params not yet provided, show the config form first
-    if not ciudad or not fecha_str:
-        return render(request, 'contratos/pdf_config.html', {
-            'contrato': contrato,
-            'ciudades': CIUDADES_VIII,
-            'fecha_hoy': contrato.fecha_inicio.strftime('%Y-%m-%d'),
-        })
-
-    # Parse fecha_doc (type=date sends YYYY-MM-DD)
-    try:
-        fecha_doc = dt.date.fromisoformat(fecha_str)
-    except ValueError:
-        fecha_doc = contrato.fecha_inicio
-
-    # Prefer empresa linked to obra, fall back to first active
-    empresa = (contrato.obra.empresa
-               if contrato.obra and contrato.obra.empresa
-               else ConfigEmpresa.objects.filter(activo=True).first())
-    sueldo = int(contrato.sueldo_base)
-    sueldo_formateado = f"{sueldo:,}".replace(",", ".")
-    sueldo_palabras = _monto_en_palabras(sueldo).capitalize()
-
-    return render(request, 'contratos/pdf_preview.html', {
-        'contrato': contrato,
-        'empresa': empresa,
-        'sueldo_formateado': sueldo_formateado,
-        'sueldo_palabras': sueldo_palabras,
-        'ciudad_doc': ciudad,
-        'fecha_doc': fecha_doc,
-    })

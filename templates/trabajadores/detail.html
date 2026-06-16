@@ -70,14 +70,46 @@
 
         <!-- Stats chips -->
         <div class="d-flex gap-2 flex-wrap mt-3">
-          <a href="?tab=contratos" class="badge bg-light text-dark border text-decoration-none py-2 px-3">
-            <i class="bi bi-file-earmark-text me-1 text-primary"></i>
-            {{ contratos_vigentes_count }} contrato{% if contratos_vigentes_count != 1 %}s{% endif %} vigente{% if contratos_vigentes_count != 1 %}s{% endif %}
-          </a>
-          <a href="?tab=documentos" class="badge {% if docs_alerta_count > 0 %}bg-warning text-dark{% else %}bg-light text-dark border{% endif %} text-decoration-none py-2 px-3">
+          {% if contratos_vigentes_count > 0 %}
+          <div class="dropdown d-inline-block">
+            <button class="badge bg-light text-dark border py-2 px-3 dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false"
+                    style="font-size:.75rem;font-weight:500;cursor:pointer;border:none">
+              <i class="bi bi-file-earmark-text me-1 text-primary"></i>
+              {{ contratos_vigentes_count }} contrato{% if contratos_vigentes_count != 1 %}s{% endif %} vigente{% if contratos_vigentes_count != 1 %}s{% endif %}
+            </button>
+            <ul class="dropdown-menu shadow-sm" style="min-width:230px">
+              {% for c in contratos %}{% if c.estado == 'Vigente' %}
+              <li>
+                <a class="dropdown-item py-2" href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion">
+                  <i class="bi bi-building me-1 text-primary"></i>
+                  <span class="fw-semibold">{{ c.obra.nombre }}</span>
+                  <small class="text-muted d-block ms-4" style="font-size:.72rem">
+                    {{ c.especialidad.nombre }} · desde {{ c.fecha_inicio|date:"d/m/Y" }}
+                  </small>
+                </a>
+              </li>
+              {% endif %}{% endfor %}
+              <li><hr class="dropdown-divider my-1"></li>
+              <li>
+                <a class="dropdown-item small text-muted" href="?tab=contratos">
+                  <i class="bi bi-list me-1"></i>Ver todos los contratos
+                </a>
+              </li>
+            </ul>
+          </div>
+          {% else %}
+          <span class="badge bg-light text-muted border py-2 px-3">
+            <i class="bi bi-file-earmark-text me-1"></i>Sin contratos vigentes
+          </span>
+          {% endif %}
+
+          <a href="?tab=documentos{% if docs_alerta_count > 0 %}&expand_alerts=1{% endif %}"
+             class="badge {% if docs_alerta_count > 0 %}bg-warning text-dark{% else %}bg-light text-dark border{% endif %} text-decoration-none py-2 px-3">
             <i class="bi bi-folder2{% if docs_alerta_count > 0 %}-open{% endif %} me-1"></i>
             {% if docs_alerta_count > 0 %}{{ docs_alerta_count }} doc{% if docs_alerta_count != 1 %}s{% endif %} con alerta{% else %}Documentos al día{% endif %}
           </a>
+
           {% if trabajador.strikes_activos > 0 %}
           <a href="?tab=strikes" class="badge {% if trabajador.strikes_activos >= 3 %}bg-danger{% else %}bg-warning text-dark{% endif %} text-decoration-none py-2 px-3">
             <i class="bi bi-exclamation-triangle me-1"></i>{{ trabajador.strikes_activos }} strike{% if trabajador.strikes_activos != 1 %}s{% endif %} activo{% if trabajador.strikes_activos != 1 %}s{% endif %}
@@ -152,6 +184,11 @@
               <i class="bi bi-folder2-open me-1"></i>Carpeta Digital
             </a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'historico' %}active{% endif %}" href="?tab=historico">
+              <i class="bi bi-archive me-1"></i>Histórico
+            </a>
+          </li>
           {% if trabajador.strikes_activos > 0 or tab == 'strikes' %}
           <li class="nav-item">
             <a class="nav-link {% if tab == 'strikes' %}active{% endif %}" href="?tab=strikes">
@@ -175,6 +212,12 @@
             </a>
           </li>
           {% endif %}
+          <li class="nav-item">
+            <a class="nav-link {% if tab == 'licencias' %}active{% endif %}" href="?tab=licencias">
+              <i class="bi bi-hospital me-1"></i>Licencias
+              {% if licencias %}<span class="badge bg-secondary ms-1">{{ licencias|length }}</span>{% endif %}
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -183,12 +226,13 @@
         <!-- TAB: Contratos -->
         {% if tab == 'contratos' %}
         <div class="table-responsive">
-          <table class="table table-hover align-middle">
+          <table class="table align-middle mb-0">
             <thead class="table-light">
-              <tr><th>#</th><th>Obra</th><th>Especialidad</th><th>Sueldo</th><th>Inicio</th><th>Término</th><th>Estado</th><th></th></tr>
+              <tr><th>#</th><th>Obra</th><th>Especialidad</th><th>Sueldo</th><th>Inicio</th><th>Término</th><th>Estado</th><th>Documentos</th></tr>
             </thead>
             <tbody>
-              {% for c in contratos %}
+              {# ── Contratos activos ── #}
+              {% for c in contratos %}{% if not c.is_terminado %}
               <tr>
                 <td><code>{{ c.pk }}</code></td>
                 <td><a href="{% url 'obra_detail' c.obra.pk %}">{{ c.obra.nombre }}</a></td>
@@ -205,16 +249,37 @@
                   <span class="badge
                     {% if c.estado == 'Vigente' %}bg-success
                     {% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark
-                    {% elif c.estado == 'Finalizado' %}bg-secondary
-                    {% else %}bg-danger{% endif %}">
+                    {% elif c.estado == 'En Licencia' %}bg-warning text-dark
+                    {% elif c.estado == 'Reactivado' %}bg-info text-dark
+                    {% else %}bg-secondary{% endif %}">
                     {{ c.estado }}
                   </span>
                 </td>
-                <td></td>
+                <td class="text-nowrap">
+                  <div class="d-flex flex-wrap gap-1">
+                    {% if c.contrato_generado %}
+                      <a href="{% url 'doc_generado_preview' c.contrato_generado.pk %}"
+                         onclick="previewDoc(this.href,'Contrato de Trabajo','html');return false;"
+                         class="badge bg-primary text-white text-decoration-none" title="Ver contrato generado">
+                        <i class="bi bi-file-earmark-text me-1"></i>Contrato
+                      </a>
+                    {% endif %}
+                    {% if c.contrato_firmado %}
+                      <a href="{% url 'documento_preview_papelera' c.contrato_firmado.pk %}"
+                         onclick="previewDoc(this.href,'Contrato Firmado','{{ c.contrato_firmado.extension|lower }}');return false;"
+                         class="badge bg-success text-white text-decoration-none" title="Ver contrato firmado">
+                        <i class="bi bi-file-check me-1"></i>Firmado
+                      </a>
+                    {% endif %}
+                  </div>
+                </td>
               </tr>
-              {% empty %}
+              {% endif %}{% endfor %}
+
+              {# ── Vacío total ── #}
+              {% if not contratos %}
               <tr><td colspan="8" class="text-center text-muted py-4">Sin contratos registrados.</td></tr>
-              {% endfor %}
+              {% endif %}
             </tbody>
           </table>
         </div>
@@ -255,7 +320,8 @@
                 </div>
               </button>
             </h2>
-            <div id="carpetaPersonal" class="accordion-collapse collapse">
+            <div id="carpetaPersonal" class="accordion-collapse collapse"
+                 {% if resumen_personal.vencido or resumen_personal.proximo or resumen_personal.sin_cargar %}data-has-alert="true"{% endif %}>
               <form method="post"
                     action="{% url 'trabajador_upload_doc_masivo' trabajador.rut %}?nivel=Trabajador"
                     enctype="multipart/form-data">
@@ -265,13 +331,19 @@
                   <div class="list-group-item px-3 py-2
                     {% if item.estado == 'vencido' %}list-group-item-danger
                     {% elif item.estado == 'proximo' %}list-group-item-warning
+                    {% elif item.estado == 'pendiente_dig' %}list-group-item-warning
                     {% elif item.estado == 'pendiente' %}list-group-item-secondary{% endif %}">
                     <div class="row align-items-center g-2">
                       <div class="col-md-3 d-flex align-items-center gap-2">
-                        <i class="bi bi-file-earmark-{% if item.doc %}check{% else %}x{% endif %}
-                          {% if item.estado == 'ok' %}text-success{% elif item.estado == 'vencido' %}text-danger{% elif item.estado == 'proximo' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
+                        <i class="bi bi-file-earmark-{% if item.estado == 'pendiente_dig' %}clock{% elif item.doc and item.doc.archivo %}check{% elif item.doc %}hourglass{% else %}x{% endif %}
+                          {% if item.estado == 'ok' %}text-success{% elif item.estado == 'vencido' %}text-danger{% elif item.estado == 'proximo' or item.estado == 'pendiente_dig' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
                         <div>
                           <div class="small fw-semibold">{{ item.tipo.nombre }}</div>
+                          {% if item.docs_historial|length > 1 %}
+                          <div style="font-size:.65rem;" class="text-muted">
+                            <i class="bi bi-layers me-1"></i>{{ item.docs_historial|length }} versiones
+                          </div>
+                          {% endif %}
                         </div>
                       </div>
                       <div class="col-md-3">
@@ -279,22 +351,32 @@
                         {% elif item.estado == 'vencido' %}<span class="badge bg-danger">Vencido</span>
                           {% if item.doc.fecha_vencimiento %}<div class="text-danger" style="font-size:.7rem">{{ item.doc.fecha_vencimiento|date:"d/m/Y" }}</div>{% endif %}
                         {% elif item.estado == 'proximo' %}<span class="badge bg-warning text-dark">Por vencer ({{ item.doc.dias_para_vencer }}d)</span>
+                        {% elif item.estado == 'pendiente_dig' %}<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Pend. digitalización</span>
+                          <div class="text-muted" style="font-size:.7rem;">Registrado {{ item.doc.fecha_carga|date:"d/m/Y" }}</div>
                         {% else %}<span class="badge bg-secondary">Sin cargar</span>
                         {% endif %}
                       </div>
-                      <div class="col-md-2 d-flex gap-1">
-                        {% if item.doc %}
-                          <button type="button" onclick="previewDoc('{{ item.doc.archivo.url }}','{{ item.tipo.nombre }}','{{ item.doc.extension }}')"
-                                  class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></button>
+                      <div class="col-md-2 d-flex gap-1 flex-wrap">
+                        {% if item.doc and item.doc.archivo %}
+                          <a href="{% url 'documento_preview_papelera' item.doc.pk %}"
+                             onclick="previewDoc(this.href,'{{ item.tipo.nombre|escapejs }}','{{ item.doc.extension|lower }}');return false;"
+                             class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></a>
                           <a href="{% url 'documento_download' item.doc.pk %}"
                              class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar"><i class="bi bi-download"></i></a>
+                          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar"
+                            onclick="eliminarDoc('{% url 'documento_delete' item.doc.pk %}','{{ item.tipo.nombre|escapejs }}','{% url 'trabajador_detail' trabajador.rut %}?tab=documentos')">
+                            <i class="bi bi-trash"></i></button>
+                        {% elif item.doc %}
+                          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar registro"
+                            onclick="eliminarDoc('{% url 'documento_delete' item.doc.pk %}','{{ item.tipo.nombre|escapejs }}','{% url 'trabajador_detail' trabajador.rut %}?tab=documentos')">
+                            <i class="bi bi-trash"></i></button>
                         {% endif %}
                       </div>
                       <div class="col-md-4">
                         <input type="file" name="archivo_{{ item.tipo.pk }}"
                                class="form-control form-control-sm"
                                onchange="marcarCambio(this)"
-                               title="{% if item.doc %}Reemplazar{% else %}Subir{% endif %} {{ item.tipo.nombre }}">
+                               title="{% if item.doc and item.doc.archivo %}Agregar versión{% else %}Subir{% endif %} {{ item.tipo.nombre }}">
                       </div>
                     </div>
                   </div>
@@ -312,36 +394,119 @@
             </div>
           </div>
 
-          <!-- ── Carpeta por Contrato ── -->
+          <!-- ── Carpeta por Contrato (solo activos) ── -->
           {% for item in contratos_con_docs %}
+          {% if not item.is_terminado %}
           {% with contrato=item.contrato checklist=item.checklist %}
+
           <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
             <h2 class="accordion-header">
               <button class="accordion-button collapsed py-0 px-0 border-0 bg-transparent" type="button"
                       data-bs-toggle="collapse" data-bs-target="#carpetaContrato{{ contrato.pk }}">
-                <div class="d-flex align-items-center gap-3 w-100 px-3 py-3">
-                  <i class="bi bi-folder2-open fs-2
-                    {% if contrato.estado == 'Vigente' %}text-primary{% elif contrato.estado == 'Pendiente de Firma' %}text-warning{% else %}text-secondary{% endif %}"></i>
+                <div class="d-flex align-items-center gap-3 w-100 px-3 py-3"
+                     style="{% if item.is_terminado %}background:#f8fafc;{% endif %}">
+                  {% if item.is_terminado %}
+                  <i class="bi bi-archive fs-2 text-secondary"></i>
+                  {% elif contrato.estado == 'Vigente' or contrato.estado == 'Reactivado' %}
+                  <i class="bi bi-folder2-open fs-2 text-primary"></i>
+                  {% elif contrato.estado == 'En Licencia' %}
+                  <i class="bi bi-folder2-open fs-2" style="color:#fd7e14"></i>
+                  {% else %}
+                  <i class="bi bi-folder2-open fs-2 text-warning"></i>
+                  {% endif %}
                   <div class="flex-grow-1">
-                    <div class="fw-bold">{{ contrato.obra.nombre }}</div>
-                    <div class="small text-muted">{{ contrato.especialidad.nombre }}</div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                      <span class="fw-bold {% if item.is_terminado %}text-muted{% endif %}">{{ contrato.obra.nombre }}</span>
+                      {% if contrato.es_recontratacion %}
+                      <span class="badge text-white" style="background:#7c3aed;font-size:.65rem"><i class="bi bi-arrow-repeat me-1"></i>Re-contratación</span>
+                      {% endif %}
+                      <span class="badge
+                        {% if contrato.estado == 'Vigente' %}bg-success
+                        {% elif contrato.estado == 'Pendiente de Firma' %}bg-warning text-dark
+                        {% elif contrato.estado == 'En Licencia' %}bg-warning text-dark
+                        {% elif contrato.estado == 'Reactivado' %}bg-info text-dark
+                        {% elif contrato.estado == 'Finiquitado' %}bg-dark
+                        {% else %}bg-secondary{% endif %}" style="font-size:.65rem">{{ contrato.estado }}</span>
+                    </div>
+                    <div class="small text-muted mt-1">
+                      {{ contrato.especialidad.nombre }}
+                      <span class="mx-1 opacity-50">·</span>
+                      {{ contrato.fecha_inicio|date:"d/m/Y" }}
+                      {% if contrato.fecha_termino_real %} — {{ contrato.fecha_termino_real|date:"d/m/Y" }}{% elif contrato.fecha_termino_estimada %} → est. {{ contrato.fecha_termino_estimada|date:"d/m/Y" }}{% endif %}
+                    </div>
                   </div>
-                  <div class="d-flex gap-1 flex-wrap justify-content-end pe-2">
-                    {% if item.resumen.vencido %}<span class="badge bg-danger">{{ item.resumen.vencido }} vencido{% if item.resumen.vencido != 1 %}s{% endif %}</span>{% endif %}
-                    {% if item.resumen.proximo %}<span class="badge bg-warning text-dark">{{ item.resumen.proximo }} por vencer</span>{% endif %}
-                    {% if item.resumen.sin_cargar %}<span class="badge bg-danger">Falta Documentación {{ item.resumen.sin_cargar }}</span>{% endif %}
-                    {% if not item.resumen.vencido and not item.resumen.proximo and not item.resumen.sin_cargar %}<span class="badge bg-success">Sin documentos pendientes</span>{% endif %}
+                  <div class="d-flex gap-1 flex-wrap justify-content-end pe-2 flex-shrink-0">
+                    {% if item.resumen.vencido %}<span class="badge bg-danger" style="font-size:.7rem">{{ item.resumen.vencido }} vencido{{ item.resumen.vencido|pluralize }}</span>{% endif %}
+                    {% if item.resumen.proximo %}<span class="badge bg-warning text-dark" style="font-size:.7rem">{{ item.resumen.proximo }} por vencer</span>{% endif %}
+                    {% if item.is_terminado %}
+                      {% if item.resumen.total_docs == 0 %}
+                        <span class="badge bg-secondary text-white" style="font-size:.7rem;opacity:.7">Sin documentos registrados</span>
+                      {% elif item.resumen.sin_cargar %}
+                        <span class="badge bg-secondary" style="font-size:.7rem">{{ item.resumen.total_docs }} doc{{ item.resumen.total_docs|pluralize }} archivado{{ item.resumen.total_docs|pluralize }}</span>
+                      {% else %}
+                        <span class="badge bg-success" style="font-size:.7rem">Completo</span>
+                      {% endif %}
+                    {% else %}
+                      {% if item.resumen.sin_cargar %}<span class="badge bg-danger" style="font-size:.7rem">{{ item.resumen.sin_cargar }} faltante{{ item.resumen.sin_cargar|pluralize }}</span>{% endif %}
+                      {% if not item.resumen.vencido and not item.resumen.proximo and not item.resumen.sin_cargar %}<span class="badge bg-success" style="font-size:.7rem">Completo</span>{% endif %}
+                    {% endif %}
                   </div>
                 </div>
               </button>
             </h2>
-            <div id="carpetaContrato{{ contrato.pk }}" class="accordion-collapse collapse">
+            <div id="carpetaContrato{{ contrato.pk }}" class="accordion-collapse collapse"
+                 {% if item.resumen.vencido or item.resumen.proximo or item.resumen.sin_cargar and not item.is_terminado %}data-has-alert="true"{% endif %}>
               {% if contrato.estado == 'Pendiente de Firma' %}
               <div class="alert alert-warning rounded-0 mb-0 py-2 px-3">
                 <i class="bi bi-exclamation-triangle me-1"></i>
                 Contrato pendiente de firma. Al subir el primer documento pasará a <strong>Vigente</strong>.
               </div>
               {% endif %}
+              {% if item.is_terminado %}
+              {# Contratos históricos — solo lectura, sin form de subida #}
+              <div class="list-group list-group-flush">
+                {% if item.resumen.total_docs == 0 %}
+                <div class="list-group-item text-center py-4 text-muted small">
+                  <i class="bi bi-archive fs-4 d-block mb-1 opacity-50"></i>
+                  Sin documentos registrados para este contrato.<br>
+                  <span class="opacity-75">Los documentos de contratos finalizados son registros históricos y no pueden modificarse desde aquí.</span>
+                </div>
+                {% else %}
+                {% for ci in checklist %}
+                {% if ci.doc %}
+                <div class="list-group-item px-3 py-2
+                  {% if ci.estado == 'vencido' %}list-group-item-danger
+                  {% elif ci.estado == 'proximo' %}list-group-item-warning{% endif %}">
+                  <div class="row align-items-center g-2">
+                    <div class="col-md-4 d-flex align-items-center gap-2">
+                      <i class="bi bi-file-earmark-{% if ci.doc.archivo %}check{% else %}hourglass{% endif %}
+                        {% if ci.estado == 'ok' %}text-success{% elif ci.estado == 'vencido' %}text-danger{% elif ci.estado == 'proximo' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
+                      <div class="small fw-semibold">{{ ci.tipo.nombre }}</div>
+                    </div>
+                    <div class="col-md-4">
+                      {% if ci.estado == 'ok' %}<span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Archivado</span>
+                      {% elif ci.estado == 'vencido' %}<span class="badge bg-danger">Vencido</span>
+                      {% elif ci.estado == 'proximo' %}<span class="badge bg-warning text-dark">Por vencer</span>
+                      {% elif ci.estado == 'pendiente_dig' %}<span class="badge bg-secondary"><i class="bi bi-hourglass-split me-1"></i>Sin digitalizar</span>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-4 d-flex gap-1 justify-content-end">
+                      {% if ci.doc.archivo %}
+                      <a href="{% url 'documento_preview_papelera' ci.doc.pk %}"
+                         onclick="previewDoc(this.href,'{{ ci.tipo.nombre|escapejs }}','{{ ci.doc.extension|lower }}');return false;"
+                         class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'documento_download' ci.doc.pk %}"
+                         class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar"><i class="bi bi-download"></i></a>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+              </div>
+              {% else %}
+              {# Contratos activos — gestión completa con subida #}
               <form method="post"
                     action="{% url 'trabajador_upload_doc_masivo' trabajador.rut %}?nivel=Contrato&contrato_id={{ contrato.pk }}"
                     enctype="multipart/form-data">
@@ -351,13 +516,19 @@
                   <div class="list-group-item px-3 py-2
                     {% if ci.estado == 'vencido' %}list-group-item-danger
                     {% elif ci.estado == 'proximo' %}list-group-item-warning
+                    {% elif ci.estado == 'pendiente_dig' %}list-group-item-warning
                     {% elif ci.estado == 'pendiente' %}list-group-item-secondary{% endif %}">
                     <div class="row align-items-center g-2">
                       <div class="col-md-3 d-flex align-items-center gap-2">
-                        <i class="bi bi-file-earmark-{% if ci.doc %}check{% else %}x{% endif %}
-                          {% if ci.estado == 'ok' %}text-success{% elif ci.estado == 'vencido' %}text-danger{% elif ci.estado == 'proximo' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
+                        <i class="bi bi-file-earmark-{% if ci.estado == 'pendiente_dig' %}clock{% elif ci.doc and ci.doc.archivo %}check{% elif ci.doc %}hourglass{% else %}x{% endif %}
+                          {% if ci.estado == 'ok' %}text-success{% elif ci.estado == 'vencido' %}text-danger{% elif ci.estado == 'proximo' or ci.estado == 'pendiente_dig' %}text-warning{% else %}text-muted{% endif %} fs-5"></i>
                         <div>
                           <div class="small fw-semibold">{{ ci.tipo.nombre }}</div>
+                          {% if ci.docs_historial|length > 1 %}
+                          <div style="font-size:.65rem;" class="text-muted">
+                            <i class="bi bi-layers me-1"></i>{{ ci.docs_historial|length }} versiones
+                          </div>
+                          {% endif %}
                         </div>
                       </div>
                       <div class="col-md-3">
@@ -365,22 +536,32 @@
                         {% elif ci.estado == 'vencido' %}<span class="badge bg-danger">Vencido</span>
                           {% if ci.doc.fecha_vencimiento %}<div class="text-danger" style="font-size:.7rem">{{ ci.doc.fecha_vencimiento|date:"d/m/Y" }}</div>{% endif %}
                         {% elif ci.estado == 'proximo' %}<span class="badge bg-warning text-dark">Por vencer ({{ ci.doc.dias_para_vencer }}d)</span>
+                        {% elif ci.estado == 'pendiente_dig' %}<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Pend. digitalización</span>
+                          <div class="text-muted" style="font-size:.7rem;">Registrado {{ ci.doc.fecha_carga|date:"d/m/Y" }}</div>
                         {% else %}<span class="badge bg-secondary">Sin cargar</span>
                         {% endif %}
                       </div>
-                      <div class="col-md-2 d-flex gap-1">
-                        {% if ci.doc %}
-                          <button type="button" onclick="previewDoc('{{ ci.doc.archivo.url }}','{{ ci.tipo.nombre }}','{{ ci.doc.extension }}')"
-                                  class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></button>
+                      <div class="col-md-2 d-flex gap-1 flex-wrap">
+                        {% if ci.doc and ci.doc.archivo %}
+                          <a href="{% url 'documento_preview_papelera' ci.doc.pk %}"
+                             onclick="previewDoc(this.href,'{{ ci.tipo.nombre|escapejs }}','{{ ci.doc.extension|lower }}');return false;"
+                             class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></a>
                           <a href="{% url 'documento_download' ci.doc.pk %}"
                              class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar"><i class="bi bi-download"></i></a>
+                          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar"
+                            onclick="confirmarEliminarDoc('{% url 'documento_delete' ci.doc.pk %}','{{ ci.tipo.nombre|escapejs }}','{% url 'trabajador_detail' trabajador.rut %}?tab=documentos')">
+                            <i class="bi bi-trash"></i></button>
+                        {% elif ci.doc %}
+                          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar registro"
+                            onclick="confirmarEliminarDoc('{% url 'documento_delete' ci.doc.pk %}','{{ ci.tipo.nombre|escapejs }}','{% url 'trabajador_detail' trabajador.rut %}?tab=documentos')">
+                            <i class="bi bi-trash"></i></button>
                         {% endif %}
                       </div>
                       <div class="col-md-4">
                         <input type="file" name="archivo_{{ ci.tipo.pk }}"
                                class="form-control form-control-sm file-input-contrato-{{ contrato.pk }}"
                                onchange="marcarCambioContrato(this, {{ contrato.pk }})"
-                               title="{% if ci.doc %}Reemplazar{% else %}Subir{% endif %} {{ ci.tipo.nombre }}">
+                               title="{% if ci.doc and ci.doc.archivo %}Agregar versión{% else %}Subir{% endif %} {{ ci.tipo.nombre }}">
                       </div>
                     </div>
                   </div>
@@ -395,14 +576,149 @@
                   </div>
                 </div>
               </form>
+              {% endif %}
             </div>
           </div>
           {% endwith %}
-          {% empty %}
-          <div class="text-center text-muted py-3"><i class="bi bi-folder-x me-1"></i>Sin contratos registrados.</div>
+          {% endif %}
           {% endfor %}
 
+          {% if not contratos_con_docs %}
+          <div class="text-center text-muted py-3"><i class="bi bi-folder-x me-1"></i>Sin contratos registrados.</div>
+          {% endif %}
+
         </div><!-- /acordeón -->
+
+        {% if request.GET.expand_alerts %}
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          document.querySelectorAll('.accordion-collapse[data-has-alert="true"]').forEach(function (el) {
+            bootstrap.Collapse.getOrCreateInstance(el).show();
+          });
+        });
+        </script>
+        {% endif %}
+
+        <!-- TAB: Histórico -->
+        {% elif tab == 'historico' %}
+        <div class="table-responsive mb-4">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr><th>Obra</th><th>Especialidad</th><th>Período</th><th>Estado</th><th>Documentos</th></tr>
+            </thead>
+            <tbody>
+              {% for c in contratos %}{% if c.is_terminado %}
+              <tr style="opacity:.8">
+                <td class="text-muted">{{ c.obra.nombre }}</td>
+                <td class="text-muted">{{ c.especialidad.nombre }}</td>
+                <td class="text-muted small">
+                  {{ c.fecha_inicio|date:"d/m/Y" }} —
+                  {{ c.fecha_termino_real|date:"d/m/Y"|default:c.fecha_termino_estimada|date:"d/m/Y"|default:"—" }}
+                </td>
+                <td>
+                  <span class="badge {% if c.estado == 'Finiquitado' %}bg-dark{% elif c.estado == 'Rescindido' %}bg-danger{% else %}bg-secondary{% endif %}">
+                    {{ c.estado }}
+                  </span>
+                </td>
+                <td class="text-nowrap">
+                  <div class="d-flex flex-wrap gap-1">
+                    {% if c.contrato_generado %}
+                      <a href="{% url 'doc_generado_preview' c.contrato_generado.pk %}"
+                         onclick="previewDoc(this.href,'Contrato de Trabajo','html');return false;"
+                         class="badge bg-secondary text-white text-decoration-none">
+                        <i class="bi bi-file-earmark-text me-1"></i>Contrato
+                      </a>
+                    {% endif %}
+                    {% if c.contrato_firmado %}
+                      <a href="{% url 'documento_preview_papelera' c.contrato_firmado.pk %}"
+                         onclick="previewDoc(this.href,'Contrato Firmado','{{ c.contrato_firmado.extension|lower }}');return false;"
+                         class="badge bg-secondary text-white text-decoration-none">
+                        <i class="bi bi-file-check me-1"></i>Firmado
+                      </a>
+                    {% endif %}
+                    {% if c.finiquito_generado %}
+                      <a href="{% url 'doc_generado_preview' c.finiquito_generado.pk %}"
+                         onclick="previewDoc(this.href,'Finiquito','html');return false;"
+                         class="badge bg-secondary text-white text-decoration-none">
+                        <i class="bi bi-file-earmark-text me-1"></i>Finiquito
+                      </a>
+                    {% endif %}
+                    {% if c.finiquito_subido %}
+                      <a href="{% url 'documento_preview_papelera' c.finiquito_subido.pk %}"
+                         onclick="previewDoc(this.href,'Finiquito Firmado','{{ c.finiquito_subido.extension|lower }}');return false;"
+                         class="badge bg-secondary text-white text-decoration-none">
+                        <i class="bi bi-file-check me-1"></i>Fin. Firmado
+                      </a>
+                    {% endif %}
+                    {% if not c.contrato_generado and not c.contrato_firmado and not c.finiquito_generado and not c.finiquito_subido %}
+                      <span class="badge text-muted border" style="font-size:.65rem">Sin documentos</span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endif %}{% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% for item in contratos_con_docs %}{% if item.is_terminado %}
+        {% if item.primer_terminado %}
+        <h6 class="text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;font-weight:600">
+          <i class="bi bi-folder2 me-1"></i>CARPETAS DE DOCUMENTOS
+        </h6>
+        {% endif %}
+        {% with contrato=item.contrato checklist=item.checklist %}
+        {% if item.resumen.total_docs > 0 %}
+        <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed py-0 px-0 border-0 bg-transparent" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#histContrato{{ contrato.pk }}">
+              <div class="d-flex align-items-center gap-3 w-100 px-3 py-3" style="background:#f8fafc;">
+                <i class="bi bi-archive fs-2 text-secondary"></i>
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold text-muted">{{ contrato.obra.nombre }}</span>
+                    <span class="badge {% if contrato.estado == 'Finiquitado' %}bg-dark{% elif contrato.estado == 'Rescindido' %}bg-danger{% else %}bg-secondary{% endif %}" style="font-size:.65rem">{{ contrato.estado }}</span>
+                  </div>
+                  <div class="small text-muted mt-1">
+                    {{ contrato.especialidad.nombre }} · {{ contrato.fecha_inicio|date:"d/m/Y" }} —
+                    {{ contrato.fecha_termino_real|date:"d/m/Y"|default:contrato.fecha_termino_estimada|date:"d/m/Y"|default:"—" }}
+                  </div>
+                </div>
+                <span class="badge bg-secondary pe-2" style="font-size:.7rem">{{ item.resumen.total_docs }} doc{{ item.resumen.total_docs|pluralize }}</span>
+              </div>
+            </button>
+          </h2>
+          <div id="histContrato{{ contrato.pk }}" class="accordion-collapse collapse">
+            <div class="list-group list-group-flush">
+              {% for ci in checklist %}{% if ci.doc %}
+              <div class="list-group-item px-3 py-2">
+                <div class="row align-items-center g-2">
+                  <div class="col-md-4 d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-{% if ci.doc.archivo %}check text-success{% else %}hourglass text-muted{% endif %} fs-5"></i>
+                    <div class="small fw-semibold">{{ ci.tipo.nombre }}</div>
+                  </div>
+                  <div class="col-md-4">
+                    <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Archivado</span>
+                  </div>
+                  <div class="col-md-4 d-flex gap-1 justify-content-end">
+                    {% if ci.doc.archivo %}
+                    <a href="{% url 'documento_preview_papelera' ci.doc.pk %}"
+                       onclick="previewDoc(this.href,'{{ ci.tipo.nombre|escapejs }}','{{ ci.doc.extension|lower }}');return false;"
+                       class="btn btn-sm btn-outline-primary py-0 px-2" title="Ver"><i class="bi bi-eye"></i></a>
+                    <a href="{% url 'documento_download' ci.doc.pk %}"
+                       class="btn btn-sm btn-outline-secondary py-0 px-2" title="Descargar"><i class="bi bi-download"></i></a>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              {% endif %}{% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% endif %}{% endfor %}
 
         <!-- TAB: Strikes -->
         {% elif tab == 'strikes' %}
@@ -504,7 +820,7 @@
                   {% if t.tipo_traslado == 'CON_FINIQUITO' %}
                     {% if t.finiquito_pendiente %}
                       <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Pendiente</span>
-                      <a href="{% url 'trabajador_upload_doc' trabajador.rut %}?contrato_id={{ t.contrato_origen_id }}" class="btn btn-sm btn-danger ms-1 py-0 px-1"><i class="bi bi-upload"></i></a>
+                      <a href="{% url 'trabajador_detail' trabajador.rut %}?tab=documentos" class="btn btn-sm btn-danger ms-1 py-0 px-1"><i class="bi bi-upload"></i></a>
                     {% else %}
                       <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Cargado</span>
                     {% endif %}
@@ -523,15 +839,134 @@
           <i class="bi bi-arrow-right-circle text-secondary fs-1 d-block mb-2"></i>Sin historial de traslados.
         </div>
         {% endif %}
+
+        <!-- TAB: Licencias Médicas -->
+        {% elif tab == 'licencias' %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0"><i class="bi bi-hospital me-1"></i>Historial de Licencias Médicas</h6>
+          <a href="{% url 'licencia_create' %}?rut={{ trabajador.rut }}&next={% url 'trabajador_detail' trabajador.rut %}%3Ftab%3Dlicencias"
+             class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-circle me-1"></i>Registrar Licencia
+          </a>
+        </div>
+        {% if licencias %}
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Tipo</th>
+                <th>Organismo</th>
+                <th>Folio</th>
+                <th>Inicio</th>
+                <th>Fin</th>
+                <th class="text-center">Días</th>
+                <th>Estado</th>
+                <th>Obra</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for lic in licencias %}
+              <tr>
+                <td><span class="badge bg-secondary">Tipo {{ lic.tipo }}</span></td>
+                <td>{{ lic.organismo }}</td>
+                <td>{{ lic.numero_folio|default:"—" }}</td>
+                <td>{{ lic.fecha_inicio }}</td>
+                <td>{{ lic.fecha_fin|default:"Abierta" }}</td>
+                <td class="text-center">{{ lic.dias_autorizados }}</td>
+                <td>
+                  {% if lic.estado == 'Autorizada' %}<span class="badge bg-success">{{ lic.estado }}</span>
+                  {% elif lic.estado == 'Rechazada' %}<span class="badge bg-danger">{{ lic.estado }}</span>
+                  {% elif lic.estado == 'Prorrogada' %}<span class="badge bg-warning text-dark">{{ lic.estado }}</span>
+                  {% else %}<span class="badge bg-secondary">{{ lic.estado }}</span>{% endif %}
+                </td>
+                <td>
+                  {% if lic.obra %}<a href="{% url 'obra_detail' lic.obra.pk %}">{{ lic.obra.nombre }}</a>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="text-end">
+                  <a href="{% url 'licencia_detail' lic.pk %}" class="btn btn-link btn-sm p-0"><i class="bi bi-eye"></i></a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-hospital text-secondary fs-1 d-block mb-2"></i>
+          Sin licencias médicas registradas.
+          <br>
+          <a href="{% url 'licencia_create' %}?rut={{ trabajador.rut }}" class="btn btn-sm btn-outline-primary mt-2">
+            <i class="bi bi-plus-circle me-1"></i>Registrar primera licencia
+          </a>
+        </div>
+        {% endif %}
         {% endif %}
 
       </div>
     </div>
 </div>
+<!-- Modal advertencia eliminación documento de contrato activo -->
+<div class="modal fade" id="modalEliminarDocContrato" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-warning text-dark border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>¿Eliminar documento?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1">Vas a mover a la papelera el documento:</p>
+        <p class="fw-semibold mb-3" id="eliminarDocNombre"></p>
+        <div class="alert alert-warning border-warning mb-0 py-2" id="eliminarDocConsequencia">
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmarEliminarDoc">
+          <i class="bi bi-trash me-1"></i>Eliminar de todas formas
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+function eliminarDoc(url, nombre, next) {
+  if (!confirm('¿Mover a papelera el documento «' + nombre + '»?')) return;
+  const f = document.createElement('form');
+  f.method = 'POST';
+  f.action = url;
+  f.innerHTML = '<input name="csrfmiddlewaretoken" value="{{ csrf_token }}">'
+              + '<input name="next" value="' + next + '">';
+  document.body.appendChild(f);
+  f.submit();
+}
+
+function confirmarEliminarDoc(url, nombre, next) {
+  const CONSECUENCIAS = {
+    'Contrato de Trabajo Firmado': '<i class="bi bi-arrow-left-circle me-1"></i>El contrato volverá al estado <strong>Pendiente de Firma</strong> hasta que se suba un nuevo documento firmado.',
+    'Anexo de Contrato': '<i class="bi bi-calendar-x me-1"></i>La <strong>fecha de término extendida</strong> del contrato se eliminará y volverá a la fecha original estimada.',
+  };
+  document.getElementById('eliminarDocNombre').textContent = '«' + nombre + '»';
+  const consecuencia = CONSECUENCIAS[nombre]
+    || '<i class="bi bi-info-circle me-1"></i>Este documento pertenece a un contrato activo. Podrás recuperarlo desde la papelera si fue un error.';
+  document.getElementById('eliminarDocConsequencia').innerHTML = consecuencia;
+  const btn = document.getElementById('btnConfirmarEliminarDoc');
+  btn.onclick = function() {
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = url;
+    f.innerHTML = '<input name="csrfmiddlewaretoken" value="{{ csrf_token }}">'
+                + '<input name="next" value="' + next + '">';
+    document.body.appendChild(f);
+    f.submit();
+  };
+  new bootstrap.Modal(document.getElementById('modalEliminarDocContrato')).show();
+}
+
 function marcarCambio(input) {
   const btn = document.getElementById('btnGuardarPersonal');
   const hint = document.getElementById('hintPersonal');

@@ -1,0 +1,143 @@
+{% comment %}
+  Partial: bloque de trabajadores con docs faltantes para una obra.
+  Variables esperadas: entry={obra, grupos, total}, estado_obra="activa"|"cerrada"
+{% endcomment %}
+<div class="mb-3">
+  <!-- Cabecera de obra -->
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <a href="{% url 'obra_detail' entry.obra.pk %}"
+       class="fw-bold text-decoration-none {% if estado_obra == 'cerrada' %}text-secondary{% else %}text-dark{% endif %}">
+      <i class="bi bi-building{% if estado_obra == 'cerrada' %}-x{% endif %} me-1 text-muted"></i>{{ entry.obra.nombre }}
+    </a>
+    <span class="badge bg-danger rounded-pill ms-1">{{ entry.total }} faltante{% if entry.total != 1 %}s{% endif %}</span>
+    {% if estado_obra == 'cerrada' %}
+    <span class="badge bg-secondary" style="font-size:.7rem;">En cierre</span>
+    {% endif %}
+  </div>
+
+  <!-- Accordion de trabajadores -->
+  <div class="accordion" id="acordeonObra{{ entry.obra.pk }}">
+    {% for grupo in entry.grupos %}
+    {% with trab=grupo.trabajador total_g=grupo.docs_personales|length|add:grupo.docs_contrato|length %}
+    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden"
+         style="border-left:3px solid #dc3545 !important;">
+      <h2 class="accordion-header">
+        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-2 px-3"
+                type="button" data-bs-toggle="collapse"
+                data-bs-target="#docTrab{{ entry.obra.pk }}-{{ trab.rut|slugify }}"
+                style="background:linear-gradient(90deg,#fff5f5 0%,#fff 100%);">
+          <div class="d-flex align-items-center gap-2 w-100 flex-wrap">
+            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+                 style="width:34px;height:34px;font-size:.8rem;background:#dc3545;">
+              {{ trab.nombres|first }}{{ trab.apellidos|first }}
+            </div>
+            <div class="flex-grow-1">
+              <a href="{% url 'trabajador_detail' trab.rut %}?tab=documentos"
+                 class="fw-bold text-decoration-none text-dark" onclick="event.stopPropagation()">
+                {{ trab.nombre_completo }}
+              </a>
+              <div class="text-muted" style="font-size:.72rem"><code>{{ trab.rut }}</code></div>
+            </div>
+            <div class="d-flex gap-1 me-2">
+              {% if grupo.docs_personales %}
+              <span class="badge bg-warning text-dark" title="Documentos personales">
+                <i class="bi bi-person-badge me-1"></i>{{ grupo.docs_personales|length }}
+              </span>
+              {% endif %}
+              {% if grupo.docs_contrato %}
+              <span class="badge bg-primary" title="Documentos de contrato">
+                <i class="bi bi-file-text me-1"></i>{{ grupo.docs_contrato|length }}
+              </span>
+              {% endif %}
+              <span class="badge bg-danger">{{ total_g }} faltante{% if total_g != 1 %}s{% endif %}</span>
+            </div>
+          </div>
+        </button>
+      </h2>
+      <div id="docTrab{{ entry.obra.pk }}-{{ trab.rut|slugify }}"
+           class="accordion-collapse collapse {% if forloop.first %}show{% endif %}">
+        <div class="accordion-body p-0">
+          <!-- barra de acceso -->
+          <div class="px-3 py-2 border-bottom d-flex gap-3 flex-wrap align-items-center small text-muted"
+               style="background:#fff5f5;">
+            {% if trab.telefono %}<span><i class="bi bi-telephone me-1"></i>{{ trab.telefono }}</span>{% endif %}
+            {% if trab.correo %}<span><i class="bi bi-envelope me-1"></i>{{ trab.correo }}</span>{% endif %}
+            <a href="{% url 'trabajador_detail' trab.rut %}?tab=documentos"
+               class="ms-auto btn btn-sm btn-outline-primary" style="font-size:.75rem;">
+              <i class="bi bi-folder2-open me-1"></i>Carpeta completa
+            </a>
+          </div>
+          <!-- Tarjetas de documentos -->
+          <div class="row g-2 px-3 py-3">
+            {% for d in grupo.docs_personales %}
+            <div class="col-sm-6 col-md-4 col-lg-3">
+              <div class="card h-100 border-0 {% if d.estado == 'vencido' %}bg-danger bg-opacity-10{% else %}bg-warning bg-opacity-10{% endif %}"
+                   style="border-left:3px solid {% if d.estado == 'vencido' %}#dc3545{% else %}#ffc107{% endif %} !important;">
+                <div class="card-body p-2">
+                  <div class="fw-semibold small mb-1">{{ d.tipo.nombre }}</div>
+                  <div class="text-muted mb-1" style="font-size:.7rem;">
+                    <i class="bi bi-person me-1"></i>Personal
+                  </div>
+                  {% if d.estado == 'vencido' %}
+                    <span class="badge bg-danger w-100 mb-1">Vencido</span>
+                    {% if d.doc and d.doc.fecha_vencimiento %}
+                    <div class="text-danger text-center mb-1" style="font-size:.68rem;">
+                      Venció {{ d.doc.fecha_vencimiento|date:"d/m/Y" }}
+                    </div>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge bg-warning text-dark w-100 mb-1">Sin cargar</span>
+                  {% endif %}
+                  <button type="button"
+                          class="btn btn-sm w-100 {% if d.estado == 'vencido' %}btn-danger{% else %}btn-warning{% endif %} btn-subir-rapido"
+                          data-rut="{{ trab.rut }}"
+                          data-tipo-id="{{ d.tipo.pk }}"
+                          data-tipo-nombre="{{ d.tipo.nombre }}"
+                          data-nivel="{{ d.tipo.nivel }}"
+                          data-contrato-id="">
+                    <i class="bi bi-upload me-1"></i>{% if d.estado == 'vencido' %}Renovar{% else %}Subir{% endif %}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+            {% for d in grupo.docs_contrato %}
+            <div class="col-sm-6 col-md-4 col-lg-3">
+              <div class="card h-100 border-0 {% if d.estado == 'vencido' %}bg-danger bg-opacity-10{% else %}bg-primary bg-opacity-10{% endif %}"
+                   style="border-left:3px solid {% if d.estado == 'vencido' %}#dc3545{% else %}#0d6efd{% endif %} !important;">
+                <div class="card-body p-2">
+                  <div class="fw-semibold small mb-1">{{ d.tipo.nombre }}</div>
+                  <div class="text-muted mb-1" style="font-size:.7rem;">
+                    <i class="bi bi-file-text me-1"></i>Contrato
+                  </div>
+                  {% if d.estado == 'vencido' %}
+                    <span class="badge bg-danger w-100 mb-1">Vencido</span>
+                    {% if d.doc and d.doc.fecha_vencimiento %}
+                    <div class="text-danger text-center mb-1" style="font-size:.68rem;">
+                      Venció {{ d.doc.fecha_vencimiento|date:"d/m/Y" }}
+                    </div>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge bg-primary w-100 mb-1">Sin cargar</span>
+                  {% endif %}
+                  <button type="button"
+                          class="btn btn-sm w-100 {% if d.estado == 'vencido' %}btn-danger{% else %}btn-primary{% endif %} btn-subir-rapido"
+                          data-rut="{{ trab.rut }}"
+                          data-tipo-id="{{ d.tipo.pk }}"
+                          data-tipo-nombre="{{ d.tipo.nombre }}"
+                          data-nivel="{{ d.tipo.nivel }}"
+                          data-contrato-id="{{ d.contrato.pk|default:'' }}">
+                    <i class="bi bi-upload me-1"></i>{% if d.estado == 'vencido' %}Renovar{% else %}Subir{% endif %}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+</div>

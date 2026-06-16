@@ -233,11 +233,13 @@ class Obra(models.Model):
 
 class Contrato(models.Model):
     ESTADO_CHOICES = [
+        ('Borrador', 'Borrador'),
         ('Pendiente de Firma', 'Pendiente de Firma'),
         ('Vigente', 'Vigente'),
         ('En Licencia', 'En Licencia'),
         ('Reactivado', 'Reactivado'),
         ('Finalizado', 'Finalizado'),
+        ('Finiquitado', 'Finiquitado'),
         ('Rescindido', 'Rescindido'),
         ('Trasladado', 'Trasladado'),
     ]
@@ -246,20 +248,44 @@ class Contrato(models.Model):
         ('Por Obra o Faena', 'Por Obra o Faena'),
         ('Indefinido', 'Indefinido'),
     ]
+    TIPO_TERMINO_CHOICES = [
+        ('', '— Sin término —'),
+        ('Renuncia voluntaria', 'Renuncia voluntaria'),
+        ('Despido por necesidades de la empresa', 'Despido por necesidades de la empresa'),
+        ('Despido por incumplimiento grave', 'Despido por incumplimiento grave'),
+        ('Mutuo acuerdo', 'Mutuo acuerdo'),
+        ('Vencimiento plazo', 'Vencimiento plazo'),
+        ('Término de obra o faena', 'Término de obra o faena'),
+        ('Fallecimiento', 'Fallecimiento'),
+        ('Invalidez', 'Invalidez'),
+        ('Otro', 'Otro'),
+    ]
     trabajador = models.ForeignKey(Trabajador, on_delete=models.PROTECT, related_name='contratos', to_field='rut')
     obra = models.ForeignKey(Obra, on_delete=models.PROTECT, related_name='contratos')
-    especialidad = models.ForeignKey(Especialidad, on_delete=models.PROTECT, related_name='contratos')
+    especialidad = models.ForeignKey(Especialidad, on_delete=models.PROTECT, related_name='contratos', null=True, blank=True)
     tipo_contrato = models.CharField(max_length=20, choices=TIPO_CONTRATO_CHOICES, default='Plazo Fijo')
-    sueldo_base = models.DecimalField(max_digits=12, decimal_places=2)
-    fecha_inicio = models.DateField()
+    sueldo_base = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    fecha_inicio = models.DateField(null=True, blank=True)
     fecha_termino_estimada = models.DateField(null=True, blank=True)
     fecha_termino_real = models.DateField(null=True, blank=True)
+    tipo_termino = models.CharField(max_length=60, blank=True, default='', choices=TIPO_TERMINO_CHOICES)
+    motivo_termino = models.TextField(blank=True, default='')
     estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='Pendiente de Firma')
     fecha_inicio_licencia = models.DateField(null=True, blank=True)
     fecha_fin_licencia = models.DateField(null=True, blank=True)
     obs_licencia = models.TextField(blank=True, default='')
     creado_el = models.DateTimeField(default=timezone.now)
     activo = models.BooleanField(default=True)
+    es_recontratacion = models.BooleanField(default=False)
+    contrato_anterior = models.ForeignKey(
+        'self', null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='recontrataciones',
+    )
+    fecha_extension = models.DateField(
+        null=True, blank=True,
+        help_text='Fecha extendida por Anexo de Contrato. No modifica la fecha original.',
+    )
 
     class Meta:
         verbose_name = 'Contrato'
@@ -269,11 +295,21 @@ class Contrato(models.Model):
     def __str__(self):
         return f"Contrato #{self.pk} - {self.trabajador.nombre_completo} | {self.obra.nombre}"
 
+    _ESTADOS_TERMINADOS = {'Finalizado', 'Finiquitado', 'Rescindido', 'Trasladado'}
+
+    @property
+    def is_terminado(self):
+        return self.estado in self._ESTADOS_TERMINADOS
+
+    @property
+    def fecha_vigencia_efectiva(self):
+        return self.fecha_extension or self.fecha_termino_estimada
+
     @property
     def dias_para_vencer(self):
-        if self.fecha_termino_estimada:
-            delta = (self.fecha_termino_estimada - timezone.now().date()).days
-            return delta
+        fecha = self.fecha_vigencia_efectiva
+        if fecha:
+            return (fecha - timezone.now().date()).days
         return None
 
 
@@ -284,15 +320,20 @@ class Contrato(models.Model):
 class Documento(models.Model):
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.PROTECT, related_name='documentos')
     trabajador_rut = models.CharField(max_length=12, blank=True, null=True)
+    trabajador_nombre = models.CharField(max_length=200, blank=True, null=True)
     contrato = models.ForeignKey(Contrato, on_delete=models.SET_NULL, null=True, blank=True, related_name='documentos')
     obra = models.ForeignKey(Obra, on_delete=models.SET_NULL, null=True, blank=True, related_name='documentos')
-    archivo = models.FileField(upload_to=documento_upload_path)
+    archivo = models.FileField(upload_to=documento_upload_path, null=True, blank=True)
     fecha_carga = models.DateTimeField(default=timezone.now)
     # Fecha de vencimiento: calculada automáticamente si el tipo tiene dias_validez,
     # pero también puede ajustarse manualmente (ej. certificados con fecha impresa).
     fecha_vencimiento = models.DateField(null=True, blank=True)
     usuario_carga = models.CharField(max_length=100)
     activo = models.BooleanField(default=True)
+    pendiente_digitalizacion = models.BooleanField(
+        default=False,
+        help_text='El papel existe pero aún no se ha escaneado/subido el archivo.'
+    )
 
     class Meta:
         verbose_name = 'Documento'
@@ -318,7 +359,9 @@ class Documento(models.Model):
 
     @property
     def nombre_archivo(self):
-        return os.path.basename(self.archivo.name) if self.archivo else ''
+        if not self.archivo:
+            return ''
+        return os.path.basename(self.archivo.name)
 
     @property
     def extension(self):
@@ -340,7 +383,9 @@ class Documento(models.Model):
 
     @property
     def estado_visual(self):
-        """Retorna: 'ok', 'vencido', 'proximo' (vence en <=30 días)."""
+        """Retorna: 'ok', 'vencido', 'proximo', 'pendiente_dig'."""
+        if self.pendiente_digitalizacion and not self.archivo:
+            return 'pendiente_dig'
         if self.esta_vencido:
             return 'vencido'
         if self.dias_para_vencer is not None and self.dias_para_vencer <= 30:
@@ -457,6 +502,7 @@ class CierreMensual(models.Model):
         verbose_name = 'Cierre Mensual'
         verbose_name_plural = 'Cierres Mensuales'
         ordering = ['-anio', '-mes', '-fecha_cierre']
+        unique_together = [('obra', 'mes', 'anio')]
 
     def __str__(self):
         return f"Cierre {self.mes}/{self.anio} - {self.obra.nombre}"
@@ -529,6 +575,10 @@ class DocumentoGenerado(models.Model):
     obra = models.ForeignKey(Obra, on_delete=models.PROTECT, related_name='documentos_generados', null=True, blank=True)
     contrato = models.ForeignKey('Contrato', on_delete=models.PROTECT, related_name='documentos_generados', null=True, blank=True)
     datos = models.JSONField(default=dict)
+    motivo_baja = models.TextField(
+        blank=True, default='',
+        help_text='Motivo por el cual se reemplazó o anuló este documento (trazabilidad de auditoría).'
+    )
     creado_el = models.DateTimeField(default=timezone.now)
     usuario = models.CharField(max_length=150)
     activo = models.BooleanField(default=True)
@@ -549,49 +599,55 @@ class DocumentoGenerado(models.Model):
 def get_checklist_trabajador(rut):
     """
     Devuelve el checklist de documentos del nivel Trabajador para un RUT.
-    Retorna una lista de dicts con: tipo, doc (o None), estado ('ok'|'vencido'|'proximo'|'pendiente').
+    Retorna una lista de dicts con: tipo, doc (último activo o None), docs_historial (todos activos),
+    estado ('ok'|'vencido'|'proximo'|'pendiente'|'pendiente_dig').
     """
     tipos = TipoDocumento.objects.filter(activo=True, nivel='Trabajador')
     resultado = []
     for tipo in tipos:
-        doc = (
+        docs_all = list(
             Documento.objects
             .filter(tipo_documento=tipo, trabajador_rut=rut, activo=True)
             .order_by('-fecha_carga')
-            .first()
         )
+        doc = docs_all[0] if docs_all else None
         if doc is None:
             estado = 'pendiente'
+        elif doc.pendiente_digitalizacion and not doc.archivo:
+            estado = 'pendiente_dig'
         elif doc.esta_vencido:
             estado = 'vencido'
         elif doc.dias_para_vencer is not None and doc.dias_para_vencer <= 30:
             estado = 'proximo'
         else:
             estado = 'ok'
-        resultado.append({'tipo': tipo, 'doc': doc, 'estado': estado})
+        resultado.append({'tipo': tipo, 'doc': doc, 'docs_historial': docs_all, 'estado': estado})
     return resultado
 
 
 def get_checklist_contrato(contrato):
     """
     Devuelve el checklist de documentos del nivel Contrato para un contrato dado.
+    Retorna lista de dicts con: tipo, doc, docs_historial, estado.
     """
     tipos = TipoDocumento.objects.filter(activo=True, nivel='Contrato')
     resultado = []
     for tipo in tipos:
-        doc = (
+        docs_all = list(
             Documento.objects
             .filter(tipo_documento=tipo, contrato=contrato, activo=True)
             .order_by('-fecha_carga')
-            .first()
         )
+        doc = docs_all[0] if docs_all else None
         if doc is None:
             estado = 'pendiente'
+        elif doc.pendiente_digitalizacion and not doc.archivo:
+            estado = 'pendiente_dig'
         elif doc.esta_vencido:
             estado = 'vencido'
         else:
             estado = 'ok'
-        resultado.append({'tipo': tipo, 'doc': doc, 'estado': estado})
+        resultado.append({'tipo': tipo, 'doc': doc, 'docs_historial': docs_all, 'estado': estado})
     return resultado
 
 
@@ -634,6 +690,193 @@ class Traslado(models.Model):
     @property
     def requiere_finiquito(self):
         return self.tipo_traslado == 'CON_FINIQUITO' and self.finiquito_pendiente
+
+
+# ---------------------------------------------------------------------------
+# LICENCIAS MÉDICAS
+# ---------------------------------------------------------------------------
+
+def licencia_upload_path(instance, filename):
+    ext = filename.split('.')[-1].lower()
+    ts = timezone.now().strftime('%Y%m%d_%H%M%S')
+    rut = re.sub(r'[^\w\-]', '_', str(instance.trabajador_id or 'sin_rut'))
+    return os.path.join('documentos', 'trabajadores', rut, 'licencias', f'LIC_{ts}.{ext}')
+
+
+class LicenciaMedica(models.Model):
+    TIPO_CHOICES = [
+        ('1', 'Tipo 1 — Enfermedad o accidente común'),
+        ('2', 'Tipo 2 — Accidente laboral / enfermedad profesional (ACHS/Mutual)'),
+        ('3', 'Tipo 3 — Prenatal'),
+        ('4', 'Tipo 4 — Postnatal / hijo menor 1 año'),
+        ('5', 'Tipo 5 — Accidente trabajo de otro trabajador'),
+        ('6', 'Tipo 6 — Enfermedad terminal / desahucio'),
+        ('7', 'Tipo 7 — Ley SANNA (hijo hasta 18 años)'),
+        ('otro', 'Otro'),
+    ]
+    ESTADO_CHOICES = [
+        ('Presentada', 'Presentada'),
+        ('En trámite', 'En trámite'),
+        ('Autorizada', 'Autorizada'),
+        ('Rechazada', 'Rechazada'),
+        ('Prorrogada', 'Prorrogada'),
+    ]
+    ORGANISMO_CHOICES = [
+        ('FONASA', 'FONASA'),
+        ('ISAPRE', 'ISAPRE'),
+        ('ACHS', 'ACHS'),
+        ('Mutual de Seguridad', 'Mutual de Seguridad'),
+        ('IST', 'IST'),
+        ('Otro', 'Otro'),
+    ]
+    contrato = models.ForeignKey(
+        Contrato, on_delete=models.PROTECT, related_name='licencias', null=True, blank=True
+    )
+    trabajador = models.ForeignKey(
+        Trabajador, on_delete=models.PROTECT, related_name='licencias', to_field='rut'
+    )
+    obra = models.ForeignKey(
+        Obra, on_delete=models.PROTECT, related_name='licencias', null=True, blank=True
+    )
+    numero_folio = models.CharField(max_length=50, blank=True, default='')
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='1')
+    organismo = models.CharField(max_length=30, choices=ORGANISMO_CHOICES, default='FONASA')
+    institucion_nombre = models.CharField(
+        max_length=150, blank=True, default='',
+        help_text='Hospital, clínica, mutual o mutualidad que emitió la licencia. Ej: Mutual de Seguridad, Hospital Las Higueras.'
+    )
+    diagnostico = models.TextField(blank=True, default='')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField(null=True, blank=True)
+    dias_autorizados = models.IntegerField(default=0)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Presentada')
+    empresa_pago_3_dias = models.BooleanField(
+        default=False,
+        help_text='Para tipo 1: ¿la empresa pagó los 3 primeros días?'
+    )
+    monto_subsidio_esperado = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    monto_subsidio_recibido = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    archivo_formulario = models.FileField(upload_to=licencia_upload_path, null=True, blank=True)
+    archivo_resolucion = models.FileField(upload_to=licencia_upload_path, null=True, blank=True)
+    archivo_alta = models.FileField(upload_to=licencia_upload_path, null=True, blank=True)
+    observaciones = models.TextField(blank=True, default='')
+    usuario_registro = models.CharField(max_length=150)
+    creado_el = models.DateTimeField(default=timezone.now)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Licencia Médica'
+        verbose_name_plural = 'Licencias Médicas'
+        ordering = ['-fecha_inicio']
+
+    def __str__(self):
+        return f"Lic. {self.get_tipo_display()} — {self.trabajador.nombre_completo} ({self.fecha_inicio})"
+
+    @property
+    def dias_efectivos(self):
+        if self.fecha_fin:
+            return (self.fecha_fin - self.fecha_inicio).days + 1
+        return self.dias_autorizados or 0
+
+    @property
+    def esta_activa(self):
+        from django.utils import timezone as tz
+        hoy = tz.now().date()
+        if not self.activo:
+            return False
+        if self.fecha_fin:
+            return self.fecha_inicio <= hoy <= self.fecha_fin
+        return self.fecha_inicio <= hoy
+
+    @property
+    def dias_transcurridos(self):
+        from django.utils import timezone as tz
+        hoy = tz.now().date()
+        if self.fecha_inicio > hoy:
+            return 0
+        fin = min(self.fecha_fin, hoy) if self.fecha_fin else hoy
+        return (fin - self.fecha_inicio).days + 1
+
+
+# ---------------------------------------------------------------------------
+# HISTORIAL DE ESTADOS DE CONTRATO (audit log)
+# ---------------------------------------------------------------------------
+
+class ContratoHistorial(models.Model):
+    contrato = models.ForeignKey(
+        Contrato, on_delete=models.CASCADE, related_name='historial'
+    )
+    estado_anterior = models.CharField(max_length=30)
+    estado_nuevo = models.CharField(max_length=30)
+    descripcion = models.TextField(blank=True, default='')
+    usuario = models.CharField(max_length=150)
+    fecha = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = 'Historial Contrato'
+        verbose_name_plural = 'Historial Contratos'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f"Contrato #{self.contrato_id}: {self.estado_anterior} → {self.estado_nuevo}"
+
+
+# ---------------------------------------------------------------------------
+# CONFIGURACIÓN DE REMUNERACIONES (tasas AFP/Salud)
+# ---------------------------------------------------------------------------
+
+class ConfigRemuneraciones(models.Model):
+    AFP_CHOICES = [
+        ('Capital', 'Capital'),
+        ('Cuprum', 'Cuprum'),
+        ('Habitat', 'Hábitat'),
+        ('PlanVital', 'PlanVital'),
+        ('ProVida', 'ProVida'),
+        ('Modelo', 'Modelo'),
+        ('Uno', 'Uno'),
+        ('IPS/INP', 'IPS/INP (antiguo)'),
+    ]
+    nombre = models.CharField(max_length=100, default='Configuración General')
+    vigente_desde = models.DateField()
+    tasa_afp_empleado = models.DecimalField(
+        max_digits=5, decimal_places=2, default=10.58,
+        help_text='% cotización obligatoria AFP (varía por AFP)'
+    )
+    tasa_salud_empleado = models.DecimalField(
+        max_digits=5, decimal_places=2, default=7.00,
+        help_text='% cotización salud obligatoria'
+    )
+    tasa_cesantia_empleado_plazo_fijo = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.60,
+        help_text='% seguro cesantía empleado (plazo fijo)'
+    )
+    tasa_cesantia_empleado_indefinido = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.60,
+        help_text='% seguro cesantía empleado (indefinido)'
+    )
+    tasa_cesantia_empleador = models.DecimalField(
+        max_digits=5, decimal_places=2, default=2.40,
+        help_text='% seguro cesantía empleador'
+    )
+    tasa_mutual_accidentes = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.93,
+        help_text='% seguro accidentes del trabajo (varía por empresa)'
+    )
+    activo = models.BooleanField(default=True)
+    notas = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Config. Remuneraciones'
+        verbose_name_plural = 'Config. Remuneraciones'
+        ordering = ['-vigente_desde']
+
+    def __str__(self):
+        return f"{self.nombre} (desde {self.vigente_desde})"
+
+    @classmethod
+    def vigente(cls):
+        from django.utils import timezone as tz
+        return cls.objects.filter(activo=True, vigente_desde__lte=tz.now().date()).first()
 
 
 def get_alertas_cruzadas(rut):

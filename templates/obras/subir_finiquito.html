@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Subir Finiquito — {{ contrato.trabajador.nombre_completo }} | TsDesk{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-file-earmark-check text-danger me-2"></i>Subir Finiquito Firmado</h2>
+    <small class="text-muted">Obra: <strong>{{ obra.nombre }}</strong></small>
+  </div>
+  <a href="{% url 'obra_detail' obra.pk %}?tab=carpeta" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Volver a Carpeta
+  </a>
+</div>
+
+{% if messages %}
+  {% for m in messages %}
+    <div class="alert alert-{{ m.tags }} alert-dismissible fade show py-2">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-danger text-white">
+        <i class="bi bi-person-fill me-2"></i>{{ contrato.trabajador.nombre_completo }}
+        <span class="ms-2 badge bg-white text-danger">{{ contrato.trabajador.rut }}</span>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm mb-4">
+          <tr><th class="text-muted fw-normal" style="width:160px">Especialidad</th><td>{{ contrato.especialidad.nombre }}</td></tr>
+          <tr><th class="text-muted fw-normal">Inicio Contrato</th><td>{{ contrato.fecha_inicio|date:"d/m/Y" }}</td></tr>
+          <tr>
+            <th class="text-muted fw-normal">Fecha Término</th>
+            <td>
+              {% if contrato.fecha_termino_real %}{{ contrato.fecha_termino_real|date:"d/m/Y" }}
+              {% elif contrato.fecha_termino_estimada %}{{ contrato.fecha_termino_estimada|date:"d/m/Y" }}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr><th class="text-muted fw-normal">Tipo Término</th><td>{{ contrato.tipo_termino|default:"—" }}</td></tr>
+        </table>
+
+        <div class="alert alert-info py-2">
+          <i class="bi bi-info-circle me-2"></i>
+          Al cargar el archivo, el contrato pasará a estado <strong>Finiquitado</strong>.
+          Se aceptan <strong>PDF, JPG, JPEG y PNG</strong>.
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Archivo del Finiquito <span class="text-danger">*</span></label>
+            <div class="drop-zone border-2 border-dashed rounded p-4 text-center" id="dropZone">
+              <i class="bi bi-cloud-arrow-up fs-1 text-muted d-block mb-2"></i>
+              <p class="text-muted small mb-2">Arrastre el archivo aquí o haga clic para seleccionar</p>
+              <input type="file" name="archivo" id="archivoInput" accept=".pdf,.jpg,.jpeg,.png" class="form-control">
+            </div>
+            <div id="filePreview" class="mt-2 d-none"></div>
+          </div>
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'obra_detail' obra.pk %}?tab=carpeta" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-upload me-1"></i>Cargar Finiquito y Finalizar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('archivoInput');
+const preview  = document.getElementById('filePreview');
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-danger'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-danger'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('border-danger');
+  if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; showPreview(e.dataTransfer.files[0]); }
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) showPreview(fileInput.files[0]); });
+
+function showPreview(file) {
+  preview.classList.remove('d-none');
+  preview.innerHTML = `<div class="alert alert-success py-2"><i class="bi bi-file-check me-2"></i><strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)</div>`;
+}
+</script>
+{% endblock %}

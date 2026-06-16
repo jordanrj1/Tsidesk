@@ -78,7 +78,7 @@
     <span class="text-muted">Especialidad:</span> {{ contrato_obj.especialidad.nombre }} &nbsp;·&nbsp;
     <span class="badge {% if contrato_obj.estado == 'Vigente' %}bg-success{% elif contrato_obj.estado == 'Pendiente de Firma' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ contrato_obj.estado }}</span>
     {% if contrato_obj.estado == 'Pendiente de Firma' %}
-    <div class="small mt-1 text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Al guardar, el contrato pasará a estado Vigente.</div>
+    <div class="small mt-1 text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Al guardar un archivo real, el contrato pasará a estado Vigente.</div>
     {% endif %}
   </div>
 </div>
@@ -87,10 +87,16 @@
   <i class="bi bi-info-circle-fill fs-4 mt-1"></i>
   <div>
     <strong>Documentos personales de {{ trabajador.nombre_completo }}</strong><br>
-    <span class="small text-muted">Certificados que pertenecen al trabajador (AFP, Fonasa, carnet, etc.). Sube solo los que necesites actualizar — los que dejes en blanco no se modifican.</span>
+    <span class="small text-muted">Certificados que pertenecen al trabajador (AFP, Fonasa, carnet, etc.). Sube solo los que necesites — los anteriores se conservan como historial.</span>
   </div>
 </div>
 {% endif %}
+
+<!-- Aviso multi-archivo -->
+<div class="alert alert-secondary d-flex gap-2 align-items-start py-2 mb-3" style="font-size:.85rem;">
+  <i class="bi bi-layers mt-1 flex-shrink-0"></i>
+  <span><strong>Modo historial activo:</strong> cada archivo que subas se agrega sin borrar los anteriores. Puedes ver el historial expandiendo cada tipo. Si el trabajador trajo el papel pero no el escáner, marca <em>"Pendiente de digitalización"</em>.</span>
+</div>
 
 <!-- Lista guiada de tipos -->
 <form method="post" enctype="multipart/form-data">
@@ -104,64 +110,131 @@
     <div class="list-group list-group-flush">
       {% for item in tipos_con_doc %}
       <div class="list-group-item px-3 py-3">
-        <div class="row align-items-center g-2">
+        <div class="row align-items-start g-2">
 
           <!-- Ícono + nombre + estado actual -->
-          <div class="col-md-4 d-flex align-items-center gap-2">
+          <div class="col-md-3 d-flex align-items-start gap-2">
             {% if item.doc_actual %}
-              {% if item.doc_actual.esta_vencido %}
-                <i class="bi bi-file-earmark-x text-danger fs-4"></i>
+              {% if item.doc_actual.pendiente_digitalizacion and not item.doc_actual.archivo %}
+                <i class="bi bi-file-earmark-clock text-warning fs-4 mt-1"></i>
+              {% elif item.doc_actual.esta_vencido %}
+                <i class="bi bi-file-earmark-x text-danger fs-4 mt-1"></i>
               {% elif item.doc_actual.dias_para_vencer is not None and item.doc_actual.dias_para_vencer <= 30 %}
-                <i class="bi bi-file-earmark-exclamation text-warning fs-4"></i>
+                <i class="bi bi-file-earmark-exclamation text-warning fs-4 mt-1"></i>
               {% else %}
-                <i class="bi bi-file-earmark-check text-success fs-4"></i>
+                <i class="bi bi-file-earmark-check text-success fs-4 mt-1"></i>
               {% endif %}
             {% else %}
-              <i class="bi bi-file-earmark text-muted fs-4"></i>
+              <i class="bi bi-file-earmark text-muted fs-4 mt-1"></i>
             {% endif %}
             <div>
               <div class="fw-semibold small">{{ item.tipo.nombre }}</div>
-              {% if item.tipo.obligatorio %}<span class="badge bg-danger" style="font-size:0.65rem;">Obligatorio</span>{% endif %}
-              {% if item.tipo.dias_validez %}<span class="text-muted" style="font-size:0.7rem;">Válido {{ item.tipo.dias_validez }}d</span>{% endif %}
-            </div>
-          </div>
-
-          <!-- Estado del doc actual -->
-          <div class="col-md-3">
-            {% if item.doc_actual %}
-              {% if item.doc_actual.esta_vencido %}
-                <span class="badge bg-danger">VENCIDO</span>
-                {% if item.doc_actual.fecha_vencimiento %}
-                  <div class="text-muted" style="font-size:0.7rem;">Venció {{ item.doc_actual.fecha_vencimiento|date:"d/m/Y" }}</div>
-                {% endif %}
-              {% elif item.doc_actual.dias_para_vencer is not None and item.doc_actual.dias_para_vencer <= 30 %}
-                <span class="badge bg-warning text-dark">Vence en {{ item.doc_actual.dias_para_vencer }}d</span>
-                <div class="text-muted" style="font-size:0.7rem;">{{ item.doc_actual.fecha_vencimiento|date:"d/m/Y" }}</div>
-              {% else %}
-                <span class="badge bg-success">Vigente</span>
-                {% if item.doc_actual.fecha_vencimiento %}
-                  <div class="text-muted" style="font-size:0.7rem;">Vence {{ item.doc_actual.fecha_vencimiento|date:"d/m/Y" }}</div>
+              {% if item.tipo.obligatorio %}<span class="badge bg-danger" style="font-size:.65rem;">Obligatorio</span>{% endif %}
+              {% if item.tipo.dias_validez %}<span class="text-muted" style="font-size:.7rem;">Válido {{ item.tipo.dias_validez }}d</span>{% endif %}
+              <!-- Estado actual -->
+              <div class="mt-1">
+                {% if item.doc_actual %}
+                  {% if item.doc_actual.pendiente_digitalizacion and not item.doc_actual.archivo %}
+                    <span class="badge bg-warning text-dark">Pend. digitalización</span>
+                    <div class="text-muted" style="font-size:.7rem;">Registrado {{ item.doc_actual.fecha_carga|date:"d/m/Y" }}</div>
+                  {% elif item.doc_actual.esta_vencido %}
+                    <span class="badge bg-danger">VENCIDO</span>
+                    {% if item.doc_actual.fecha_vencimiento %}
+                      <div class="text-muted" style="font-size:.7rem;">Venció {{ item.doc_actual.fecha_vencimiento|date:"d/m/Y" }}</div>
+                    {% endif %}
+                  {% elif item.doc_actual.dias_para_vencer is not None and item.doc_actual.dias_para_vencer <= 30 %}
+                    <span class="badge bg-warning text-dark">Vence en {{ item.doc_actual.dias_para_vencer }}d</span>
+                    <div class="text-muted" style="font-size:.7rem;">{{ item.doc_actual.fecha_vencimiento|date:"d/m/Y" }}</div>
+                  {% else %}
+                    <span class="badge bg-success">Vigente</span>
+                    {% if item.doc_actual.fecha_vencimiento %}
+                      <div class="text-muted" style="font-size:.7rem;">Vence {{ item.doc_actual.fecha_vencimiento|date:"d/m/Y" }}</div>
+                    {% else %}
+                      <div class="text-muted" style="font-size:.7rem;">Sin vencimiento</div>
+                    {% endif %}
+                  {% endif %}
+                  <div class="text-muted" style="font-size:.7rem;">Último: {{ item.doc_actual.fecha_carga|date:"d/m/Y" }}</div>
                 {% else %}
-                  <div class="text-muted" style="font-size:0.7rem;">Sin vencimiento</div>
+                  <span class="badge bg-secondary">Pendiente</span>
                 {% endif %}
+              </div>
+              <!-- Historial colapsable -->
+              {% if item.historial|length > 1 %}
+              <div class="mt-1">
+                <button type="button" class="btn btn-link btn-sm p-0" style="font-size:.7rem;"
+                        data-bs-toggle="collapse" data-bs-target="#hist_{{ item.tipo.pk }}">
+                  <i class="bi bi-clock-history me-1"></i>{{ item.historial|length }} versiones
+                </button>
+                <div class="collapse mt-1" id="hist_{{ item.tipo.pk }}">
+                  {% for hdoc in item.historial %}
+                  <div class="d-flex align-items-center gap-1 mb-1" style="font-size:.7rem;">
+                    {% if hdoc.archivo %}
+                      <a href="{{ hdoc.archivo.url }}" target="_blank" class="text-decoration-none">
+                        <i class="bi bi-file-earmark-arrow-down text-primary"></i>
+                        {{ hdoc.fecha_carga|date:"d/m/Y H:i" }}
+                        <span class="text-muted">({{ hdoc.extension }})</span>
+                      </a>
+                    {% else %}
+                      <span class="text-warning"><i class="bi bi-hourglass-split"></i> {{ hdoc.fecha_carga|date:"d/m/Y" }} — pendiente</span>
+                    {% endif %}
+                    {% if forloop.first %}<span class="badge bg-primary" style="font-size:.6rem;">Actual</span>{% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% elif item.historial|length == 1 and item.doc_actual and item.doc_actual.archivo %}
+              <div class="mt-1">
+                <a href="{{ item.doc_actual.archivo.url }}" target="_blank" style="font-size:.7rem;"
+                   class="text-decoration-none text-muted">
+                  <i class="bi bi-eye me-1"></i>Ver archivo actual
+                </a>
+              </div>
               {% endif %}
-              <div class="text-muted" style="font-size:0.7rem;">Cargado {{ item.doc_actual.fecha_carga|date:"d/m/Y" }}</div>
-            {% else %}
-              <span class="badge bg-secondary">Pendiente</span>
-              <div class="text-muted" style="font-size:0.7rem;">Sin documento</div>
-            {% endif %}
+            </div>
           </div>
 
           <!-- Input de archivo -->
           <div class="col-md-5">
-            <div class="border rounded p-2 text-center">
+            <div class="border rounded p-2">
               <input type="file" name="archivo_{{ item.tipo.pk }}" id="file_{{ item.tipo.pk }}"
                      class="form-control form-control-sm"
                      onchange="mostrarNombre(this, {{ item.tipo.pk }})">
-              <div id="fname_{{ item.tipo.pk }}" class="text-muted mt-1" style="font-size:0.75rem;">
-                {% if item.doc_actual %}<i class="bi bi-arrow-repeat me-1"></i>Reemplazar{% else %}<i class="bi bi-upload me-1"></i>Subir{% endif %}
+              <div id="fname_{{ item.tipo.pk }}" class="text-muted mt-1" style="font-size:.75rem;">
+                {% if item.doc_actual and item.doc_actual.archivo %}
+                  <i class="bi bi-arrow-repeat me-1"></i>Agregar nueva versión
+                {% else %}
+                  <i class="bi bi-upload me-1"></i>Subir archivo
+                {% endif %}
               </div>
             </div>
+          </div>
+
+          <!-- Pendiente de digitalización -->
+          <div class="col-md-4">
+            {% if not item.doc_actual or item.doc_actual.pendiente_digitalizacion %}
+            <div class="border rounded p-2 bg-warning bg-opacity-10 h-100 d-flex flex-column justify-content-center">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="pendiente_{{ item.tipo.pk }}"
+                       id="pend_{{ item.tipo.pk }}" value="1"
+                       onchange="togglePendiente(this, {{ item.tipo.pk }})"
+                       {% if item.doc_actual and item.doc_actual.pendiente_digitalizacion and not item.doc_actual.archivo %}checked{% endif %}>
+                <label class="form-check-label small fw-semibold" for="pend_{{ item.tipo.pk }}">
+                  <i class="bi bi-hourglass-split text-warning me-1"></i>Pendiente de digitalización
+                </label>
+              </div>
+              <div class="text-muted mt-1" style="font-size:.7rem;">
+                El papel existe pero aún no se ha escaneado. Registra la intención para que no aparezca en rojo.
+              </div>
+            </div>
+            {% else %}
+            <div class="border rounded p-2 bg-light h-100 d-flex align-items-center">
+              <div class="text-muted small">
+                <i class="bi bi-check-circle text-success me-1"></i>
+                Ya tiene documento cargado.<br>
+                <span style="font-size:.7rem;">Para reemplazarlo, sube un nuevo archivo.</span>
+              </div>
+            </div>
+            {% endif %}
           </div>
 
         </div>
@@ -179,7 +252,7 @@
       <a href="{% url 'trabajador_detail' trabajador.rut %}?tab=documentos" class="btn btn-outline-secondary">Cancelar</a>
       {% if tipos_con_doc %}
       <button type="submit" class="btn btn-primary">
-        <i class="bi bi-cloud-upload me-1"></i>Guardar documentos seleccionados
+        <i class="bi bi-cloud-upload me-1"></i>Guardar selección
       </button>
       {% endif %}
     </div>
@@ -193,9 +266,20 @@ function mostrarNombre(input, tipoPk) {
   const el = document.getElementById('fname_' + tipoPk);
   if (input.files && input.files[0]) {
     const f = input.files[0];
-    const kb = (f.size / 1024).toFixed(1);
-    const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : kb+' KB';
+    const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : (f.size/1024).toFixed(1)+' KB';
     el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${f.name} (${size})</span>`;
+    // Si se selecciona un archivo, desmarcar pendiente
+    const pend = document.getElementById('pend_' + tipoPk);
+    if (pend) pend.checked = false;
+  }
+}
+function togglePendiente(checkbox, tipoPk) {
+  if (checkbox.checked) {
+    // Limpiar el input de archivo si se marca pendiente
+    const fileInput = document.getElementById('file_' + tipoPk);
+    if (fileInput) fileInput.value = '';
+    const el = document.getElementById('fname_' + tipoPk);
+    if (el) el.innerHTML = '<i class="bi bi-upload me-1"></i>Subir archivo';
   }
 }
 </script>

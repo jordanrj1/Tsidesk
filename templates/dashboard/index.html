@@ -102,12 +102,91 @@
   <!-- Columna alertas (izquierda) -->
   <div class="col-lg-8">
 
-    {% if not alertas_contratos and not alertas_disciplina and not traslados_pendientes_finiquito and not trabajadores_multi_obra %}
+    {% if not alertas_contratos and not alertas_disciplina and not traslados_pendientes_finiquito and not trabajadores_multi_obra and not obras_alertas %}
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-body text-center py-5">
         <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
         <h5 class="text-success fw-bold mb-1">Todo al día</h5>
         <p class="text-muted mb-0">Sin alertas operativas en este momento.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Estado por Obra -->
+    {% if obras_alertas %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#0f2543;color:#fff;">
+        <i class="bi bi-building-fill-exclamation"></i>
+        <strong>Estado por Obra</strong>
+        <span class="badge bg-light text-dark ms-auto">{{ obras_alertas|length }} obra{{ obras_alertas|length|pluralize }} con alertas</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.82rem">
+          <thead class="table-light">
+            <tr>
+              <th>Obra</th>
+              <th class="text-center" title="Finiquitos pendientes de subir">Finiquitos↑</th>
+              <th class="text-center" title="Contratos con fecha vencida sin acción">Vencidos</th>
+              <th class="text-center" title="Contratos vencen en 10 días">Próx. 10d</th>
+              <th class="text-center" title="Documentos obligatorios faltantes en carpeta">Docs</th>
+              <th class="text-center" title="Re-contrataciones con finiquito anterior pendiente">Re-ct.</th>
+              <th class="text-center" title="Días para cierre estimado de la obra">Cierre</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for oa in obras_alertas %}
+            <tr>
+              <td>
+                <a href="{% url 'obra_detail' oa.obra.pk %}" class="fw-semibold text-decoration-none text-dark">{{ oa.obra.nombre }}</a>
+                {% if oa.obra.estado == 'Pausada' %}<span class="badge bg-secondary ms-1" style="font-size:.6rem">Pausada</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if oa.n_finiquitos_pend %}
+                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge bg-danger text-decoration-none">{{ oa.n_finiquitos_pend }}</a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if oa.n_vencidos %}
+                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge bg-danger text-decoration-none">{{ oa.n_vencidos }}</a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if oa.n_proximos %}
+                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge bg-warning text-dark text-decoration-none">{{ oa.n_proximos }}</a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if oa.n_docs_faltantes %}
+                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=carpeta" class="badge bg-primary text-decoration-none">{{ oa.n_docs_faltantes }}</a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if oa.n_recontrataciones_pend %}
+                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge text-white text-decoration-none" style="background:#7c3aed">{{ oa.n_recontrataciones_pend }}</a>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if oa.dias_cierre is None %}
+                  <span class="text-muted">—</span>
+                {% elif oa.dias_cierre < 0 %}
+                  <span class="badge bg-danger">VENCIDA</span>
+                {% elif oa.dias_cierre <= 10 %}
+                  <span class="badge bg-danger">{{ oa.dias_cierre }}d</span>
+                {% elif oa.dias_cierre <= 30 %}
+                  <span class="badge bg-warning text-dark">{{ oa.dias_cierre }}d</span>
+                {% else %}
+                  <span class="text-muted">{{ oa.dias_cierre }}d</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer py-1 text-muted d-flex flex-wrap gap-3" style="font-size:.72rem">
+        <span><span class="badge bg-danger">N</span> crítico</span>
+        <span><span class="badge bg-warning text-dark">N</span> advertencia</span>
+        <span>Finiquitos↑ = sin doc subido · Vencidos = plazo superado · Docs = carpeta incompleta · Re-ct. = re-contratación con finiquito anterior pendiente</span>
       </div>
     </div>
     {% endif %}
@@ -190,7 +269,7 @@
             <div class="fw-semibold">{{ t.trabajador.nombre_completo }}</div>
             <div class="text-muted">{{ t.obra_origen.nombre }}{% if t.obra_destino %} → {{ t.obra_destino.nombre }}{% endif %}</div>
           </div>
-          <a href="{% url 'trabajador_upload_doc' t.trabajador.rut %}?contrato_id={{ t.contrato_origen_id }}"
+          <a href="{% url 'trabajador_detail' t.trabajador.rut %}?tab=documentos"
              class="btn btn-sm btn-outline-warning py-0 flex-shrink-0">
             <i class="bi bi-upload me-1"></i>Finiquito
           </a>
@@ -256,7 +335,79 @@
     </div>
     {% endif %}
 
-  </div>
+    <!-- Alertas ERP: Contratos vencidos sin renovar -->
+    {% if contratos_vencidos_sin_renovar %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex align-items-center gap-2 py-2" style="background:#FFF1F2;">
+        <i class="bi bi-calendar-x-fill text-danger"></i>
+        <strong class="text-danger small">Contratos Vencidos Sin Renovar</strong>
+        <span class="badge bg-danger ms-auto">{{ contratos_vencidos_sin_renovar|length }}</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for c in contratos_vencidos_sin_renovar|slice:":8" %}
+        <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-exclamation-circle-fill text-danger flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+              <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
+              <div class="text-muted">{{ c.obra.nombre }} · Venció {{ c.fecha_termino_estimada|date:"d/m/Y" }}</div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Alertas ERP: En Licencia > 30 días -->
+    {% if contratos_licencia_larga %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex align-items-center gap-2 py-2" style="background:#FFFBEB;">
+        <i class="bi bi-hospital-fill text-warning"></i>
+        <strong class="text-warning small">En Licencia > 30 Días</strong>
+        <span class="badge bg-warning text-dark ms-auto">{{ contratos_licencia_larga|length }}</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for c in contratos_licencia_larga|slice:":8" %}
+        <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-hourglass-split text-warning flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+              <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
+              <div class="text-muted">{{ c.obra.nombre }} · Desde {{ c.fecha_inicio_licencia|date:"d/m/Y" }}</div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Alertas ERP: Pendiente de Firma > 15 días -->
+    {% if contratos_pdf_antiguos %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex align-items-center gap-2 py-2" style="background:#EFF6FF;">
+        <i class="bi bi-pen-fill text-primary"></i>
+        <strong class="text-primary small">Pendiente de Firma > 15 Días</strong>
+        <span class="badge bg-primary ms-auto">{{ contratos_pdf_antiguos|length }}</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for c in contratos_pdf_antiguos|slice:":8" %}
+        <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion" class="list-group-item list-group-item-action py-2">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-file-earmark-x text-primary flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+              <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
+              <div class="text-muted">{{ c.obra.nombre }} · Desde {{ c.fecha_inicio|date:"d/m/Y" }}</div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /col-lg-8 -->
 
   <!-- Panel derecho: vencimientos -->
   <div class="col-lg-4">

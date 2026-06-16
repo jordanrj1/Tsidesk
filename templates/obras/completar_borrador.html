@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% block title %}Completar Contrato | {{ obra.nombre }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <nav aria-label="breadcrumb" style="font-size:.85rem;">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{% url 'obras_list' %}">Obras</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'obra_detail' obra.pk %}?tab=dotacion">{{ obra.nombre }}</a></li>
+        <li class="breadcrumb-item active">Completar datos</li>
+      </ol>
+    </nav>
+    <h2 class="mb-0 fw-bold">
+      <i class="bi bi-pencil-fill text-warning me-2"></i>Completar datos del contrato
+    </h2>
+  </div>
+  <a href="{% url 'obra_detail' obra.pk %}?tab=dotacion" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Volver
+  </a>
+</div>
+
+<!-- Contexto -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <div class="row g-3 align-items-center">
+      <div class="col-auto">
+        <div class="rounded-circle bg-warning text-dark d-flex align-items-center justify-content-center fw-bold fs-5"
+             style="width:52px;height:52px;flex-shrink:0;">
+          {{ contrato.trabajador.nombres|first }}{{ contrato.trabajador.apellidos|first }}
+        </div>
+      </div>
+      <div class="col">
+        <div class="fw-bold fs-6">{{ contrato.trabajador.nombre_completo }}</div>
+        <div class="text-muted small"><code>{{ contrato.trabajador.rut }}</code></div>
+      </div>
+      <div class="col-auto text-end">
+        <div class="text-muted small">Obra</div>
+        <div class="fw-semibold">{{ obra.nombre }}</div>
+      </div>
+      <div class="col-auto">
+        <span class="badge bg-secondary fs-6"><i class="bi bi-hourglass-split me-1"></i>Borrador</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="alert alert-warning d-flex gap-2 align-items-start py-2 mb-4">
+  <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
+  <div class="small">
+    Completa los datos que trae el contrato firmado. Si ya tienes el documento escaneado, súbelo aquí mismo y el contrato
+    pasará directamente a <strong>Vigente</strong>. Si no tienes el archivo aún, completa los datos y quedará
+    <strong>Pendiente de Firma</strong>.
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="row g-4">
+
+    <!-- Datos del contrato -->
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header fw-semibold">
+          <i class="bi bi-file-text me-2 text-primary"></i>Datos del contrato
+        </div>
+        <div class="card-body">
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Especialidad</label>
+              <select name="especialidad" class="form-select">
+                <option value="">— Sin definir —</option>
+                {% for esp in especialidades %}
+                <option value="{{ esp.pk }}" {% if contrato.especialidad_id == esp.pk %}selected{% endif %}>
+                  {{ esp.nombre }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Tipo de contrato</label>
+              <select name="tipo_contrato" class="form-select">
+                {% for val, label in tipos_contrato %}
+                <option value="{{ val }}" {% if contrato.tipo_contrato == val %}selected{% endif %}>
+                  {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Sueldo base</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" name="sueldo_base" class="form-control"
+                       value="{{ contrato.sueldo_base|default:'' }}" min="0" step="1"
+                       placeholder="Ej: 650000">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Fecha de inicio</label>
+              <input type="date" name="fecha_inicio" class="form-control"
+                     value="{{ contrato.fecha_inicio|date:'Y-m-d'|default:'' }}">
+              <div class="form-text">Define desde cuándo cuenta para el cierre mensual.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Fecha de término estimada</label>
+              <input type="date" name="fecha_termino_estimada" class="form-control"
+                     value="{{ contrato.fecha_termino_estimada|date:'Y-m-d'|default:'' }}">
+              <div class="form-text">Déjala en blanco si es indefinido o por obra/faena.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Subir documento -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold">
+          <i class="bi bi-upload me-2 text-success"></i>Contrato firmado (opcional)
+        </div>
+        <div class="card-body d-flex flex-column">
+          <p class="text-muted small mb-3">
+            Si ya tienes el PDF o imagen del contrato firmado, súbelo aquí. El sistema lo guardará como
+            evidencia y el contrato pasará automáticamente a <strong>Vigente</strong>.
+          </p>
+          <div class="border rounded p-3 text-center flex-grow-1 d-flex flex-column justify-content-center"
+               id="dropZone" style="border-style:dashed !important; cursor:pointer;"
+               onclick="document.getElementById('fileContrato').click()">
+            <i class="bi bi-file-earmark-arrow-up fs-2 text-muted mb-2"></i>
+            <div class="text-muted small" id="dropLabel">
+              Haz clic o arrastra el archivo aquí<br>
+              <span style="font-size:.75rem;">PDF, JPG, PNG — cualquier formato</span>
+            </div>
+            <input type="file" name="archivo_contrato" id="fileContrato" class="d-none"
+                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                   onchange="mostrarArchivoSeleccionado(this)">
+          </div>
+          <div class="mt-3 p-2 rounded bg-light border small text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            Si no subes el archivo ahora, puedes hacerlo después desde la carpeta del trabajador.
+            El contrato quedará en <strong>Pendiente de Firma</strong>.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-4">
+    <a href="{% url 'obra_detail' obra.pk %}?tab=dotacion" class="btn btn-outline-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-primary fw-semibold">
+      <i class="bi bi-check-circle me-1"></i>Guardar y continuar
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function mostrarArchivoSeleccionado(input) {
+  const label = document.getElementById('dropLabel');
+  const zone = document.getElementById('dropZone');
+  if (input.files && input.files[0]) {
+    const f = input.files[0];
+    const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB';
+    label.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle me-1"></i>${f.name}</span><br><span style="font-size:.75rem;" class="text-muted">${size} — listo para subir</span>`;
+    zone.classList.add('border-success');
+  }
+}
+
+// Drag and drop
+const zone = document.getElementById('dropZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('bg-light'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('bg-light'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('bg-light');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const input = document.getElementById('fileContrato');
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    mostrarArchivoSeleccionado(input);
+  }
+});
+</script>
+{% endblock %}

@@ -17,7 +17,6 @@ urlpatterns = [
     path('trabajadores/nuevo/', views.trabajador_create, name='trabajador_create'),
     path('trabajadores/<str:rut>/', views.trabajador_detail, name='trabajador_detail'),
     path('trabajadores/<str:rut>/editar/', views.trabajador_edit, name='trabajador_edit'),
-    path('trabajadores/<str:rut>/documento/', views.trabajador_upload_doc, name='trabajador_upload_doc'),
     path('trabajadores/<str:rut>/documentos-masivo/', views.trabajador_upload_doc_masivo, name='trabajador_upload_doc_masivo'),
     path('trabajadores/<str:rut>/strike/', views.trabajador_add_strike, name='trabajador_add_strike'),
     path('trabajadores/<str:rut>/strike/<int:pk>/editar/', views.trabajador_edit_strike, name='trabajador_edit_strike'),
@@ -46,6 +45,10 @@ urlpatterns = [
     path('obras/<int:pk>/archivar/', views.obra_archivar, name='obra_archivar'),
     path('obras/<int:pk>/check-trabajador/', views.obra_check_trabajador, name='obra_check_trabajador'),
     path('obras/<int:pk>/asignar-trabajador/', views.obra_asignar_trabajador, name='obra_asignar_trabajador'),
+    path('obras/<int:pk>/ingreso-rapido/', views.obra_ingreso_rapido, name='obra_ingreso_rapido'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/completar/', views.obra_completar_borrador, name='obra_completar_borrador'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/finalizar/', views.obra_finalizar_contrato, name='obra_finalizar_contrato'),
+    path('obras/<int:pk>/contrato/<int:contrato_pk>/subir-finiquito/', views.obra_subir_finiquito, name='obra_subir_finiquito'),
     path('obras/<int:pk>/contrato/<int:contrato_pk>/resolver-duplicado/', views.obra_resolver_duplicado, name='obra_resolver_duplicado'),
     path('obras/<int:pk>/contrato/<int:contrato_pk>/quitar/', views.obra_quitar_trabajador, name='obra_quitar_trabajador'),
     path('obras/<int:pk>/contrato/<int:contrato_pk>/licencia/', views.obra_licencia_trabajador, name='obra_licencia_trabajador'),
@@ -61,7 +64,7 @@ urlpatterns = [
     path('contratos/<int:pk>/wizard/', views.contrato_wizard, name='contrato_wizard'),
     path('contratos/<int:pk>/editar/', views.contrato_edit, name='contrato_edit'),
     path('contratos/<int:pk>/subir-firmado/', views.contrato_upload_firmado, name='contrato_upload_firmado'),
-    path('contratos/<int:pk>/pdf/', views.contrato_pdf, name='contrato_pdf'),
+
 
     # Documentos
     path('documentos/central/', views.documentos_central, name='documentos_central'),
@@ -100,12 +103,28 @@ urlpatterns = [
     # Documentos Generados
     path('documentos-empresa/', views.doc_generado_list, name='doc_generado_list'),
     path('documentos-empresa/nuevo/', views.doc_generado_create, name='doc_generado_create'),
+    path('documentos-empresa/borradores/', views.doc_generado_borradores, name='doc_generado_borradores'),
+    path('documentos-empresa/imprimir-masivo/', views.doc_generado_imprimir_masivo, name='doc_generado_imprimir_masivo'),
     path('documentos-empresa/en-blanco/', views.doc_generado_blank_preview, name='doc_generado_blank_preview'),
     path('documentos-empresa/<int:pk>/editar/', views.doc_generado_edit, name='doc_generado_edit'),
     path('documentos-empresa/<int:pk>/preview/', views.doc_generado_preview, name='doc_generado_preview'),
     path('documentos-empresa/<int:pk>/word/', views.doc_generado_word, name='doc_generado_word'),
+    path('documentos-empresa/<int:pk>/pdf/', views.doc_generado_pdf_download, name='doc_generado_pdf_download'),
     path('documentos-empresa/<int:pk>/eliminar/', views.doc_generado_delete, name='doc_generado_delete'),
     path('documentos-empresa/<int:pk>/firmar/', views.doc_generado_firmar, name='doc_generado_firmar'),
+
+    # Licencias Médicas
+    path('licencias/', views.licencia_list, name='licencia_list'),
+    path('licencias/nueva/', views.licencia_create, name='licencia_create'),
+    path('licencias/<int:pk>/', views.licencia_detail, name='licencia_detail'),
+    path('licencias/<int:pk>/editar/', views.licencia_edit, name='licencia_edit'),
+    path('licencias/<int:pk>/eliminar/', views.licencia_delete, name='licencia_delete'),
+    path('licencias/<int:pk>/prorroga/', views.licencia_prorroga, name='licencia_prorroga'),
+    path('licencias/trabajador/<str:rut>/ajax/', views.licencias_trabajador_ajax, name='licencias_trabajador_ajax'),
+
+    # Config Remuneraciones
+    path('admin-panel/remuneraciones/', views.config_remuneraciones_list, name='config_remuneraciones_list'),
+    path('admin-panel/remuneraciones/guardar/', views.config_remuneraciones_save, name='config_remuneraciones_save'),
 
     # Admin Panel
     path('admin-panel/usuarios/', views.admin_usuarios, name='admin_usuarios'),

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load core_extras %}
 {% block title %}{{ obra.nombre }} | TsDesk{% endblock %}
 
 {% block content %}
@@ -10,10 +11,28 @@
   <div class="d-flex gap-2">
     <a href="{% url 'obra_edit' obra.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
     <a href="{% url 'obra_download_zip' obra.pk %}" class="btn btn-sm btn-dark"><i class="bi bi-file-zip me-1"></i>Descargar Todo ZIP</a>
-    {% if obra.estado != 'Cerrada' %}
+    {% if obra.estado != 'Cerrada' and not obra.archivada %}
     <button class="btn btn-sm btn-danger" id="btnCerrarObra" data-obra-id="{{ obra.pk }}">
       <i class="bi bi-lock-fill me-1"></i>Cerrar Obra
     </button>
+    {% endif %}
+    {% if obra.estado == 'Cerrada' and not obra.archivada %}
+    <form method="post" action="{% url 'obra_archivar' obra.pk %}" class="d-inline"
+          onsubmit="return confirm('¿Archivar la obra? Quedará en solo lectura y no se podrán subir más documentos.')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-dark">
+        <i class="bi bi-archive-fill me-1"></i>Archivar obra
+      </button>
+    </form>
+    {% endif %}
+    {% if obra.archivada %}
+    <form method="post" action="{% url 'obra_archivar' obra.pk %}" class="d-inline"
+          onsubmit="return confirm('¿Desarchivar la obra? Volverá al estado En cierre.')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Desarchivar
+      </button>
+    </form>
     {% endif %}
   </div>
 </div>
@@ -32,10 +51,13 @@
       </div>
       <div class="col-md-4 text-end">
         <span class="badge fs-6
-          {% if obra.estado == 'Activa' %}bg-success
+          {% if obra.archivada %}bg-dark
+          {% elif obra.estado == 'Activa' %}bg-success
           {% elif obra.estado == 'Pausada' %}bg-warning text-dark
+          {% elif obra.estado == 'Cerrada' %}bg-warning text-dark
           {% else %}bg-secondary{% endif %}">
-          <i class="bi bi-circle-fill me-1"></i>{{ obra.estado }}
+          <i class="bi bi-{% if obra.archivada %}archive-fill{% else %}circle-fill{% endif %} me-1"></i>
+          {% if obra.archivada %}Archivada{% elif obra.estado == 'Cerrada' %}En cierre{% else %}{{ obra.estado }}{% endif %}
         </span>
         <div class="mt-2">
           <span class="badge bg-primary">{{ obra.contratos_vigentes_count }} contratos vigentes</span>
@@ -44,6 +66,30 @@
     </div>
   </div>
 </div>
+
+{% if obra.estado == 'Cerrada' and not obra.archivada %}
+{% if carpetas_completas %}
+<div class="alert alert-success d-flex align-items-center justify-content-between gap-2 py-2 mb-3">
+  <div><i class="bi bi-check-circle-fill me-2"></i><strong>Todas las carpetas están completas.</strong> Puedes archivar la obra para dejarla en solo lectura.</div>
+  <form method="post" action="{% url 'obra_archivar' obra.pk %}" class="d-inline flex-shrink-0"
+        onsubmit="return confirm('¿Archivar la obra? Quedará en solo lectura.')">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-archive-fill me-1"></i>Archivar ahora</button>
+  </form>
+</div>
+{% else %}
+<div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+  <i class="bi bi-hourglass-split flex-shrink-0 fs-5"></i>
+  <div><strong>Obra en cierre.</strong> Puedes seguir subiendo documentación hasta completar todas las carpetas de los trabajadores. Cuando estén completas, podrás archivar la obra.</div>
+</div>
+{% endif %}
+{% endif %}
+{% if obra.archivada %}
+<div class="alert alert-secondary d-flex align-items-center gap-2 py-2 mb-3">
+  <i class="bi bi-archive-fill flex-shrink-0 fs-5"></i>
+  <div><strong>Obra archivada.</strong> Los documentos están en solo lectura. Para volver a subir documentos, usa el botón Desarchivar.</div>
+</div>
+{% endif %}
 
 <!-- Pestañas -->
 <div class="card border-0 shadow-sm">
@@ -61,6 +107,33 @@
   <div class="card-body">
 
     {% if tab == 'resumen' %}
+
+    <!-- Alerta fecha cierre obra -->
+    {% if dias_para_cierre_obra is not None %}
+      {% if dias_para_cierre_obra < 0 %}
+      <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
+        <i class="bi bi-calendar-x-fill flex-shrink-0 fs-5"></i>
+        <div>
+          <strong>Fecha estimada de cierre VENCIDA</strong> — La obra superó su fecha estimada ({{ obra.fecha_termino_estimada|date:"d/m/Y" }}) hace {{ dias_para_cierre_obra|cut:"-" }} día{{ dias_para_cierre_obra|cut:"-"|pluralize }} sin ser cerrada.
+        </div>
+      </div>
+      {% elif dias_para_cierre_obra <= 10 %}
+      <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
+        <i class="bi bi-alarm-fill flex-shrink-0 fs-5"></i>
+        <div>
+          <strong>Cierre en {{ dias_para_cierre_obra }} día{{ dias_para_cierre_obra|pluralize }}</strong> — Fecha estimada de término: {{ obra.fecha_termino_estimada|date:"d/m/Y" }}. Prepare los finiquitos y documentación pendiente.
+        </div>
+      </div>
+      {% elif dias_para_cierre_obra <= 30 %}
+      <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+        <i class="bi bi-calendar-event-fill flex-shrink-0 fs-5"></i>
+        <div>
+          <strong>Cierre próximo en {{ dias_para_cierre_obra }} días</strong> — Fecha estimada: {{ obra.fecha_termino_estimada|date:"d/m/Y" }}. Revise los pendientes documentales antes del cierre.
+        </div>
+      </div>
+      {% endif %}
+    {% endif %}
+
     <div class="row g-3">
       <div class="col-md-4">
         <div class="card bg-primary text-white text-center"><div class="card-body py-3">
@@ -95,11 +168,70 @@
         <a href="{% url 'obra_traslado_masivo' obra.pk %}" class="btn btn-sm btn-warning">
           <i class="bi bi-arrow-right-circle-fill me-1"></i>Trasladar Personal
         </a>
+        {% if not obra.archivada and obra.estado != 'Cerrada' %}
         <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAgregarTrabajador">
           <i class="bi bi-person-plus me-1"></i>Agregar Trabajador
         </button>
+        {% endif %}
       </div>
     </div>
+
+    {% if contratos_vencidos_sin_accion %}
+    <div class="alert alert-danger py-2 mb-2 d-flex align-items-start gap-2">
+      <i class="bi bi-calendar-x-fill mt-1 flex-shrink-0 fs-5"></i>
+      <div class="w-100">
+        <strong>{{ contratos_vencidos_sin_accion|length }} contrato(s) con plazo vencido sin acción.</strong>
+        <span class="text-muted small ms-1">Decide qué ocurrió para mantener el historial correcto.</span>
+        <ul class="mb-0 mt-1 small list-unstyled">{% for c in contratos_vencidos_sin_accion %}
+          <li class="d-flex align-items-center gap-2 py-1 border-bottom border-danger border-opacity-25">
+            <span>
+              <strong>{{ c.trabajador.nombre_completo }}</strong> — venció el
+              {{ c.fecha_vigencia_efectiva|date:"d/m/Y" }}
+              {% with dias=c.dias_para_vencer %}
+              <span class="badge bg-danger ms-1">hace {{ dias|add:"0"|default:dias }} día{{ dias|add:"0"|default:dias|pluralize }}</span>
+              {% endwith %}
+            </span>
+            <button class="btn btn-danger btn-sm py-0 px-2 ms-auto flex-shrink-0"
+              onclick="abrirModalVencido({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.fecha_vigencia_efectiva|date:"Y-m-d" }}', {{ c.dias_para_vencer }})">
+              <i class="bi bi-question-circle me-1"></i>¿Qué ocurrió?
+            </button>
+          </li>
+        {% endfor %}</ul>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if contratos_por_vencer %}
+    <div class="alert alert-warning py-2 mb-2 d-flex align-items-start gap-2">
+      <i class="bi bi-clock-history mt-1 flex-shrink-0"></i>
+      <div>
+        <strong>{{ contratos_por_vencer|length }} contrato(s) por vencer en los próximos 10 días.</strong>
+        <ul class="mb-0 mt-1 small">{% for c in contratos_por_vencer %}
+          <li>
+            {{ c.trabajador.nombre_completo }} — vence el {{ c.fecha_vigencia_efectiva|date:"d/m/Y" }}
+            {% if c.fecha_extension %}<span class="badge bg-info text-dark ms-1" title="Extendido por Anexo">Extendido</span>{% endif %}
+            ({{ c.dias_para_vencer }} día{{ c.dias_para_vencer|pluralize }})
+            <button class="btn btn-link btn-sm p-0 ms-1 text-warning" style="font-size:.78rem"
+              onclick="abrirModalVencido({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.fecha_vigencia_efectiva|date:"Y-m-d" }}', {{ c.dias_para_vencer }})">
+              <i class="bi bi-question-circle me-1"></i>¿Qué hacer?
+            </button>
+          </li>
+        {% endfor %}</ul>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if finalizados_sin_finiquito %}
+    <div class="alert alert-info py-2 mb-2 d-flex align-items-start gap-2">
+      <i class="bi bi-file-earmark-x mt-1 flex-shrink-0"></i>
+      <div>
+        <strong>{{ finalizados_sin_finiquito|length }} trabajador(es) finalizados sin finiquito subido.</strong>
+        El finiquito no es obligatorio para continuar operando.
+        <a href="?tab=carpeta" class="ms-2 small">Ver en Carpeta →</a>
+      </div>
+    </div>
+    {% endif %}
+
     {% if contratos_duplicados %}
     <div class="alert alert-danger d-flex align-items-start gap-2 py-2 mb-2">
       <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
@@ -108,7 +240,7 @@
         El mismo trabajador aparece más de una vez en esta obra.
         Elimina el duplicado de menor jerarquía para limpiar la dotación.
         <ul class="mb-0 mt-1">
-          {% for c, doc_contrato in contratos_con_doc %}{% if c.trabajador_id in contratos_duplicados and c.estado == 'Pendiente de Firma' %}
+          {% for c, doc_contrato, doc_firmado in contratos_con_doc %}{% if c.trabajador_id in contratos_duplicados and c.estado == 'Pendiente de Firma' %}
           <li>
             {{ c.trabajador.nombre_completo }} — Contrato #{{ c.pk }}
             ({{ c.estado }}, ${{ c.sueldo_base|floatformat:0 }}, inicio {{ c.fecha_inicio|date:"d/m/Y" }})
@@ -131,51 +263,108 @@
           <tr><th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Sueldo Base</th><th>Inicio</th><th>Término</th><th>Estado</th><th>Contrato Doc.</th><th>Acciones</th></tr>
         </thead>
         <tbody>
-          {% for c, doc_contrato in contratos_con_doc %}
+          {% for c, doc_contrato, doc_firmado in contratos_con_doc %}
           {% with otras=c.trabajador.contratos_vigentes %}
-          <tr class="{% if c.trabajador.en_lista_negra %}table-danger{% elif c.estado == 'En Licencia' %}table-warning{% elif c.estado == 'Reactivado' %}table-info{% endif %}">
+          <tr class="{% if c.estado == 'Borrador' %}table-secondary{% elif c.trabajador.en_lista_negra %}table-danger{% elif c.dias_para_vencer != None and c.dias_para_vencer < 0 %}table-danger{% elif c.estado == 'En Licencia' %}table-warning{% elif c.estado == 'Reactivado' %}table-info{% endif %}"
+              style="{% if c.dias_para_vencer != None and c.dias_para_vencer < 0 %}opacity:.9{% endif %}{% if c.estado == 'Borrador' %}opacity:.85{% endif %}">
             <td>
               <a href="{% url 'trabajador_detail' c.trabajador.rut %}">{{ c.trabajador.nombre_completo }}</a>
               {% if c.trabajador.en_lista_negra %}<span class="badge bg-danger ms-1">Lista Negra</span>{% endif %}
+              {% if c.es_recontratacion %}<span class="badge ms-1 text-white" style="background:#7c3aed" title="Este trabajador ya trabajó antes en esta obra"><i class="bi bi-arrow-repeat me-1"></i>Re-contratación</span>{% endif %}
               {% if otras.count > 1 %}
               <span class="badge bg-warning text-dark ms-1" title="Participa en múltiples obras">
                 <i class="bi bi-diagram-2-fill"></i> {{ otras.count }} obras
               </span>
               {% endif %}
               {% if c.estado == 'En Licencia' and c.fecha_inicio_licencia %}
-              <div class="text-muted" style="font-size:.75rem"><i class="bi bi-hospital"></i> Lic. desde {{ c.fecha_inicio_licencia|date:"d/m/Y" }}</div>
+              <div class="text-muted" style="font-size:.75rem">
+                {% if c.pk in licencias_tipo2_activas %}
+                <span class="badge bg-danger me-1" title="Accidente Laboral (Tipo 2)">⚕ Accidentado</span>
+                {% else %}
+                <i class="bi bi-hospital"></i> Lic. desde {{ c.fecha_inicio_licencia|date:"d/m/Y" }}
+                {% endif %}
+              </div>
               {% endif %}
               {% if c.estado == 'Reactivado' and c.fecha_fin_licencia %}
               <div class="text-info" style="font-size:.75rem"><i class="bi bi-arrow-clockwise"></i> Reactivado {{ c.fecha_fin_licencia|date:"d/m/Y" }}</div>
               {% endif %}
             </td>
             <td><code>{{ c.trabajador.rut }}</code></td>
-            <td>{{ c.especialidad.nombre }}</td>
-            <td>${{ c.sueldo_base|floatformat:0 }}</td>
-            <td>{{ c.fecha_inicio|date:"d/m/Y" }}</td>
-            <td>{{ c.fecha_termino_estimada|date:"d/m/Y"|default:"Indef." }}</td>
+            <td>{% if c.especialidad %}{{ c.especialidad.nombre }}{% else %}<span class="text-muted fst-italic small">Sin definir</span>{% endif %}</td>
+            <td>{% if c.sueldo_base %}${{ c.sueldo_base|pesos_cl }}{% else %}<span class="text-muted fst-italic small">Sin definir</span>{% endif %}</td>
+            <td>{% if c.fecha_inicio %}{{ c.fecha_inicio|date:"d/m/Y" }}{% else %}<span class="text-muted fst-italic small">Sin definir</span>{% endif %}</td>
             <td>
+              {% if c.estado == 'Borrador' %}
+              <span class="text-muted fst-italic small">—</span>
+              {% else %}
+              {{ c.fecha_termino_estimada|date:"d/m/Y"|default:"Indef." }}
+              {% if c.fecha_extension %}
+              <br><span class="badge bg-info text-dark" style="font-size:.65rem" title="Extendido por Anexo hasta {{ c.fecha_extension|date:'d/m/Y' }}">
+                <i class="bi bi-arrow-right me-1"></i>{{ c.fecha_extension|date:"d/m/Y" }}
+              </span>
+              {% endif %}
+              {% if c.dias_para_vencer != None and c.dias_para_vencer < 0 %}
+              <br><span class="badge bg-danger" style="font-size:.65rem">Vencido hace {{ c.dias_para_vencer|add:"0"|slice:"1:" }} d</span>
+              {% endif %}
+              {% endif %}
+            </td>
+            <td>
+              {% if c.estado == 'Borrador' %}
+              <span class="badge bg-secondary"><i class="bi bi-hourglass-split me-1"></i>Borrador</span>
+              <div class="text-muted" style="font-size:.65rem;">Datos pendientes</div>
+              {% else %}
               <span class="badge
                 {% if c.estado == 'Vigente' %}bg-success
                 {% elif c.estado == 'Pendiente de Firma' %}bg-warning text-dark
                 {% elif c.estado == 'En Licencia' %}bg-orange text-dark" style="background:#fd7e14
                 {% elif c.estado == 'Reactivado' %}bg-info text-dark
+                {% elif c.estado == 'Finiquitado' %}bg-dark
                 {% else %}bg-secondary{% endif %}">{{ c.estado }}</span>
+              {% endif %}
             </td>
             <td>
-              {% if doc_contrato %}
+              {% if doc_firmado %}
+              {# Firmado subido: tiene prioridad, solo lectura #}
+              <a href="{% url 'documento_preview_papelera' doc_firmado.pk %}"
+                 onclick="previewDoc(this.href,'Contrato Firmado','{{ doc_firmado.extension|lower }}');return false;"
+                 class="badge bg-success text-white text-decoration-none d-block mb-1" title="Ver contrato firmado">
+                <i class="bi bi-file-check me-1"></i>Firmado
+              </a>
+              {% elif doc_contrato %}
+              {# Solo borrador generado: editable mientras no haya firmado #}
               <a href="{% url 'doc_generado_preview' doc_contrato.pk %}" target="_blank"
-                 class="badge bg-success text-white text-decoration-none">
-                <i class="bi bi-file-text me-1"></i>Generado
+                 class="badge bg-primary text-white text-decoration-none d-block mb-1" title="Ver borrador generado">
+                <i class="bi bi-file-text me-1"></i>Borrador
               </a>
               {% else %}
               <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&obra_id={{ obra.pk }}&contrato_id={{ c.pk }}"
-                 class="badge bg-warning text-dark text-decoration-none">
+                 class="badge bg-warning text-dark text-decoration-none" title="Generar contrato">
                 <i class="bi bi-file-earmark-plus me-1"></i>Generar
               </a>
               {% endif %}
             </td>
             <td style="white-space:nowrap">
+              {% if c.estado == 'Borrador' %}
+              <a href="{% url 'obra_completar_borrador' obra.pk c.pk %}"
+                 class="btn btn-warning btn-sm py-0 px-2 me-1 fw-semibold" title="Completar datos del contrato">
+                <i class="bi bi-pencil-fill me-1" style="font-size:.8rem"></i>Completar
+              </a>
+              <button class="btn btn-link btn-sm p-0 text-danger" title="Quitar de obra"
+                onclick="abrirModalQuitar({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.estado }}')">
+                <i class="bi bi-person-dash" style="font-size:.95rem"></i>
+              </button>
+              {% else %}
+              {% if c.dias_para_vencer != None and c.dias_para_vencer < 0 %}
+              <button class="btn btn-danger btn-sm py-0 px-2 me-1" title="Contrato vencido — ¿Qué ocurrió?"
+                onclick="abrirModalVencido({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.fecha_vigencia_efectiva|date:"Y-m-d" }}', {{ c.dias_para_vencer }})">
+                <i class="bi bi-question-circle" style="font-size:.85rem"></i>
+              </button>
+              {% elif c.estado == 'Vigente' or c.estado == 'Reactivado' %}
+              <button class="btn btn-link btn-sm p-0 me-1 text-danger" title="Finalizar contrato"
+                onclick="abrirModalFinalizar({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.fecha_vigencia_efectiva|date:"Y-m-d"|default:"" }}')">
+                <i class="bi bi-check-square" style="font-size:.95rem"></i>
+              </button>
+              {% endif %}
               {% if c.estado == 'Vigente' or c.estado == 'Pendiente de Firma' %}
               <button class="btn btn-link btn-sm p-0 me-1 text-warning" title="Poner en Licencia"
                 onclick="abrirModalLicencia({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}')">
@@ -196,10 +385,15 @@
                 </button>
               </form>
               {% endif %}
+              <a href="{% url 'contrato_edit' c.pk %}?next={{ request.path }}%3Ftab%3Ddotacion"
+                 class="btn btn-link btn-sm p-0 me-1 text-secondary" title="Editar contrato">
+                <i class="bi bi-pencil-square" style="font-size:.95rem"></i>
+              </a>
               <button class="btn btn-link btn-sm p-0 text-danger" title="Quitar de obra"
                 onclick="abrirModalQuitar({{ c.pk }}, '{{ c.trabajador.nombre_completo|escapejs }}', '{{ c.estado }}')">
                 <i class="bi bi-person-dash" style="font-size:.95rem"></i>
               </button>
+              {% endif %}
             </td>
           </tr>
           {% endwith %}
@@ -209,6 +403,48 @@
         </tbody>
       </table>
     </div>
+
+    <!-- ══ HISTORIAL: contratos finalizados / finiquitados ══ -->
+    {% if contratos_historial %}
+    <div class="mt-4">
+      <button class="btn btn-sm btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center"
+              type="button" data-bs-toggle="collapse" data-bs-target="#historialContratos">
+        <span><i class="bi bi-clock-history me-2 text-muted"></i>Contratos anteriores en esta obra <span class="badge bg-secondary ms-1">{{ contratos_historial|length }}</span></span>
+        <i class="bi bi-chevron-down text-muted small"></i>
+      </button>
+      <div class="collapse" id="historialContratos">
+        <div class="table-responsive mt-2">
+          <table class="table table-sm align-middle" style="font-size:.88rem;">
+            <thead class="table-light">
+              <tr>
+                <th>Trabajador</th><th>RUT</th><th>Especialidad</th><th>Sueldo</th>
+                <th>Inicio</th><th>Término</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in contratos_historial %}
+              <tr class="text-muted">
+                <td><a href="{% url 'trabajador_detail' c.trabajador.rut %}" class="text-decoration-none text-dark">{{ c.trabajador.nombre_completo }}</a></td>
+                <td><code>{{ c.trabajador.rut }}</code></td>
+                <td>{{ c.especialidad.nombre|default:"—" }}</td>
+                <td>{% if c.sueldo_base %}${{ c.sueldo_base|floatformat:0 }}{% else %}—{% endif %}</td>
+                <td>{{ c.fecha_inicio|date:"d/m/Y"|default:"—" }}</td>
+                <td>{{ c.fecha_termino_real|date:"d/m/Y"|default:c.fecha_termino_estimada|date:"d/m/Y"|default:"—" }}</td>
+                <td>
+                  {% if c.estado == 'Finiquitado' %}
+                    <span class="badge bg-success bg-opacity-75">Finiquitado</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Finalizado</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
     {% elif tab == 'carpeta' %}
     <!-- ══ CARPETA DE OBRA ══ -->
@@ -250,7 +486,7 @@
       <table class="table table-hover align-middle">
         <thead class="table-light">
           <tr>
-            <th>Tipo de Documento</th>
+            <th>Tipo / Trabajador</th>
             <th>Archivo</th>
             <th>Fecha Carga</th>
             <th>Vencimiento</th>
@@ -261,7 +497,17 @@
         <tbody>
           {% for doc in documentos_carpeta %}
           <tr {% if doc.esta_vencido %}class="table-danger"{% elif doc.estado_visual == 'proximo' %}class="table-warning"{% endif %}>
-            <td><span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span></td>
+            <td>
+              <span class="badge bg-secondary">{{ doc.tipo_documento.nombre }}</span>
+              {% if doc.contrato and doc.tipo_documento.nombre == 'Finiquito Legalizado' %}
+                <div class="small text-muted mt-1">
+                  <a href="{% url 'trabajador_detail' doc.contrato.trabajador.rut %}" class="text-decoration-none">
+                    <i class="bi bi-person-fill me-1"></i>{{ doc.contrato.trabajador.nombre_completo }}
+                  </a>
+                  <code class="ms-1">{{ doc.contrato.trabajador.rut }}</code>
+                </div>
+              {% endif %}
+            </td>
             <td>
               <a href="{{ doc.archivo.url }}" target="_blank" class="text-decoration-none">
                 <i class="bi bi-file-earmark me-1"></i>{{ doc.nombre_archivo }}
@@ -283,7 +529,9 @@
             </td>
             <td class="small text-muted">{{ doc.usuario_carga }}</td>
             <td class="text-nowrap">
-              <a href="{{ doc.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2"
+              <a href="{% url 'documento_preview_papelera' doc.pk %}"
+                 onclick="previewDoc(this.href,'{{ doc.nombre_archivo|escapejs }}','{{ doc.extension|lower }}');return false;"
+                 class="btn btn-sm btn-outline-primary py-0 px-2"
                  data-bs-toggle="tooltip" data-bs-title="Ver documento"><i class="bi bi-eye"></i></a>
               <a href="{% url 'documento_download' doc.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2"
                  data-bs-toggle="tooltip" data-bs-title="Descargar"><i class="bi bi-download"></i></a>
@@ -311,6 +559,45 @@
         </tbody>
       </table>
     </div>
+
+    {% if finalizados_sin_finiquito %}
+    <div class="mt-4">
+      <h6 class="fw-semibold text-danger mb-2">
+        <i class="bi bi-file-earmark-x me-2"></i>Finiquitos Pendientes de Subir
+        <span class="badge bg-danger ms-1">{{ finalizados_sin_finiquito|length }}</span>
+      </h6>
+      <p class="text-muted small mb-2">Trabajadores con contrato Finalizado cuyo finiquito aún no ha sido cargado. No es obligatorio para continuar operando.</p>
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr><th>Trabajador</th><th>RUT</th><th>Tipo Término</th><th>Fecha Término</th><th>Acción</th></tr>
+        </thead>
+        <tbody>
+          {% for c in finalizados_sin_finiquito %}
+          <tr>
+            <td><a href="{% url 'trabajador_detail' c.trabajador.rut %}">{{ c.trabajador.nombre_completo }}</a></td>
+            <td><code>{{ c.trabajador.rut }}</code></td>
+            <td>{{ c.tipo_termino|default:"—" }}</td>
+            <td>
+              {% if c.fecha_termino_real %}{{ c.fecha_termino_real|date:"d/m/Y" }}
+              {% elif c.fecha_termino_estimada %}{{ c.fecha_termino_estimada|date:"d/m/Y" }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <a href="{% url 'obra_subir_finiquito' obra.pk c.pk %}"
+                 class="btn btn-sm btn-danger py-0 px-2">
+                <i class="bi bi-upload me-1"></i>Subir Finiquito
+              </a>
+              <a href="{% url 'doc_generado_create' %}?tipo=finiquito&obra_id={{ obra.pk }}&contrato_id={{ c.pk }}"
+                 class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1">
+                <i class="bi bi-file-earmark-text me-1"></i>Generar
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
 
     {% elif tab == 'documentos' %}
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -362,7 +649,8 @@
                     <i class="bi bi-file-earmark me-1 text-muted"></i>{{ doc.nombre_archivo }}
                   </td>
                   <td class="text-nowrap pe-3">
-                    <a href="{{ doc.archivo.url }}" target="_blank"
+                    <a href="{% url 'documento_preview_papelera' doc.pk %}"
+                       onclick="previewDoc(this.href,'{{ doc.nombre_archivo|escapejs }}','{{ doc.extension|lower }}');return false;"
                        class="btn btn-sm btn-outline-primary py-0 px-2"
                        data-bs-toggle="tooltip" data-bs-title="Ver documento">
                       <i class="bi bi-eye"></i>
@@ -684,6 +972,140 @@
   </div>
 </div>
 
+<!-- ── Modal ¿Qué ocurrió? / ¿Qué vas a hacer? — Contrato Vencido o Próximo ── -->
+<div class="modal fade" id="modalVencido" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" id="modalVencidoContent">
+      <div class="modal-header text-white" id="modalVencidoHeader">
+        <h5 class="modal-title" id="modalVencidoTitle"></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert py-2 mb-3" id="modalVencidoAlert">
+          <strong id="vencidoNombre"></strong> — <span id="vencidoTextoFecha"></span>
+          <span id="vencidoDias" class="ms-2 badge"></span>
+        </div>
+        <p class="text-muted small mb-3" id="modalVencidoSubtitulo"></p>
+        <div class="row g-3">
+
+          <!-- Opción 1: Anexo (siempre visible) -->
+          <div class="col-md-4">
+            <div class="card border-info h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-file-earmark-plus fs-2 text-info mb-2 d-block"></i>
+                <h6 class="fw-bold" id="anexoTitulo"></h6>
+                <p class="small text-muted mb-3" id="anexoDesc"></p>
+                <a id="btnAnexo" href="#" class="btn btn-info text-white w-100">
+                  <i class="bi bi-file-earmark-plus me-1"></i>Generar Anexo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opción 2: Finalizar (solo si ya venció) -->
+          <div class="col-md-4" id="opcionFinalizar">
+            <div class="card border-danger h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-file-earmark-text fs-2 text-danger mb-2 d-block"></i>
+                <h6 class="fw-bold">Terminó en esa fecha</h6>
+                <p class="small text-muted mb-3">El trabajador dejó de venir al vencer el contrato. Se finaliza y se genera el finiquito en el paso siguiente.</p>
+                <button type="button" class="btn btn-danger w-100"
+                   onclick="usarFinalizarDesdeVencido(false, true)">
+                  <i class="bi bi-file-earmark-text me-1"></i>Finalizar + Finiquito
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opción 3: Re-contratación (solo si ya venció) -->
+          <div class="col-md-4" id="opcionRecontratar">
+            <div class="card border-success h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-arrow-repeat fs-2 text-success mb-2 d-block"></i>
+                <h6 class="fw-bold">Terminó y vuelve</h6>
+                <p class="small text-muted mb-3">El trabajador terminó pero comenzará un nuevo período. Finaliza este contrato y luego créale uno nuevo desde Dotación.</p>
+                <button type="button" class="btn btn-success w-100"
+                   onclick="usarFinalizarDesdeVencido(true)">
+                  <i class="bi bi-arrow-repeat me-1"></i>Finalizar para Re-contratar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opción alternativa 2 (solo si es próximo, no vencido): preparar finiquito -->
+          <div class="col-md-4" id="opcionDejarVencer">
+            <div class="card border-danger h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-file-earmark-text fs-2 text-danger mb-2 d-block"></i>
+                <h6 class="fw-bold">Preparar Finiquito</h6>
+                <p class="small text-muted mb-3">El trabajador terminará en la fecha indicada. Puedes adelantar el finiquito antes de que expire.</p>
+                <button type="button" class="btn btn-danger w-100"
+                  onclick="usarFinalizarDesdeVencido(false, true)">
+                  <i class="bi bi-file-earmark-text me-1"></i>Finalizar + Finiquito
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Finalizar Contrato ──────────────────────────────────────── -->
+<div class="modal fade" id="modalFinalizar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-check-square me-2"></i>Finalizar Contrato</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formFinalizar" action="">
+        {% csrf_token %}
+        <input type="hidden" name="ir_a_finiquito" id="finalizarIrFiniquito" value="">
+        <div class="modal-body">
+          <p class="mb-3">Trabajador: <strong id="finalizarNombre"></strong></p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tipo de término *</label>
+            <select name="tipo_termino" id="finalizarTipoTermino" class="form-select" required>
+              <option value="">— Seleccionar —</option>
+              {% for val, label in TIPO_TERMINO_CHOICES %}{% if val %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Fecha efectiva de término</label>
+            <input type="date" name="fecha_termino_real" id="finalizarFecha" class="form-control">
+            <small class="text-muted">Si está vacía se usa la fecha estimada del contrato.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Motivo / observaciones</label>
+            <textarea name="motivo_termino" id="finalizarMotivo" class="form-control" rows="3"
+              placeholder="Ej: El trabajador presentó renuncia voluntaria el 10/06/2026..."></textarea>
+          </div>
+          <div class="alert alert-warning py-2 mb-0 small">
+            <i class="bi bi-info-circle me-1"></i>
+            El finiquito <strong>no es obligatorio</strong> para continuar operando. Una vez finalizado, puedes subir el finiquito firmado en la <strong>Carpeta de la Obra</strong>. El trabajador quedará disponible para asignarse a otra obra.
+          </div>
+        </div>
+        <div class="modal-footer flex-wrap gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-outline-danger"
+                  onclick="document.getElementById('finalizarIrFiniquito').value=''">
+            <i class="bi bi-check-square me-1"></i>Solo Finalizar
+          </button>
+          <button type="submit" class="btn btn-danger"
+                  onclick="document.getElementById('finalizarIrFiniquito').value='1'">
+            <i class="bi bi-file-earmark-text me-1"></i>Finalizar y Generar Finiquito
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal Quitar Trabajador ───────────────────────────────────────── -->
 <div class="modal fade" id="modalQuitar" tabindex="-1">
   <div class="modal-dialog modal-lg">
@@ -695,64 +1117,53 @@
       <div class="modal-body">
         <p class="mb-3">Trabajador: <strong id="quitarNombre"></strong></p>
         <hr>
-        <!-- Pendiente de Firma -->
+        <!-- Borrador / Pendiente de Firma -->
         <div id="quitarCasoPendiente">
-          <p class="fw-semibold text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Contrato en estado <em>Pendiente de Firma</em>.</p>
-          <p class="mb-3">¿El trabajador <strong>ya inició labores</strong> en esta obra?</p>
-          <div class="d-flex gap-2 flex-wrap mb-3">
-            <form method="post" id="formQuitarErroneo" action="">
-              {% csrf_token %}<input type="hidden" name="accion" value="eliminar_erroneo">
-              <button type="button" class="btn btn-danger btn-sm"
-                onclick="if(confirm('¿Eliminar registro? El trabajador no aparecerá en planilla.')) this.closest('form').submit()">
-                <i class="bi bi-trash me-1"></i>No inició — Ingreso erróneo, eliminar
-              </button>
-            </form>
-            <form method="post" id="formQuitarMantener" action="">
-              {% csrf_token %}<input type="hidden" name="accion" value="mantener">
-              <button type="submit" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-x me-1"></i>Mantener (cancelar)
-              </button>
-            </form>
-          </div>
-          <hr>
-          <p class="fw-semibold mb-2">¿Ya inició labores y solo necesita corregir el contrato?</p>
-          <div class="d-flex gap-2 flex-wrap">
-            <form method="post" id="formQuitarActualizar" action="">
-              {% csrf_token %}<input type="hidden" name="accion" value="actualizar_contrato">
-              <button type="submit" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-pencil me-1"></i>Editar documento de contrato
-              </button>
-            </form>
-            <form method="post" id="formQuitarEliminarDoc" action="">
-              {% csrf_token %}<input type="hidden" name="accion" value="eliminar_doc_contrato">
-              <button type="button" class="btn btn-outline-warning text-dark btn-sm"
-                onclick="if(confirm('¿Eliminar el documento de contrato generado?')) this.closest('form').submit()">
-                <i class="bi bi-file-x me-1"></i>Eliminar documento de contrato
-              </button>
-            </form>
-          </div>
+          <p class="text-muted small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            El contrato está en estado <strong id="quitarEstadoLabelPendiente"></strong>.
+            Quitar al trabajador <strong>no borra sus documentos</strong> ni su ficha — solo lo saca de esta obra.
+            Si lo quieres volver a agregar después, puedes hacerlo en cualquier momento.
+          </p>
+          <form method="post" id="formQuitarErroneo" action="">
+            {% csrf_token %}<input type="hidden" name="accion" value="eliminar_erroneo">
+            <button type="button" class="btn btn-danger w-100"
+              onclick="this.closest('form').submit()">
+              <i class="bi bi-person-dash me-2"></i>Quitar de la obra
+            </button>
+          </form>
         </div>
         <!-- Vigente / otros -->
         <div id="quitarCasoVigente" style="display:none">
-          <div class="alert alert-info mb-3 py-2">
-            <i class="bi bi-info-circle me-1"></i>
-            Contrato en estado <strong id="quitarEstadoLabel"></strong>.
-            <strong>¿Aclaración:</strong> Si el trabajador está de licencia o se ausentará temporalmente, usa el icono
-            <i class="bi bi-hospital text-warning"></i> directamente en la fila — no es necesario "quitarlo".
-          </div>
-          <p class="mb-2 fw-semibold">¿Qué deseas hacer?</p>
-          <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-outline-warning text-dark btn-sm" data-bs-dismiss="modal" id="btnIrLicencia">
-              <i class="bi bi-hospital me-1"></i>Poner en Licencia (sigue en esta obra)
+          <p class="text-muted small mb-3">
+            <i class="bi bi-info-circle me-1"></i>Contrato en estado <strong id="quitarEstadoLabel"></strong>.
+          </p>
+          <div class="list-group gap-2">
+            <button class="list-group-item list-group-item-action d-flex align-items-center gap-3 border rounded"
+                    id="btnIrLicencia" data-bs-dismiss="modal">
+              <i class="bi bi-hospital fs-4 text-warning flex-shrink-0"></i>
+              <div class="text-start">
+                <div class="fw-semibold">Licencia médica o ausencia temporal</div>
+                <small class="text-muted">El trabajador sigue en la obra, solo se marca como en licencia.</small>
+              </div>
             </button>
-            <a href="" id="quitarLinkFiniquito" class="btn btn-outline-danger btn-sm">
-              <i class="bi bi-file-earmark-x me-1"></i>Finiquito (retiro definitivo con documento)
+            <a href="" id="quitarLinkFiniquito"
+               class="list-group-item list-group-item-action d-flex align-items-center gap-3 border rounded text-decoration-none text-dark">
+              <i class="bi bi-file-earmark-text fs-4 text-danger flex-shrink-0"></i>
+              <div class="text-start">
+                <div class="fw-semibold">Generar finiquito</div>
+                <small class="text-muted">Retiro definitivo con documento legal. El contrato debe estar Finalizado primero.</small>
+              </div>
             </a>
             <form method="post" id="formQuitarRescindirVigente" action="">
               {% csrf_token %}<input type="hidden" name="accion" value="eliminar_erroneo">
-              <button type="button" class="btn btn-danger btn-sm"
-                onclick="if(confirm('¿Rescindir contrato y quitar al trabajador de esta obra? El trabajador quedará activo en el sistema y podrá asignarse a otra obra.')) this.closest('form').submit()">
-                <i class="bi bi-arrow-right-circle me-1"></i>Quitar de esta obra (para reasignar a otra)
+              <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-3 border rounded w-100 text-start"
+                onclick="if(confirm('¿Rescindir contrato y quitar al trabajador de esta obra? El trabajador quedará activo en el sistema.')) this.closest('form').submit()">
+                <i class="bi bi-arrow-right-circle fs-4 text-secondary flex-shrink-0"></i>
+                <div>
+                  <div class="fw-semibold">Quitar y reasignar a otra obra</div>
+                  <small class="text-muted">Rescinde el contrato en esta obra. El trabajador queda disponible para ser asignado a otra.</small>
+                </div>
               </button>
             </form>
           </div>
@@ -768,6 +1179,89 @@
 <script>
 let _quitarContratoId = null;
 let _quitarNombre = null;
+
+function abrirModalFinalizar(contratoId, nombre, fechaEstimada) {
+  document.getElementById('finalizarNombre').textContent = nombre;
+  document.getElementById('finalizarFecha').value = fechaEstimada || '';
+  document.getElementById('formFinalizar').action = `/obras/{{ obra.pk }}/contrato/${contratoId}/finalizar/`;
+  new bootstrap.Modal(document.getElementById('modalFinalizar')).show();
+}
+
+let _vencidoContratoId = null;
+let _vencidoFecha = null;
+let _vencidoNombre = null;
+
+function abrirModalVencido(contratoId, nombre, fecha, dias) {
+  _vencidoContratoId = contratoId;
+  _vencidoFecha = fecha;
+  _vencidoNombre = nombre;
+  const fechaStr = fecha.split('-').reverse().join('/');
+  const d = Math.abs(dias);
+  const yaVencio = dias < 0;
+
+  const header   = document.getElementById('modalVencidoHeader');
+  const content  = document.getElementById('modalVencidoContent');
+  const title    = document.getElementById('modalVencidoTitle');
+  const alert    = document.getElementById('modalVencidoAlert');
+  const diasEl   = document.getElementById('vencidoDias');
+  const subtit   = document.getElementById('modalVencidoSubtitulo');
+
+  document.getElementById('vencidoNombre').textContent = nombre;
+
+  if (yaVencio) {
+    // Contrato ya vencido
+    header.className = 'modal-header bg-danger text-white';
+    content.className = 'modal-content border-danger';
+    alert.className = 'alert alert-danger py-2 mb-3';
+    title.innerHTML = '<i class="bi bi-calendar-x-fill me-2"></i>Contrato vencido — ¿Qué ocurrió?';
+    document.getElementById('vencidoTextoFecha').innerHTML = `contrato vencido el <strong>${fechaStr}</strong>`;
+    diasEl.className = 'ms-2 badge bg-danger';
+    diasEl.textContent = `hace ${d} día${d !== 1 ? 's' : ''}`;
+    subtit.textContent = 'Selecciona la situación real para mantener el historial correcto:';
+    document.getElementById('anexoTitulo').textContent = 'Sigue trabajando';
+    document.getElementById('anexoDesc').textContent = 'El trabajador continúa en la obra. Solo se extiende la fecha — el contrato original no se modifica.';
+    document.getElementById('opcionFinalizar').style.display = '';
+    document.getElementById('opcionRecontratar').style.display = '';
+    document.getElementById('opcionDejarVencer').style.display = 'none';
+  } else {
+    // Contrato próximo a vencer
+    header.className = 'modal-header bg-warning text-dark';
+    content.className = 'modal-content border-warning';
+    alert.className = 'alert alert-warning py-2 mb-3';
+    title.innerHTML = '<i class="bi bi-clock-history me-2"></i>Contrato próximo a vencer — ¿Qué vas a hacer?';
+    document.getElementById('vencidoTextoFecha').innerHTML = `contrato vence el <strong>${fechaStr}</strong>`;
+    diasEl.className = 'ms-2 badge bg-warning text-dark';
+    diasEl.textContent = `en ${d} día${d !== 1 ? 's' : ''}`;
+    subtit.textContent = 'El contrato está por vencer. Decide con anticipación qué pasará:';
+    document.getElementById('anexoTitulo').textContent = 'Seguirá trabajando';
+    document.getElementById('anexoDesc').textContent = 'El trabajador continúa en la obra más allá de esta fecha. Genera un Anexo para extender la vigencia.';
+    document.getElementById('opcionFinalizar').style.display = 'none';
+    document.getElementById('opcionRecontratar').style.display = 'none';
+    document.getElementById('opcionDejarVencer').style.display = '';
+  }
+
+  document.getElementById('btnAnexo').href =
+    `/documentos-empresa/nuevo/?tipo=anexo_contrato&contrato_id=${contratoId}`;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalVencido')).show();
+}
+
+function usarFinalizarDesdeVencido(esRecontratacion, irAFiniquito) {
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalVencido')).hide();
+  setTimeout(function() {
+    abrirModalFinalizar(_vencidoContratoId, _vencidoNombre, _vencidoFecha);
+    setTimeout(function() {
+      const sel = document.getElementById('finalizarTipoTermino');
+      if (sel) sel.value = 'Vencimiento plazo';
+      const motivo = document.getElementById('finalizarMotivo');
+      if (esRecontratacion && motivo && !motivo.value) {
+        motivo.value = 'Re-contratación: trabajador finaliza para iniciar nuevo contrato.';
+      }
+      // Pre-activar "Finalizar y Generar Finiquito" si viene de esa opción
+      const irFin = document.getElementById('finalizarIrFiniquito');
+      if (irFin) irFin.value = irAFiniquito ? '1' : '';
+    }, 100);
+  }, 300);
+}
 
 function abrirModalLicencia(contratoId, nombre) {
   document.getElementById('licNombre').textContent = nombre;
@@ -787,21 +1281,23 @@ function abrirModalQuitar(contratoId, nombre, estado) {
   _quitarNombre = nombre;
   document.getElementById('quitarNombre').textContent = nombre;
   document.getElementById('quitarEstadoLabel').textContent = estado;
+  const lp = document.getElementById('quitarEstadoLabelPendiente');
+  if (lp) lp.textContent = estado;
   const baseUrl = `/obras/{{ obra.pk }}/contrato/${contratoId}/quitar/`;
-  document.getElementById('formQuitarErroneo').action = baseUrl;
-  document.getElementById('formQuitarMantener').action = baseUrl;
-  document.getElementById('formQuitarActualizar').action = baseUrl;
-  document.getElementById('formQuitarEliminarDoc').action = baseUrl;
-  document.getElementById('formQuitarRescindirVigente').action = baseUrl;
+  ['formQuitarErroneo','formQuitarActualizar','formQuitarEliminarDoc','formQuitarRescindirVigente'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.action = baseUrl;
+  });
   document.getElementById('quitarLinkFiniquito').href =
     `{% url 'doc_generado_create' %}?tipo=finiquito&obra_id={{ obra.pk }}&contrato_id=${contratoId}`;
   document.getElementById('btnIrLicencia').onclick = function() {
     bootstrap.Modal.getInstance(document.getElementById('modalQuitar')).hide();
     setTimeout(() => abrirModalLicencia(contratoId, nombre), 400);
   };
-  const esPendiente = (estado === 'Pendiente de Firma');
-  document.getElementById('quitarCasoPendiente').style.display = esPendiente ? '' : 'none';
-  document.getElementById('quitarCasoVigente').style.display = esPendiente ? 'none' : '';
+  const esBorrador   = (estado === 'Borrador');
+  const esPendiente  = (estado === 'Pendiente de Firma');
+  document.getElementById('quitarCasoPendiente').style.display = (esBorrador || esPendiente) ? '' : 'none';
+  document.getElementById('quitarCasoVigente').style.display   = (esBorrador || esPendiente) ? 'none' : '';
   new bootstrap.Modal(document.getElementById('modalQuitar')).show();
 }
 </script>
@@ -931,23 +1427,25 @@ if (btnCerrar) {
       .then(data => {
         const body = document.getElementById('diagnosticoBody');
         const btn = document.getElementById('btnConfirmarCierre');
-        let html = '<ul class="list-group">';
-        if (data.contratos_vigentes === 0) {
-          html += '<li class="list-group-item list-group-item-success"><i class="bi bi-check-circle me-2"></i>Contratos operativos: <strong>Todos cerrados</strong></li>';
-        } else {
-          html += `<li class="list-group-item list-group-item-danger"><i class="bi bi-x-circle me-2"></i>ERROR: Existen <strong>${data.contratos_vigentes} contrato(s) vigente(s)</strong></li>`;
-        }
-        if (data.sin_finiquito === 0) {
-          html += '<li class="list-group-item list-group-item-success"><i class="bi bi-check-circle me-2"></i>Finiquitos: <strong>Todos cargados</strong></li>';
-        } else {
-          html += `<li class="list-group-item list-group-item-danger"><i class="bi bi-x-circle me-2"></i>ALERTA: Faltan <strong>${data.sin_finiquito} finiquito(s)</strong> en el sistema</li>`;
-        }
+        const ok = v => `<li class="list-group-item list-group-item-success py-1"><i class="bi bi-check-circle-fill me-2 text-success"></i>${v}</li>`;
+        const err = v => `<li class="list-group-item list-group-item-danger py-1"><i class="bi bi-x-circle-fill me-2 text-danger"></i>${v}</li>`;
+        let html = '<ul class="list-group list-group-flush">';
+        html += data.contratos_vigentes === 0
+          ? ok('Contratos Vigentes: ninguno activo')
+          : err(`<strong>${data.contratos_vigentes} contrato(s) vigente(s)</strong> — deben finalizarse primero`);
+        html += data.contratos_pendientes_firma === 0
+          ? ok('Contratos Pendientes de Firma: ninguno')
+          : err(`<strong>${data.contratos_pendientes_firma} contrato(s) pendiente(s) de firma</strong> — complételos o elimínelos`);
+        html += data.contratos_en_licencia === 0
+          ? ok('Licencias / Reactivaciones: ninguna activa')
+          : err(`<strong>${data.contratos_en_licencia} trabajador(es) en licencia o reactivado</strong>`);
+        html += data.sin_finiquito === 0
+          ? ok('Finiquitos: todos subidos al sistema')
+          : err(`<strong>${data.sin_finiquito} finiquito(s) pendiente(s)</strong> de subir al sistema`);
         html += '</ul>';
-        if (!data.puede_cerrar) {
-          html += '<div class="alert alert-danger mt-3 mb-0"><i class="bi bi-lock me-2"></i>Resuelva los pendientes antes de cerrar la obra.</div>';
-        } else {
-          html += '<div class="alert alert-success mt-3 mb-0"><i class="bi bi-check-circle me-2"></i>La obra cumple con todos los requisitos para ser cerrada.</div>';
-        }
+        html += data.puede_cerrar
+          ? '<div class="alert alert-success mt-3 mb-0 py-2"><i class="bi bi-check-circle-fill me-2"></i>La obra cumple todos los requisitos. Puede cerrarse.</div>'
+          : '<div class="alert alert-danger mt-3 mb-0 py-2"><i class="bi bi-lock-fill me-2"></i>Resuelva los puntos en rojo antes de cerrar la obra.</div>';
         body.innerHTML = html;
         btn.disabled = !data.puede_cerrar;
       });
@@ -955,23 +1453,26 @@ if (btnCerrar) {
 }
 </script>
 
-<!-- ══ Modal: Asignar Trabajador a Obra ══════════════════════════════════ -->
-<div class="modal fade" id="modalAgregarTrabajador" tabindex="-1" aria-labelledby="modalAgregarTrabajadorLabel" aria-hidden="true">
-  <div class="modal-dialog">
+<!-- ══ Modal: Agregar Trabajador (unificado) ══════════════════════════════ -->
+<div class="modal fade" id="modalAgregarTrabajador" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <form method="post" action="{% url 'obra_asignar_trabajador' obra.pk %}" id="formAsignarTrabajador">
+      <form method="post" action="{% url 'obra_asignar_trabajador' obra.pk %}" id="formAsignarTrabajador" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-header">
-          <h5 class="modal-title" id="modalAgregarTrabajadorLabel">
-            <i class="bi bi-person-plus me-2"></i>Asignar Trabajador
-          </h5>
+          <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Agregar Trabajador</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
 
-          <!-- Selección de trabajador -->
+          <div class="alert alert-info py-2 small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            Solo el trabajador es obligatorio. Los demás campos puedes completarlos ahora o después cuando tengas el contrato firmado.
+          </div>
+
+          <!-- Trabajador -->
           <div class="mb-3">
-            <label class="form-label fw-semibold">Trabajador *</label>
+            <label class="form-label fw-semibold">Trabajador <span class="text-danger">*</span></label>
             <select class="form-select" name="trabajador" id="selectTrabajadorModal" required>
               <option value="">— Seleccionar trabajador —</option>
               {% for t in trabajadores_disponibles %}
@@ -980,14 +1481,22 @@ if (btnCerrar) {
             </select>
           </div>
 
-          <!-- Alerta: contrato vigente en otra obra -->
+          <!-- Alertas AJAX -->
+          <div id="alertaFiniquitoModal" class="alert alert-warning d-none mb-3 py-2">
+            <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Finiquito pendiente en esta obra</strong>
+            <div id="alertaFiniquitoDetalle" class="small mt-1 fw-semibold"></div>
+            <div class="text-muted small">Puede continuar igualmente.</div>
+          </div>
+          <div id="alertaFiniquitoOtrasModal" class="alert alert-secondary d-none mb-3 py-2">
+            <strong><i class="bi bi-info-circle-fill me-1"></i>Finiquito(s) pendiente(s) en otras obras</strong>
+            <div id="alertaFiniquitoOtrasDetalle" class="small mt-1"></div>
+          </div>
           <div id="alertaVigenteModal" class="alert alert-warning d-none mb-3">
             <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Contrato vigente en otra obra:</strong>
             <span id="alertaObrasNombres" class="fw-semibold"></span>
             <div class="small text-muted mt-1">¿Qué deseas hacer?</div>
             <div class="d-flex flex-wrap gap-2 mt-2">
-              <a id="btnTrasladoModal" href="{% url 'obra_traslado_masivo' obra.pk %}"
-                 class="btn btn-sm btn-warning">
+              <a id="btnTrasladoModal" href="{% url 'obra_traslado_masivo' obra.pk %}" class="btn btn-sm btn-warning">
                 <i class="bi bi-arrow-right-circle-fill me-1"></i>Es un traslado
                 <span class="d-block" style="font-size:.7rem;font-weight:normal">Cierra contrato anterior</span>
               </a>
@@ -998,49 +1507,65 @@ if (btnCerrar) {
             </div>
           </div>
 
-          <!-- Campos del contrato -->
-          <div id="camposContratoModal">
-            <div class="row g-2 mb-2">
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Especialidad *</label>
-                <select class="form-select form-select-sm" name="especialidad" required>
-                  <option value="">— Seleccionar —</option>
-                  {% for esp in especialidades %}
-                  <option value="{{ esp.pk }}">{{ esp.nombre }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Tipo Contrato *</label>
-                <select class="form-select form-select-sm" name="tipo_contrato">
-                  <option value="Plazo Fijo">Plazo Fijo</option>
-                  <option value="Por Obra o Faena">Por Obra o Faena</option>
-                  <option value="Indefinido">Indefinido</option>
-                </select>
-              </div>
+          <hr class="my-3">
+
+          <!-- Datos del contrato (todos opcionales) -->
+          <p class="small text-muted mb-2"><i class="bi bi-pencil me-1"></i>Datos del contrato <span class="text-muted">(opcionales — completa lo que tengas)</span></p>
+          <div class="row g-2 mb-2">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Especialidad</label>
+              <select class="form-select form-select-sm" name="especialidad">
+                <option value="">— Sin definir —</option>
+                {% for esp in especialidades %}
+                <option value="{{ esp.pk }}">{{ esp.nombre }}</option>
+                {% endfor %}
+              </select>
             </div>
-            <div class="row g-2 mb-2">
-              <div class="col-12">
-                <label class="form-label small fw-semibold">Fecha Inicio *</label>
-                <input type="date" class="form-control form-control-sm" name="fecha_inicio" required>
-              </div>
-            </div>
-            <div class="row g-2">
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold">Fecha Término Estimada</label>
-                <input type="date" class="form-control form-control-sm" name="fecha_termino_estimada">
-              </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Tipo de contrato</label>
+              <select class="form-select form-select-sm" name="tipo_contrato">
+                <option value="Plazo Fijo">Plazo Fijo</option>
+                <option value="Por Obra o Faena">Por Obra o Faena</option>
+                <option value="Indefinido">Indefinido</option>
+              </select>
             </div>
           </div>
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Sueldo base</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control" name="sueldo_base" min="0" step="1" placeholder="Ej: 650000">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Fecha de inicio</label>
+              <input type="date" class="form-control form-control-sm" name="fecha_inicio">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Fecha término estimada</label>
+              <input type="date" class="form-control form-control-sm" name="fecha_termino_estimada">
+            </div>
+          </div>
+
+          <!-- Archivo opcional -->
+          <div class="mt-3">
+            <label class="form-label small fw-semibold">Contrato firmado <span class="text-muted fw-normal">(opcional — si ya lo tienes escaneado)</span></label>
+            <input type="file" class="form-control form-control-sm" name="archivo_contrato" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+            <div class="form-text">Si subes el archivo y tienes los datos completos, el contrato quedará directamente en <strong>Vigente</strong>.</div>
+          </div>
+
+          <!-- Indicador de estado resultante -->
+          <div id="estadoResultante" class="mt-3 p-2 rounded bg-light border small d-none"></div>
 
         </div>
         <div class="modal-footer">
           <a href="{% url 'trabajador_create' %}" class="btn btn-outline-secondary btn-sm me-auto" target="_blank">
-            <i class="bi bi-person-plus me-1"></i>Crear nuevo trabajador
+            <i class="bi bi-person-plus me-1"></i>Nuevo trabajador
           </a>
           <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-success btn-sm" id="btnSubmitAsignar" disabled>
-            <i class="bi bi-check-lg me-1"></i>Asignar
+            <i class="bi bi-check-lg me-1"></i>Agregar
           </button>
         </div>
       </form>
@@ -1050,39 +1575,73 @@ if (btnCerrar) {
 
 <script>
 (function () {
-  const select = document.getElementById('selectTrabajadorModal');
-  const alerta = document.getElementById('alertaVigenteModal');
-  const obrasList = document.getElementById('alertaObrasNombres');
+  const form    = document.getElementById('formAsignarTrabajador');
+  const select  = document.getElementById('selectTrabajadorModal');
   const btnSubmit = document.getElementById('btnSubmitAsignar');
-  const btnIgual = document.getElementById('btnIngresarIgualModal');
+  const btnIgual  = document.getElementById('btnIngresarIgualModal');
+  const estadoDiv = document.getElementById('estadoResultante');
+
+  function actualizarEstado() {
+    const esp    = form.querySelector('[name=especialidad]').value;
+    const sueldo = form.querySelector('[name=sueldo_base]').value.trim();
+    const fi     = form.querySelector('[name=fecha_inicio]').value;
+    const arch   = form.querySelector('[name=archivo_contrato]').files.length > 0;
+    const completo = esp && sueldo && fi;
+    let txt, cls;
+    if (arch && completo)       { txt = '✓ Quedará como <strong>Vigente</strong> (datos completos + archivo)'; cls = 'text-success'; }
+    else if (completo)          { txt = '⏳ Quedará como <strong>Pendiente de Firma</strong> (datos completos, sin archivo)'; cls = 'text-primary'; }
+    else                        { txt = '📋 Quedará como <strong>Borrador</strong> (datos incompletos — puedes completarlos después)'; cls = 'text-secondary'; }
+    estadoDiv.innerHTML = `<span class="${cls}">${txt}</span>`;
+    estadoDiv.classList.remove('d-none');
+  }
+
+  form.querySelectorAll('[name=especialidad],[name=sueldo_base],[name=fecha_inicio],[name=archivo_contrato]')
+      .forEach(el => el.addEventListener('change', actualizarEstado));
+  form.querySelector('[name=sueldo_base]').addEventListener('input', actualizarEstado);
 
   select.addEventListener('change', function () {
-    alerta.classList.add('d-none');
+    document.getElementById('alertaVigenteModal').classList.add('d-none');
+    document.getElementById('alertaFiniquitoModal').classList.add('d-none');
+    document.getElementById('alertaFiniquitoOtrasModal').classList.add('d-none');
     btnSubmit.disabled = true;
     const rut = this.value;
-    if (!rut) return;
+    if (!rut) { estadoDiv.classList.add('d-none'); return; }
 
     fetch('{% url "obra_check_trabajador" obra.pk %}?rut=' + encodeURIComponent(rut))
       .then(r => r.json())
       .then(data => {
+        if (data.finiquito_pendiente_misma_obra && data.finiquito_pendiente_misma_obra.length > 0) {
+          document.getElementById('alertaFiniquitoDetalle').textContent =
+            data.finiquito_pendiente_misma_obra.map(c => `Contrato #${c.contrato_pk} (${c.estado}${c.fecha_termino ? ', terminó ' + c.fecha_termino : ''})`).join(' / ');
+          document.getElementById('alertaFiniquitoModal').classList.remove('d-none');
+        }
+        if (data.finiquito_pendiente_otras_obras && data.finiquito_pendiente_otras_obras.length > 0) {
+          document.getElementById('alertaFiniquitoOtrasDetalle').innerHTML =
+            data.finiquito_pendiente_otras_obras.map(c => `<span class="fw-semibold">${c.obra_nombre}</span> — Contrato #${c.contrato_pk} (${c.estado}${c.fecha_termino ? ', terminó ' + c.fecha_termino : ''})`).join('<br>');
+          document.getElementById('alertaFiniquitoOtrasModal').classList.remove('d-none');
+        }
         if (data.vigente_otras_obras.length > 0) {
-          obrasList.textContent = data.vigente_otras_obras.map(o => o.obra_nombre).join(', ');
-          alerta.classList.remove('d-none');
+          document.getElementById('alertaObrasNombres').textContent = data.vigente_otras_obras.map(o => o.obra_nombre).join(', ');
+          document.getElementById('alertaVigenteModal').classList.remove('d-none');
         } else {
           btnSubmit.disabled = false;
+          actualizarEstado();
         }
       })
-      .catch(() => { btnSubmit.disabled = false; });
+      .catch(() => { btnSubmit.disabled = false; actualizarEstado(); });
   });
 
   btnIgual.addEventListener('click', function () {
-    alerta.classList.add('d-none');
+    document.getElementById('alertaVigenteModal').classList.add('d-none');
     btnSubmit.disabled = false;
+    actualizarEstado();
   });
 
   document.getElementById('modalAgregarTrabajador').addEventListener('hidden.bs.modal', function () {
-    document.getElementById('formAsignarTrabajador').reset();
-    alerta.classList.add('d-none');
+    form.reset();
+    ['alertaVigenteModal','alertaFiniquitoModal','alertaFiniquitoOtrasModal'].forEach(id =>
+      document.getElementById(id).classList.add('d-none'));
+    estadoDiv.classList.add('d-none');
     btnSubmit.disabled = true;
   });
 }());

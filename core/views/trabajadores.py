@@ -7,7 +7,8 @@ from django.utils import timezone
 from django.db.models import Q
 from ..models import (Trabajador, Contrato, Documento, Strike,
                       HistorialListaNegra, TipoDocumento, LogAuditoria, Traslado,
-                      get_checklist_trabajador, get_checklist_contrato, get_alertas_cruzadas)
+                      get_checklist_trabajador, get_checklist_contrato, get_alertas_cruzadas,
+                      LicenciaMedica, DocumentoGenerado)
 from ..forms import (TrabajadorForm, TrabajadorEditForm, StrikeForm, StrikeEditForm,
                      ListaNegraIngresoForm, ListaNegraSalidaForm, DocumentoForm)
 
@@ -39,20 +40,22 @@ def trabajadores_list(request):
     if lista_negra == '1':
         qs = qs.filter(en_lista_negra=True)
 
-    # Progreso documental por trabajador
-    tipos_obligatorios = list(TipoDocumento.objects.filter(activo=True, nivel='Trabajador', obligatorio=True))
-    total_tipos = len(tipos_obligatorios)
+    # Progreso documental por trabajador: personal + todos sus contratos activos
     progreso_dict = {}
-    hoy = timezone.now().date()
     for t in qs:
         ok = 0
-        for tipo in tipos_obligatorios:
-            doc = Documento.objects.filter(
-                tipo_documento=tipo, trabajador_rut=t.rut, activo=True
-            ).order_by('-fecha_carga').first()
-            if doc and not doc.esta_vencido:
+        total = 0
+        for ci in get_checklist_trabajador(t.rut):
+            total += 1
+            if ci['estado'] in ('ok', 'proximo'):
                 ok += 1
-        progreso_dict[t.rut] = {'ok': ok, 'total': total_tipos}
+        for contrato in t.contratos.filter(activo=True):
+            if not contrato.is_terminado:
+                for ci in get_checklist_contrato(contrato):
+                    total += 1
+                    if ci['estado'] in ('ok', 'proximo'):
+                        ok += 1
+        progreso_dict[t.rut] = {'ok': ok, 'total': total}
 
     # Trabajadores con traslados con finiquito pendiente
     ruts_con_alerta_traslado = set(
@@ -72,7 +75,6 @@ def trabajadores_list(request):
         'obra_id': obra_id,
         'obras': Obra.objects.filter(activo=True).order_by('nombre'),
         'progreso_dict': progreso_dict,
-        'total_tipos': total_tipos,
         'ruts_con_alerta_traslado': ruts_con_alerta_traslado,
     }
     return render(request, 'trabajadores/list.html', context)
@@ -132,10 +134,15 @@ def trabajador_detail(request, rut):
         if item['tipo'].obligatorio
     )
 
+    # Activos primero, luego terminados (dentro de cada grupo por fecha desc)
+    _activos = [c for c in contratos if not c.is_terminado]
+    _terminados = [c for c in contratos if c.is_terminado]
+    contratos_ordenados = _activos + _terminados
+
     contratos_con_docs = []
-    for contrato in contratos:
+    for idx, contrato in enumerate(contratos_ordenados):
         checklist_contrato = get_checklist_contrato(contrato)
-        resumen = {'sin_cargar': 0, 'vencido': 0, 'proximo': 0}
+        resumen = {'sin_cargar': 0, 'vencido': 0, 'proximo': 0, 'total_docs': 0}
         for ci in checklist_contrato:
             if ci['estado'] == 'pendiente':
                 resumen['sin_cargar'] += 1
@@ -143,10 +150,14 @@ def trabajador_detail(request, rut):
                 resumen['vencido'] += 1
             elif ci['estado'] == 'proximo':
                 resumen['proximo'] += 1
+            if ci['doc']:
+                resumen['total_docs'] += 1
         contratos_con_docs.append({
             'contrato': contrato,
             'checklist': checklist_contrato,
             'resumen': resumen,
+            'is_terminado': contrato.is_terminado,
+            'primer_terminado': contrato.is_terminado and (idx == 0 or not contratos_ordenados[idx - 1].is_terminado),
         })
 
     resumen_personal = {'sin_cargar': 0, 'vencido': 0, 'proximo': 0}
@@ -167,7 +178,50 @@ def trabajador_detail(request, rut):
     docs_alerta_count = sum(
         1 for item in checklist_trabajador
         if item['estado'] in ('pendiente', 'vencido', 'proximo')
+    ) + sum(
+        item['resumen']['sin_cargar'] + item['resumen']['vencido'] + item['resumen']['proximo']
+        for item in contratos_con_docs
+        if not item['is_terminado']
     )
+
+    licencias = LicenciaMedica.objects.filter(
+        trabajador=trabajador, activo=True
+    ).select_related('contrato', 'obra').order_by('-fecha_inicio')
+
+    # Anota documentos asociados a cada contrato para acceso directo en template
+    _fg_map = {
+        dg.contrato_id: dg
+        for dg in DocumentoGenerado.objects.filter(
+            trabajador=trabajador, tipo='finiquito', activo=True
+        )
+    }
+    _fs_map = {
+        doc.contrato_id: doc
+        for doc in Documento.objects.filter(
+            trabajador_rut=trabajador.rut,
+            tipo_documento__nombre='Finiquito Legalizado',
+            activo=True,
+        )
+    }
+    _cg_map = {
+        dg.contrato_id: dg
+        for dg in DocumentoGenerado.objects.filter(
+            trabajador=trabajador, tipo='contrato_trabajo', activo=True
+        )
+    }
+    _cf_map = {
+        doc.contrato_id: doc
+        for doc in Documento.objects.filter(
+            trabajador_rut=trabajador.rut,
+            tipo_documento__nombre='Contrato de Trabajo Firmado',
+            activo=True,
+        )
+    }
+    for c in contratos:
+        c.finiquito_generado = _fg_map.get(c.pk)
+        c.finiquito_subido = _fs_map.get(c.pk)
+        c.contrato_generado = _cg_map.get(c.pk)
+        c.contrato_firmado = _cf_map.get(c.pk)
 
     tab = request.GET.get('tab', 'contratos')
     context = {
@@ -183,6 +237,7 @@ def trabajador_detail(request, rut):
         'contratos_vigentes_count': contratos_vigentes_count,
         'docs_alerta_count': docs_alerta_count,
         'resumen_personal': resumen_personal,
+        'licencias': licencias,
         'tab': tab,
     }
     return render(request, 'trabajadores/detail.html', context)
@@ -204,15 +259,6 @@ def trabajador_edit(request, rut):
         'form': form, 'titulo': 'Editar Trabajador',
         'trabajador': trabajador, 'next_url': next_url,
     })
-
-
-@login_required
-def trabajador_upload_doc(request, rut):
-    """Redirige a la carga guiada unificada preservando nivel y contrato_id."""
-    from django.urls import reverse
-    params = request.GET.urlencode()
-    url = reverse('trabajador_upload_doc_masivo', args=[rut])
-    return redirect(f'{url}?{params}' if params else url)
 
 
 @login_required
@@ -360,53 +406,117 @@ def trabajador_upload_doc_masivo(request, rut):
 
     tipos = TipoDocumento.objects.filter(activo=True, nivel=nivel).order_by('nombre')
 
-    # Estado actual de cada tipo para este contexto
-    docs_existentes = {}
-    for tipo in tipos:
-        filtro = {'tipo_documento': tipo, 'activo': True}
+    def _filtro_contexto(tipo):
+        f = {'tipo_documento': tipo, 'activo': True}
         if nivel == 'Contrato' and contrato_obj:
-            filtro['contrato'] = contrato_obj
+            f['contrato'] = contrato_obj
         else:
-            filtro['trabajador_rut'] = rut
-        docs_existentes[tipo.pk] = Documento.objects.filter(**filtro).order_by('-fecha_carga').first()
+            f['trabajador_rut'] = rut
+        return f
+
+    def _doc_kwargs(tipo, archivo=None, pendiente=False):
+        kw = {'tipo_documento': tipo, 'usuario_carga': request.user.username}
+        if archivo:
+            kw['archivo'] = archivo
+        if pendiente:
+            kw['pendiente_digitalizacion'] = True
+        if nivel == 'Contrato' and contrato_obj:
+            kw['contrato'] = contrato_obj
+        else:
+            kw['trabajador_rut'] = rut
+        return kw
+
+    # Bloquear subida si la obra del contrato está archivada
+    if request.method == 'POST' and contrato_obj and contrato_obj.obra and contrato_obj.obra.archivada:
+        messages.error(request, f'La obra "{contrato_obj.obra.nombre}" está archivada. No se pueden subir más documentos.')
+        return redirect(f'/trabajadores/{rut}/?tab=documentos')
 
     if request.method == 'POST':
         guardados = 0
         for tipo in tipos:
             archivo = request.FILES.get(f'archivo_{tipo.pk}')
-            if not archivo:
+            pendiente = request.POST.get(f'pendiente_{tipo.pk}') == '1'
+
+            if not archivo and not pendiente:
                 continue
-            filtro = {'tipo_documento': tipo, 'activo': True}
-            if nivel == 'Contrato' and contrato_obj:
-                filtro['contrato'] = contrato_obj
-            else:
-                filtro['trabajador_rut'] = rut
-            Documento.objects.filter(**filtro).update(activo=False)
-            doc_kwargs = {
-                'tipo_documento': tipo,
-                'archivo': archivo,
-                'usuario_carga': request.user.username,
-            }
-            if nivel == 'Contrato' and contrato_obj:
-                doc_kwargs['contrato'] = contrato_obj
-            else:
-                doc_kwargs['trabajador_rut'] = rut
-            Documento.objects.create(**doc_kwargs)
+
+            if archivo:
+                # Nuevo archivo real: marcar anteriores "pendiente_dig sin archivo" como inactivos,
+                # pero conservar todos los que SÍ tienen archivo (historial)
+                Documento.objects.filter(
+                    **_filtro_contexto(tipo),
+                    pendiente_digitalizacion=True,
+                    archivo='',
+                ).update(activo=False)
+                Documento.objects.filter(
+                    **{**_filtro_contexto(tipo), 'archivo': None},
+                ).update(activo=False)
+                Documento.objects.create(**_doc_kwargs(tipo, archivo=archivo))
+            elif pendiente:
+                # Solo marcar como "pendiente de digitalización" si no hay doc vigente con archivo
+                tiene_archivo = Documento.objects.filter(
+                    **_filtro_contexto(tipo),
+                ).exclude(archivo=None).exclude(archivo='').exists()
+                if not tiene_archivo:
+                    Documento.objects.create(**_doc_kwargs(tipo, pendiente=True))
+                else:
+                    continue
             guardados += 1
 
-        if guardados and contrato_obj and contrato_obj.estado == 'Pendiente de Firma':
-            contrato_obj.estado = 'Vigente'
-            contrato_obj.save(update_fields=['estado'])
-            messages.success(request, f'{guardados} documento(s) cargado(s). Contrato marcado como Vigente.')
+        # Mapa: TipoDocumento.nombre → DocumentoGenerado.tipo (borrador a eliminar al subir real)
+        _TIPO_A_GENERADO = {
+            'Contrato de Trabajo Firmado': 'contrato_trabajo',
+            'Finiquito Legalizado': 'finiquito',
+            'Anexo de Contrato': 'anexo_contrato',
+            'Reglamento Interno Firmado': 'acta_reglamento',
+            'Pacto Horas Extraordinarias': 'pacto_horas_extras',
+            'Acta Entrega EPP': 'acta_epp',
+            'Acta Entrega Reglamento Interno': 'acta_reglamento',
+        }
+        if guardados and contrato_obj:
+            # Eliminar borradores cuyo original acaba de ser subido
+            for tipo in tipos:
+                if request.FILES.get(f'archivo_{tipo.pk}'):
+                    tipo_gen = _TIPO_A_GENERADO.get(tipo.nombre)
+                    if tipo_gen:
+                        DocumentoGenerado.objects.filter(
+                            contrato=contrato_obj, tipo=tipo_gen, activo=True
+                        ).update(activo=False)
+            # Transición a Vigente solo cuando se sube el contrato firmado
+            if contrato_obj.estado == 'Pendiente de Firma':
+                tipo_firmado = next(
+                    (t for t in tipos if t.nombre == 'Contrato de Trabajo Firmado'), None
+                )
+                subio_firmado = bool(
+                    tipo_firmado and request.FILES.get(f'archivo_{tipo_firmado.pk}')
+                )
+                if subio_firmado:
+                    contrato_obj.estado = 'Vigente'
+                    contrato_obj.save(update_fields=['estado'])
+                    messages.success(request, f'{guardados} documento(s) cargado(s). Contrato marcado como Vigente.')
+                else:
+                    messages.success(request, f'{guardados} documento(s) procesado(s) exitosamente.')
+            else:
+                messages.success(request, f'{guardados} documento(s) procesado(s) exitosamente.')
         elif guardados:
-            messages.success(request, f'{guardados} documento(s) cargado(s) exitosamente.')
+            messages.success(request, f'{guardados} documento(s) procesado(s) exitosamente.')
         else:
-            messages.warning(request, 'No se seleccionó ningún archivo.')
+            messages.warning(request, 'No se seleccionó ningún archivo ni se marcó ningún pendiente.')
         return redirect(f'/trabajadores/{rut}/?tab=documentos')
 
-    # Combinar tipo + doc_actual en una sola lista para simplificar el template
+    # Historial completo por tipo para mostrar en el template
+    docs_historial = {}
+    for tipo in tipos:
+        docs_historial[tipo.pk] = list(
+            Documento.objects.filter(**_filtro_contexto(tipo)).order_by('-fecha_carga')
+        )
+
     tipos_con_doc = [
-        {'tipo': tipo, 'doc_actual': docs_existentes.get(tipo.pk)}
+        {
+            'tipo': tipo,
+            'doc_actual': docs_historial[tipo.pk][0] if docs_historial[tipo.pk] else None,
+            'historial': docs_historial[tipo.pk],
+        }
         for tipo in tipos
     ]
 

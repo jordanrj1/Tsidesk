@@ -30,8 +30,8 @@
 
 <div class="alert alert-secondary border-0 mb-3 small">
   <div class="d-flex gap-4 flex-wrap">
-    <span><i class="bi bi-eye me-1"></i><strong>Ver/Descargar</strong> — revisa el archivo y descárgalo si lo necesitas, luego súbelo manualmente donde corresponde</span>
-    {% if user.is_superuser %}<span><i class="bi bi-trash3 me-1 text-danger"></i><strong>Eliminar</strong> — borra permanentemente del servidor (no se puede deshacer)</span>{% endif %}
+    <span><i class="bi bi-arrow-counterclockwise me-1 text-success"></i><strong>Restaurar</strong> — reactiva el documento. Si ya existe una versión activa del mismo tipo, esta se mueve a papelera automáticamente.</span>
+    <span><i class="bi bi-trash3 me-1 text-danger"></i><strong>Eliminar</strong> — borra el archivo del servidor permanentemente (no se puede deshacer).</span>
   </div>
 </div>
 
@@ -57,9 +57,12 @@
               <small class="text-muted">{{ doc.tipo_documento.get_nivel_display }}</small>
             </td>
             <td>
-              {% if doc.contrato %}
+              {% if doc.contrato and doc.contrato.trabajador %}
                 <div>{{ doc.contrato.trabajador.nombre_completo }}</div>
                 <small class="text-muted"><code>{{ doc.contrato.trabajador.rut }}</code> · {{ doc.contrato.obra.nombre }}</small>
+              {% elif doc.trabajador_nombre %}
+                <div>{{ doc.trabajador_nombre }}</div>
+                {% if doc.trabajador_rut %}<small class="text-muted"><code>{{ doc.trabajador_rut }}</code> <em>(ex-trabajador)</em></small>{% endif %}
               {% elif doc.trabajador_rut %}
                 <div><code>{{ doc.trabajador_rut }}</code></div>
               {% elif doc.obra %}
@@ -72,27 +75,29 @@
             <td class="text-muted small">{{ doc.usuario_carga }}</td>
             <td class="text-end">
               <div class="d-flex gap-1 justify-content-end flex-wrap">
-                <!-- Ver / Descargar (sin restaurar) -->
                 {% if doc.archivo %}
-                <a href="{% url 'documento_preview_papelera' doc.pk %}" target="_blank"
-                   class="btn btn-sm btn-outline-secondary" title="Ver archivo en nueva pestaña">
-                  <i class="bi bi-eye me-1"></i>Ver
+                <a href="{% url 'documento_preview_papelera' doc.pk %}"
+                   onclick="previewDoc(this.href,'{{ doc.nombre_archivo|escapejs }}','{{ doc.extension|lower }}');return false;"
+                   class="btn btn-sm btn-outline-secondary" title="Ver">
+                  <i class="bi bi-eye"></i>
                 </a>
                 <a href="{% url 'documento_download' doc.pk %}" class="btn btn-sm btn-outline-secondary" title="Descargar">
                   <i class="bi bi-download"></i>
                 </a>
                 {% endif %}
-
-                <!-- Eliminar permanente (solo admin) -->
-                {% if user.is_superuser %}
+                <form method="post" action="{% url 'documento_restore' doc.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Restaurar">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar
+                  </button>
+                </form>
                 <button type="button" class="btn btn-sm btn-outline-danger"
                         data-bs-toggle="modal" data-bs-target="#modalHardDelete"
                         data-pk="{{ doc.pk }}"
                         data-nombre="{{ doc.tipo_documento.nombre }}"
                         title="Eliminar permanentemente">
-                  <i class="bi bi-trash3"></i>
+                  <i class="bi bi-trash3 me-1"></i>Eliminar
                 </button>
-                {% endif %}
               </div>
             </td>
           </tr>
@@ -115,7 +120,6 @@
 {% endif %}
 
 <!-- Modal confirmación eliminar permanente -->
-{% if user.is_superuser %}
 <div class="modal fade" id="modalHardDelete" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -147,5 +151,4 @@ document.getElementById('modalHardDelete').addEventListener('show.bs.modal', fun
 });
 </script>
 {% endblock %}
-{% endif %}
 {% endblock %}

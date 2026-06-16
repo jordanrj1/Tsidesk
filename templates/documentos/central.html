@@ -3,24 +3,21 @@
 
 {% block content %}
 
-<!-- Encabezado -->
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
     <h4 class="mb-0 fw-bold"><i class="bi bi-folder2-open text-primary me-2"></i>Archivo de Documentos</h4>
-    <small class="text-muted">Busca y filtra documentos cargados — agrupados por obra</small>
+    <small class="text-muted">Registro histórico de todos los documentos subidos — agrupados por estado de obra</small>
   </div>
-  {% if has_filter %}
-  <a href="{% url 'documentos_exportar_excel' %}" class="btn btn-outline-success btn-sm">
+  <a href="{% url 'documentos_exportar_excel' %}{% if has_filter %}?{{ request.GET.urlencode }}{% endif %}"
+     class="btn btn-outline-success btn-sm">
     <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
   </a>
-  {% endif %}
 </div>
 
-<!-- Panel de filtros -->
+<!-- Filtros -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body py-3 px-3">
     <form method="get" id="formFiltros">
-      <!-- Búsqueda principal -->
       <div class="mb-2">
         <div class="input-group">
           <span class="input-group-text bg-white border-end-0">
@@ -32,20 +29,14 @@
                  style="font-size:.95rem">
         </div>
       </div>
-      <!-- Filtros secundarios -->
       <div class="row g-2 align-items-center">
         <div class="col-sm-4">
           <select name="obra_id" class="form-select form-select-sm">
             <option value="">Todas las obras</option>
-            {% regroup obras by get_estado_display as obras_por_estado %}
-            {% for grupo_estado in obras_por_estado %}
-            <optgroup label="{{ grupo_estado.grouper }}">
-              {% for o in grupo_estado.list %}
-              <option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>
-                {{ o.nombre }}
-              </option>
-              {% endfor %}
-            </optgroup>
+            {% for o in obras %}
+            <option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>
+              {{ o.nombre }}{% if o.archivada %} (archivada){% elif o.estado == 'Cerrada' %} (en cierre){% endif %}
+            </option>
             {% endfor %}
           </select>
         </div>
@@ -70,7 +61,7 @@
             <i class="bi bi-search me-1"></i>Aplicar filtro
           </button>
           {% if has_filter %}
-          <a href="{% url 'documentos_central' %}" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
+          <a href="{% url 'documentos_central' %}" class="btn btn-outline-secondary btn-sm" title="Ver todos">
             <i class="bi bi-x-lg me-1"></i>Limpiar
           </a>
           {% endif %}
@@ -80,57 +71,159 @@
   </div>
 </div>
 
-<!-- ── RESULTADOS ────────────────────────────────────────────────── -->
+<!-- Resumen -->
+{% if total > 0 %}
+<div class="d-flex align-items-center gap-3 mb-3 px-1 flex-wrap" style="font-size:.84rem">
+  <span class="text-muted">
+    <strong class="text-dark">{{ total }}</strong> documento{{ total|pluralize }} encontrado{{ total|pluralize }}
+    {% if q %} · búsqueda <em>"{{ q }}"</em>{% endif %}
+  </span>
+  <!-- Leyenda de estados -->
+  <div class="d-flex gap-2 ms-auto flex-wrap">
+    {% if grupos_activas %}
+    <span class="badge fw-normal px-2 py-1" style="background:#dcfce7;color:#166534;border:1px solid #86efac;">
+      <i class="bi bi-circle-fill me-1" style="font-size:.5rem;vertical-align:middle;"></i>Obras activas · {{ grupos_activas|length }}
+    </span>
+    {% endif %}
+    {% if grupos_en_cierre %}
+    <span class="badge fw-normal px-2 py-1" style="background:#fef9c3;color:#854d0e;border:1px solid #fde047;">
+      <i class="bi bi-circle-fill me-1" style="font-size:.5rem;vertical-align:middle;"></i>En cierre · {{ grupos_en_cierre|length }}
+    </span>
+    {% endif %}
+    {% if grupos_archivadas %}
+    <span class="badge fw-normal px-2 py-1" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">
+      <i class="bi bi-circle-fill me-1" style="font-size:.5rem;vertical-align:middle;"></i>Archivadas · {{ grupos_archivadas|length }}
+    </span>
+    {% endif %}
+    {% if sin_obra_docs %}
+    <span class="badge fw-normal px-2 py-1" style="background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;">
+      <i class="bi bi-circle-fill me-1" style="font-size:.5rem;vertical-align:middle;"></i>Personales · {{ sin_obra_docs|length }}
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
-{% if not has_filter %}
-<!-- Estado inicial: sin búsqueda -->
+{% if total == 0 %}
 <div class="card border-0 shadow-sm">
   <div class="card-body text-center py-5">
     <i class="bi bi-folder2-open fs-1 text-secondary d-block mb-3"></i>
-    <h6 class="fw-semibold text-dark mb-1">Aplica un filtro para ver documentos</h6>
-    <p class="text-muted small mb-0">
-      Busca por nombre, RUT o tipo · filtra por obra, tipo de documento o estado de vigencia
-    </p>
-  </div>
-</div>
-
-{% elif total == 0 %}
-<!-- Sin resultados -->
-<div class="card border-0 shadow-sm">
-  <div class="card-body text-center py-5">
-    <i class="bi bi-search fs-1 text-secondary d-block mb-3"></i>
-    <h6 class="fw-semibold text-dark mb-1">Sin resultados</h6>
-    <p class="text-muted small mb-3">No se encontraron documentos con los filtros aplicados.</p>
-    <a href="{% url 'documentos_central' %}" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-x me-1"></i>Limpiar filtros
+    <h6 class="fw-semibold text-dark mb-1">Sin documentos</h6>
+    <p class="text-muted small mb-0">No se encontraron documentos con los filtros aplicados.</p>
+    {% if has_filter %}
+    <a href="{% url 'documentos_central' %}" class="btn btn-sm btn-outline-secondary mt-3">
+      <i class="bi bi-x me-1"></i>Ver todos
     </a>
+    {% endif %}
   </div>
 </div>
 
 {% else %}
-<!-- Resumen de resultados -->
-<div class="d-flex align-items-center gap-3 mb-3 px-1" style="font-size:.84rem">
-  <span class="text-muted">
-    <strong class="text-dark">{{ total }}</strong> documento{{ total|pluralize }}
-    {% if q %}· búsqueda <em>"{{ q }}"</em>{% endif %}
-  </span>
-  {% if total >= 300 %}
-  <span class="text-warning"><i class="bi bi-info-circle me-1"></i>Máximo 300 — afina los filtros para ver más</span>
-  {% endif %}
+
+<!-- ── OBRAS ACTIVAS ─────────────────────────────────────────────────── -->
+{% if grupos_activas %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
+          style="width:10px;height:10px;background:#16a34a;flex-shrink:0;"></span>
+    <span class="fw-bold text-dark" style="font-size:.9rem">Obras Activas</span>
+    <span class="badge bg-light text-secondary border" style="font-size:.72rem">{{ grupos_activas|length }} obra{{ grupos_activas|length|pluralize }}</span>
+    <small class="text-muted">— contratos en curso</small>
+  </div>
+  {% for grupo in grupos_activas %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header py-2 px-3 d-flex align-items-center gap-2 bg-white border-bottom"
+         style="border-left:3px solid #16a34a !important;">
+      <i class="bi bi-building text-success" style="font-size:.85rem"></i>
+      <a href="{% url 'obra_detail' grupo.obra.pk %}" class="fw-semibold small text-decoration-none text-dark">{{ grupo.obra.nombre }}</a>
+      <span class="badge bg-success ms-1" style="font-size:.65rem;">Activa</span>
+      <span class="badge bg-light text-secondary border ms-1" style="font-size:.7rem">{{ grupo.docs|length }} doc{{ grupo.docs|length|pluralize }}</span>
+      {% for doc in grupo.docs %}{% if doc.estado_visual == 'vencido' %}<span class="badge bg-danger ms-1" style="font-size:.65rem">Vencido</span>{% endif %}{% endfor %}
+      {% for doc in grupo.docs %}{% if doc.estado_visual == 'proximo' %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Por vencer</span>{% endif %}{% endfor %}
+      <a href="{% url 'obra_detail' grupo.obra.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" style="font-size:.75rem"><i class="bi bi-box-arrow-up-right"></i></a>
+    </div>
+    {% include "documentos/_filas_docs.html" with docs=grupo.docs %}
+  </div>
+  {% endfor %}
 </div>
+{% endif %}
 
-{% include "documentos/_tabla_docs.html" with titulo="Obras Activas / En Ejecución" grupos=grupos_activas icono="bi-building-fill" color="#16A34A" empty_msg="Ningún documento en obras activas." %}
+<!-- ── OBRAS EN CIERRE ───────────────────────────────────────────────── -->
+{% if grupos_en_cierre %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
+          style="width:10px;height:10px;background:#d97706;flex-shrink:0;"></span>
+    <span class="fw-bold text-dark" style="font-size:.9rem">Obras en Cierre</span>
+    <span class="badge bg-light text-secondary border" style="font-size:.72rem">{{ grupos_en_cierre|length }} obra{{ grupos_en_cierre|length|pluralize }}</span>
+    <small class="text-muted">— sin archivar, aún editables</small>
+  </div>
+  {% for grupo in grupos_en_cierre %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header py-2 px-3 d-flex align-items-center gap-2 bg-white border-bottom"
+         style="border-left:3px solid #d97706 !important;">
+      <i class="bi bi-building text-warning" style="font-size:.85rem"></i>
+      <a href="{% url 'obra_detail' grupo.obra.pk %}" class="fw-semibold small text-decoration-none text-dark">{{ grupo.obra.nombre }}</a>
+      <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">En cierre</span>
+      <span class="badge bg-light text-secondary border ms-1" style="font-size:.7rem">{{ grupo.docs|length }} doc{{ grupo.docs|length|pluralize }}</span>
+      <a href="{% url 'obra_detail' grupo.obra.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" style="font-size:.75rem"><i class="bi bi-box-arrow-up-right"></i></a>
+    </div>
+    {% include "documentos/_filas_docs.html" with docs=grupo.docs %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 
-{% include "documentos/_tabla_docs.html" with titulo="Obras Cerradas / Históricas" grupos=grupos_cerradas icono="bi-archive-fill" color="#6B7280" empty_msg="Ningún documento en obras cerradas." %}
+<!-- ── OBRAS ARCHIVADAS ──────────────────────────────────────────────── -->
+{% if grupos_archivadas %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
+          style="width:10px;height:10px;background:#64748b;flex-shrink:0;"></span>
+    <span class="fw-bold text-dark" style="font-size:.9rem">Obras Archivadas</span>
+    <span class="badge bg-light text-secondary border" style="font-size:.72rem">{{ grupos_archivadas|length }} obra{{ grupos_archivadas|length|pluralize }}</span>
+    <small class="text-muted">— historial, solo lectura</small>
+  </div>
+  {% for grupo in grupos_archivadas %}
+  <div class="card border-0 shadow-sm mb-3 opacity-85">
+    <div class="card-header py-2 px-3 d-flex align-items-center gap-2 bg-white border-bottom"
+         style="border-left:3px solid #64748b !important;">
+      <i class="bi bi-archive text-secondary" style="font-size:.85rem"></i>
+      <a href="{% url 'obra_detail' grupo.obra.pk %}" class="fw-semibold small text-decoration-none text-secondary">{{ grupo.obra.nombre }}</a>
+      <span class="badge bg-secondary ms-1" style="font-size:.65rem;">Archivada</span>
+      <span class="badge bg-light text-secondary border ms-1" style="font-size:.7rem">{{ grupo.docs|length }} doc{{ grupo.docs|length|pluralize }}</span>
+      <a href="{% url 'obra_detail' grupo.obra.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" style="font-size:.75rem"><i class="bi bi-box-arrow-up-right"></i></a>
+    </div>
+    {% include "documentos/_filas_docs.html" with docs=grupo.docs %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 
+<!-- ── DOCUMENTOS PERSONALES ─────────────────────────────────────────── -->
 {% if sin_obra_docs %}
 <div class="mb-4">
-  <div class="d-flex align-items-center gap-2 mb-2 border-bottom pb-1">
-    <i class="bi bi-person-badge-fill text-secondary"></i>
-    <span class="fw-semibold text-dark small">Documentos Personales (sin obra asociada)</span>
-    <span class="badge bg-light text-secondary border ms-1" style="font-size:.72rem">{{ sin_obra_docs|length }}</span>
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
+          style="width:10px;height:10px;background:#3b82f6;flex-shrink:0;"></span>
+    <span class="fw-bold text-dark" style="font-size:.9rem">Documentos Personales</span>
+    <span class="badge bg-light text-secondary border" style="font-size:.72rem">{{ sin_obra_docs|length }} doc{{ sin_obra_docs|length|pluralize }}</span>
+    <small class="text-muted">— sin obra asociada</small>
   </div>
-  {% include "documentos/_filas_docs.html" with docs=sin_obra_docs %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header py-2 px-3 d-flex align-items-center gap-2 bg-white border-bottom"
+         style="border-left:3px solid #3b82f6 !important;">
+      <i class="bi bi-person-badge text-primary" style="font-size:.85rem"></i>
+      <span class="fw-semibold small">Documentos de trabajador (nivel personal)</span>
+    </div>
+    {% include "documentos/_filas_docs.html" with docs=sin_obra_docs %}
+  </div>
+</div>
+{% endif %}
+
+{% if truncado %}
+<div class="alert alert-info border-0 shadow-sm small mt-2">
+  <i class="bi bi-info-circle me-1"></i>Se muestran los 500 documentos más recientes. Usa los filtros para buscar registros anteriores.
 </div>
 {% endif %}
 
@@ -140,10 +233,44 @@
 
 {% block extra_js %}
 <script>
+function previewDoc(url, nombre, ext) {
+  const e = (ext || '').toLowerCase();
+  if (e === 'pdf') { window.open(url, '_blank'); return; }
+  let modal = document.getElementById('modalPreviewDoc');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalPreviewDoc';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.innerHTML = `
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content" style="height:90vh;display:flex;flex-direction:column">
+          <div class="modal-header py-2" style="flex-shrink:0">
+            <h6 class="modal-title fw-semibold" id="previewDocTitulo"></h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-0 d-flex flex-column" style="flex:1;min-height:0;overflow:hidden">
+            <img id="previewImg" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;margin:auto;display:none">
+            <div id="previewNoSoporte" style="display:none;margin:auto" class="text-center p-4">
+              <i class="bi bi-file-earmark-x fs-1 text-muted d-block mb-2"></i>
+              <p class="text-muted">No se puede previsualizar este tipo de archivo.</p>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('previewDocTitulo').textContent = nombre;
+  const img = document.getElementById('previewImg');
+  const noSop = document.getElementById('previewNoSoporte');
+  img.style.display = noSop.style.display = 'none';
+  img.src = '';
+  if (['jpg','jpeg','png','gif','webp'].includes(e)) { img.src = url; img.style.display = ''; }
+  else { noSop.style.display = ''; }
+  new bootstrap.Modal(modal).show();
+}
 document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('[title]').forEach(el => {
-    new bootstrap.Tooltip(el, { trigger: 'hover' });
-  });
+  document.querySelectorAll('[title]').forEach(el => { new bootstrap.Tooltip(el, { trigger: 'hover' }); });
 });
 </script>
 {% endblock %}

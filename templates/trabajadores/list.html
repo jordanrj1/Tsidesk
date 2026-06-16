@@ -125,7 +125,6 @@
             </td>
             <td>
               <a href="{% url 'trabajador_detail' t.rut %}" class="btn btn-sm btn-outline-primary" title="Ver ficha"><i class="bi bi-eye"></i></a>
-              <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ t.rut }}" class="btn btn-sm btn-outline-success" title="Nuevo contrato"><i class="bi bi-file-earmark-plus"></i></a>
               {% if user.is_superuser %}
               <button type="button" class="btn btn-sm btn-outline-danger" title="Desactivar ficha"
                       data-bs-toggle="modal" data-bs-target="#modalEliminar"

@@ -1,17 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Documentos Pendientes | TsDesk{% endblock %}
+{% block title %}Centro de Alertas | TsDesk{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h2 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Documentos Pendientes</h2>
+    <h2 class="mb-0 fw-bold">
+      <i class="bi bi-bell-fill {% if total_alertas > 0 %}text-danger{% else %}text-success{% endif %} me-2"></i>
+      Centro de Alertas
+    </h2>
     <div class="mt-1">
-      {% if total == 0 %}
-        <span class="text-success fw-semibold"><i class="bi bi-check-circle me-1"></i>Todo al día</span>
+      {% if total_alertas == 0 %}
+        <span class="text-success fw-semibold"><i class="bi bi-check-circle me-1"></i>Todo al día — sin alertas pendientes</span>
       {% else %}
-        <span class="text-danger fw-semibold">{{ total }} documento{% if total != 1 %}s{% endif %} faltante{% if total != 1 %}s{% endif %}</span>
-        <span class="text-muted"> en </span>
-        <span class="fw-semibold">{{ total_trabajadores }} trabajador{% if total_trabajadores != 1 %}es{% endif %}</span>
+        <span class="text-danger fw-semibold">{{ total_alertas }} alerta{% if total_alertas != 1 %}s{% endif %} activa{% if total_alertas != 1 %}s{% endif %}</span>
       {% endif %}
     </div>
   </div>
@@ -21,213 +22,490 @@
   </a>
 </div>
 
-<!-- Filtros -->
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-body py-2">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-5">
-        <select name="obra_id" class="form-select form-select-sm">
-          <option value="">Todas las obras</option>
-          {% for o in obras %}<option value="{{ o.pk }}" {% if obra_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.nombre }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="col-md-5">
-        <select name="especialidad_id" class="form-select form-select-sm">
-          <option value="">Todas las especialidades</option>
-          {% for e in especialidades %}<option value="{{ e.pk }}" {% if especialidad_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-outline-primary btn-sm flex-grow-1"><i class="bi bi-search me-1"></i>Filtrar</button>
-        {% if obra_id or especialidad_id %}
-        <a href="{% url 'documentos_pendientes' %}" class="btn btn-outline-secondary btn-sm" title="Limpiar"><i class="bi bi-x"></i></a>
-        {% endif %}
-      </div>
-    </form>
+{% if total_alertas == 0 %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-3"></i>
+    <h5 class="text-success fw-bold">¡Todo al día!</h5>
+    <p class="text-muted mb-0">No hay contratos vencidos, documentos pendientes ni obras con alertas.</p>
   </div>
 </div>
 
-<!-- Contenido -->
-{% if grupos %}
-<div class="accordion" id="acordeonPendientes">
-  {% for grupo in grupos %}
-  {% with trab=grupo.trabajador obras_str=grupo.obras %}
-  {% with total_docs=grupo.docs_personales|length|add:grupo.docs_contrato|length %}
+{% else %}
 
+<div class="accordion" id="acordeonAlertas">
+
+  <!-- ── 1. CONTRATOS VENCIDOS SIN ACCIÓN ───────────────────────────────── -->
   <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden"
-       style="border-left: 4px solid #dc3545 !important;">
-
-    <!-- Header -->
+       style="border-left:4px solid #dc3545 !important;">
     <h2 class="accordion-header">
-      <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-3 px-4"
-              type="button" data-bs-toggle="collapse"
-              data-bs-target="#pend{{ trab.rut|slugify }}"
-              style="background: linear-gradient(90deg,#fff5f5 0%,#fff 100%);">
-        <div class="d-flex align-items-center gap-3 w-100 flex-wrap">
-
-          <!-- Avatar -->
-          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-               style="width:42px;height:42px;font-size:.9rem;background:#dc3545;">
-            {{ trab.nombres|first }}{{ trab.apellidos|first }}
+      <button class="accordion-button collapsed py-3 px-4"
+              type="button" data-bs-toggle="collapse" data-bs-target="#secVencidos"
+              style="background:linear-gradient(90deg,#fff5f5 0%,#fff 100%);">
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
+               style="width:38px;height:38px;background:#dc3545;font-size:1.1rem;">
+            <i class="bi bi-x-circle-fill"></i>
           </div>
-
-          <!-- Nombre + RUT + obras -->
           <div class="flex-grow-1">
-            <div class="fw-bold">{{ trab.nombre_completo }}</div>
-            <div class="small text-muted">
-              <code>{{ trab.rut }}</code>&nbsp;·&nbsp;{{ obras_str|join:", " }}
-            </div>
+            <div class="fw-bold">Contratos vencidos sin acción</div>
+            <div class="small text-muted">Fecha de término superada — requieren finiquito o renovación urgente</div>
           </div>
-
-          <!-- Badges resumen -->
-          <div class="d-flex gap-2 flex-wrap align-items-center me-2">
-            {% if grupo.docs_personales %}
-            <span class="badge bg-warning text-dark">
-              <i class="bi bi-person-badge me-1"></i>{{ grupo.docs_personales|length }} personal{% if grupo.docs_personales|length != 1 %}es{% endif %}
-            </span>
-            {% endif %}
-            {% if grupo.docs_contrato %}
-            <span class="badge" style="background:#0d6efd;">
-              <i class="bi bi-building me-1"></i>{{ grupo.docs_contrato|length }} de obra
-            </span>
-            {% endif %}
-            <span class="badge bg-danger fw-semibold">
-              <i class="bi bi-exclamation-circle me-1"></i>Falta Documentación {{ total_docs }}
-            </span>
-          </div>
-
+          <span class="badge {% if vencidos %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill fs-6 me-2">
+            {{ vencidos|length }}
+          </span>
         </div>
       </button>
     </h2>
-
-    <!-- Cuerpo -->
-    <div id="pend{{ trab.rut|slugify }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}">
-      <div class="accordion-body pt-0 px-0 pb-0">
-
-        <!-- Barra de contacto -->
-        <div class="px-4 py-2 border-bottom d-flex gap-4 flex-wrap small align-items-center"
-             style="background:#fff5f5;">
-          {% if trab.telefono %}
-          <span class="text-muted"><i class="bi bi-telephone me-1 text-danger"></i>{{ trab.telefono }}</span>
-          {% endif %}
-          {% if trab.correo %}
-          <span class="text-muted"><i class="bi bi-envelope me-1 text-danger"></i>{{ trab.correo }}</span>
-          {% endif %}
-          <a href="{% url 'trabajador_detail' trab.rut %}?tab=documentos"
-             class="ms-auto btn btn-sm btn-outline-primary">
-            <i class="bi bi-folder2-open me-1"></i>Ver carpeta completa
-          </a>
+    <div id="secVencidos" class="accordion-collapse collapse ">
+      <div class="accordion-body p-0">
+        {% if vencidos %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Trabajador</th>
+                <th>Obra</th>
+                <th>Especialidad</th>
+                <th>Venció el</th>
+                <th>Días</th>
+                <th class="pe-4 text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in vencidos %}
+              <tr>
+                <td class="ps-4">
+                  <a href="{% url 'trabajador_detail' v.contrato.trabajador.rut %}?tab=contratos"
+                     class="fw-semibold text-decoration-none">{{ v.contrato.trabajador.nombre_completo }}</a>
+                  <div class="text-muted" style="font-size:.75rem">{{ v.contrato.trabajador.rut }}</div>
+                </td>
+                <td>
+                  <a href="{% url 'obra_detail' v.contrato.obra.pk %}"
+                     class="text-decoration-none text-dark">{{ v.contrato.obra.nombre }}</a>
+                </td>
+                <td class="text-muted">{{ v.contrato.especialidad.nombre|default:"—" }}</td>
+                <td><span class="text-danger fw-semibold">{{ v.fecha|date:"d/m/Y" }}</span></td>
+                <td><span class="badge bg-danger">{{ v.dias }}d</span></td>
+                <td class="pe-4 text-end">
+                  <a href="{% url 'doc_generado_create' %}?tipo=finiquito&contrato_id={{ v.contrato.pk }}"
+                     class="btn btn-sm btn-outline-danger me-1" title="Generar finiquito">
+                    <i class="bi bi-file-earmark-x me-1"></i>Finiquitar
+                  </a>
+                  <a href="{% url 'doc_generado_create' %}?tipo=anexo_contrato&contrato_id={{ v.contrato.pk }}"
+                     class="btn btn-sm btn-outline-warning me-1" title="Generar anexo de renovación">
+                    <i class="bi bi-file-earmark-plus me-1"></i>Renovar
+                  </a>
+                  <a href="{% url 'trabajador_detail' v.contrato.trabajador.rut %}?tab=contratos"
+                     class="btn btn-sm btn-outline-secondary" title="Ver trabajador">
+                    <i class="bi bi-person"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-
-        <!-- Documentos Personales -->
-        {% if grupo.docs_personales %}
-        <div class="px-4 pt-3 pb-2">
-          <div class="d-flex align-items-center gap-2 mb-3">
-            <span class="badge bg-warning text-dark px-3 py-2">
-              <i class="bi bi-person-badge me-1"></i>Documentos Personales
-            </span>
-            <span class="text-muted small">{{ grupo.docs_personales|length }} pendiente{% if grupo.docs_personales|length != 1 %}s{% endif %}</span>
-          </div>
-          <div class="row g-2">
-            {% for d in grupo.docs_personales %}
-            <div class="col-sm-6 col-md-4 col-lg-3">
-              <div class="card h-100 border-0 {% if d.estado == 'vencido' %}bg-danger bg-opacity-10{% else %}bg-warning bg-opacity-10{% endif %}"
-                   style="border-left: 3px solid {% if d.estado == 'vencido' %}#dc3545{% else %}#ffc107{% endif %} !important;">
-                <div class="card-body p-3">
-                  <div class="d-flex align-items-start gap-2 mb-2">
-                    <i class="bi bi-file-earmark-{% if d.estado == 'vencido' %}x text-danger{% else %}plus text-warning{% endif %} fs-4 flex-shrink-0"></i>
-                    <div class="fw-semibold small">{{ d.tipo.nombre }}</div>
-                  </div>
-                  {% if d.estado == 'vencido' %}
-                    <span class="badge bg-danger w-100 mb-1">Vencido</span>
-                    {% if d.doc and d.doc.fecha_vencimiento %}
-                    <div class="text-danger text-center" style="font-size:.7rem">Venció {{ d.doc.fecha_vencimiento|date:"d/m/Y" }}</div>
-                    {% endif %}
-                  {% else %}
-                    <span class="badge bg-warning text-dark w-100 mb-1">Sin cargar</span>
-                  {% endif %}
-                  <button type="button"
-                          class="btn btn-sm w-100 mt-2 {% if d.estado == 'vencido' %}btn-danger{% else %}btn-warning{% endif %} btn-subir-rapido"
-                          data-rut="{{ trab.rut }}"
-                          data-tipo-id="{{ d.tipo.pk }}"
-                          data-tipo-nombre="{{ d.tipo.nombre }}"
-                          data-nivel="{{ d.tipo.nivel }}"
-                          data-contrato-id="">
-                    <i class="bi bi-upload me-1"></i>{% if d.estado == 'vencido' %}Renovar{% else %}Subir{% endif %}
-                  </button>
-                </div>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
+        {% else %}
+        <div class="px-4 py-3 text-success small">
+          <i class="bi bi-check-circle me-1"></i>Sin contratos vencidos.
         </div>
         {% endif %}
+      </div>
+    </div>
+  </div>
 
-        <!-- Documentos de Obra -->
-        {% if grupo.docs_contrato %}
-        <div class="px-4 pt-3 pb-3 {% if grupo.docs_personales %}border-top{% endif %}">
-          <div class="d-flex align-items-center gap-2 mb-3">
-            <span class="badge px-3 py-2" style="background:#0d6efd;">
-              <i class="bi bi-building me-1"></i>Documentos de Obra
-            </span>
-            <span class="text-muted small">{{ grupo.docs_contrato|length }} pendiente{% if grupo.docs_contrato|length != 1 %}s{% endif %}</span>
+  <!-- ── 2. PENDIENTES DE FIRMA ───────────────────────────────────────── -->
+  <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden"
+       style="border-left:4px solid #f97316 !important;">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed py-3 px-4"
+              type="button" data-bs-toggle="collapse" data-bs-target="#secFirma"
+              style="background:linear-gradient(90deg,#fff7ed 0%,#fff 100%);">
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
+               style="width:38px;height:38px;background:#f97316;font-size:1.1rem;">
+            <i class="bi bi-pen-fill"></i>
           </div>
-          <div class="row g-2">
-            {% for d in grupo.docs_contrato %}
-            <div class="col-sm-6 col-md-4 col-lg-3">
-              <div class="card h-100 border-0 {% if d.estado == 'vencido' %}bg-danger bg-opacity-10{% else %}bg-primary bg-opacity-10{% endif %}"
-                   style="border-left: 3px solid {% if d.estado == 'vencido' %}#dc3545{% else %}#0d6efd{% endif %} !important;">
-                <div class="card-body p-3">
-                  <div class="d-flex align-items-start gap-2 mb-2">
-                    <i class="bi bi-file-earmark-{% if d.estado == 'vencido' %}x text-danger{% else %}plus text-primary{% endif %} fs-4 flex-shrink-0"></i>
-                    <div>
-                      <div class="fw-semibold small">{{ d.tipo.nombre }}</div>
-                      <div class="text-muted" style="font-size:.75rem">
-                        <i class="bi bi-building me-1"></i>{{ d.obra.nombre }}
-                      </div>
-                    </div>
-                  </div>
-                  {% if d.estado == 'vencido' %}
-                    <span class="badge bg-danger w-100 mb-1">Vencido</span>
-                    {% if d.doc and d.doc.fecha_vencimiento %}
-                    <div class="text-danger text-center" style="font-size:.7rem">Venció {{ d.doc.fecha_vencimiento|date:"d/m/Y" }}</div>
-                    {% endif %}
-                  {% else %}
-                    <span class="badge bg-primary w-100 mb-1">Sin cargar</span>
-                  {% endif %}
+          <div class="flex-grow-1">
+            <div class="fw-bold">Pendientes de firma</div>
+            <div class="small text-muted">Contratos generados en espera del documento firmado</div>
+          </div>
+          <span class="badge {% if pendientes_firma %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill fs-6 me-2">
+            {{ pendientes_firma|length }}
+          </span>
+        </div>
+      </button>
+    </h2>
+    <div id="secFirma" class="accordion-collapse collapse ">
+      <div class="accordion-body p-0">
+        {% if pendientes_firma %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Trabajador</th>
+                <th>Obra</th>
+                <th>Especialidad</th>
+                <th>Inicio</th>
+                <th class="pe-4 text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in pendientes_firma %}
+              <tr>
+                <td class="ps-4">
+                  <a href="{% url 'trabajador_detail' c.trabajador.rut %}?tab=contratos"
+                     class="fw-semibold text-decoration-none">{{ c.trabajador.nombre_completo }}</a>
+                  <div class="text-muted" style="font-size:.75rem">{{ c.trabajador.rut }}</div>
+                </td>
+                <td>
+                  <a href="{% url 'obra_detail' c.obra.pk %}"
+                     class="text-decoration-none text-dark">{{ c.obra.nombre }}</a>
+                </td>
+                <td class="text-muted">{{ c.especialidad.nombre|default:"—" }}</td>
+                <td>{{ c.fecha_inicio|date:"d/m/Y"|default:"—" }}</td>
+                <td class="pe-4 text-end">
+                  <a href="{% url 'trabajador_detail' c.trabajador.rut %}?tab=documentos"
+                     class="btn btn-sm btn-warning me-1"
+                     title="Ir a la carpeta digital — ahí aparece 'Contrato de Trabajo Firmado' para subir">
+                    <i class="bi bi-folder2-open me-1"></i>Ir a carpeta
+                  </a>
+                  <a href="{% url 'trabajador_detail' c.trabajador.rut %}?tab=contratos"
+                     class="btn btn-sm btn-outline-secondary" title="Ver contratos del trabajador">
+                    <i class="bi bi-person"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="px-4 py-3 text-success small">
+          <i class="bi bi-check-circle me-1"></i>Sin contratos pendientes de firma.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. FINIQUITOS POR SUBIR ────────────────────────────────────────── -->
+  <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden"
+       style="border-left:4px solid #6366f1 !important;">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed py-3 px-4"
+              type="button" data-bs-toggle="collapse" data-bs-target="#secFiniquitos"
+              style="background:linear-gradient(90deg,#f5f3ff 0%,#fff 100%);">
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
+               style="width:38px;height:38px;background:#6366f1;font-size:1.1rem;">
+            <i class="bi bi-file-earmark-check-fill"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">Finiquitos por subir</div>
+            <div class="small text-muted">Contratos finalizados sin Finiquito Legalizado en la carpeta digital</div>
+          </div>
+          <span class="badge {% if sin_finiquito %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill fs-6 me-2">
+            {{ sin_finiquito|length }}
+          </span>
+        </div>
+      </button>
+    </h2>
+    <div id="secFiniquitos" class="accordion-collapse collapse ">
+      <div class="accordion-body p-0">
+        {% if sin_finiquito %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Trabajador</th>
+                <th>Obra</th>
+                <th>Estado</th>
+                <th>Fecha término</th>
+                <th class="pe-4 text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in sin_finiquito %}
+              <tr>
+                <td class="ps-4">
+                  <a href="{% url 'trabajador_detail' c.trabajador.rut %}?tab=historico"
+                     class="fw-semibold text-decoration-none">{{ c.trabajador.nombre_completo }}</a>
+                  <div class="text-muted" style="font-size:.75rem">{{ c.trabajador.rut }}</div>
+                </td>
+                <td>
+                  <a href="{% url 'obra_detail' c.obra.pk %}"
+                     class="text-decoration-none text-dark">{{ c.obra.nombre }}</a>
+                </td>
+                <td>
+                  <span class="badge {% if c.estado == 'Finiquitado' %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ c.estado }}
+                  </span>
+                </td>
+                <td>{{ c.fecha_termino_real|date:"d/m/Y"|default:c.fecha_termino_estimada|date:"d/m/Y"|default:"—" }}</td>
+                <td class="pe-4 text-end">
+                  {% if tipo_finiquito_id %}
                   <button type="button"
-                          class="btn btn-sm w-100 mt-2 {% if d.estado == 'vencido' %}btn-danger{% else %}btn-primary{% endif %} btn-subir-rapido"
-                          data-rut="{{ trab.rut }}"
-                          data-tipo-id="{{ d.tipo.pk }}"
-                          data-tipo-nombre="{{ d.tipo.nombre }}"
-                          data-nivel="{{ d.tipo.nivel }}"
-                          data-contrato-id="{{ d.contrato.pk|default:'' }}">
-                    <i class="bi bi-upload me-1"></i>{% if d.estado == 'vencido' %}Renovar{% else %}Subir{% endif %}
+                          class="btn btn-sm btn-outline-primary me-1 btn-subir-rapido"
+                          data-rut="{{ c.trabajador.rut }}"
+                          data-tipo-id="{{ tipo_finiquito_id }}"
+                          data-tipo-nombre="Finiquito Legalizado"
+                          data-nivel="Contrato"
+                          data-contrato-id="{{ c.pk }}"
+                          title="Subir finiquito legalizado escaneado">
+                    <i class="bi bi-upload me-1"></i>Subir finiquito
                   </button>
-                </div>
-              </div>
-            </div>
-            {% endfor %}
+                  {% endif %}
+                  <a href="{% url 'trabajador_detail' c.trabajador.rut %}?tab=historico"
+                     class="btn btn-sm btn-outline-secondary" title="Ver historial del trabajador">
+                    <i class="bi bi-clock-history"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="px-4 py-3 text-success small">
+          <i class="bi bi-check-circle me-1"></i>Todos los contratos finalizados tienen su finiquito cargado.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. DOCUMENTOS OBLIGATORIOS FALTANTES ──────────────────────────── -->
+  {% with hay_docs=docs_obras_activas|length|add:docs_obras_cerradas|length %}
+  <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden"
+       style="border-left:4px solid #dc3545 !important;">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed py-3 px-4"
+              type="button" data-bs-toggle="collapse" data-bs-target="#secDocsFaltantes"
+              style="background:linear-gradient(90deg,#fff5f5 0%,#fff 100%);">
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
+               style="width:38px;height:38px;background:#dc3545;font-size:1.1rem;">
+            <i class="bi bi-folder-x"></i>
           </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">Documentos obligatorios faltantes</div>
+            <div class="small text-muted">
+              {{ total_trabajadores }} trabajador{% if total_trabajadores != 1 %}es{% endif %}
+              · {{ docs_obras_activas|length }} obra{% if docs_obras_activas|length != 1 %}s{% endif %} activa{% if docs_obras_activas|length != 1 %}s{% endif %}
+              {% if docs_obras_cerradas %} · {{ docs_obras_cerradas|length }} en cierre{% endif %}
+            </div>
+          </div>
+          <span class="badge {% if hay_docs %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill fs-6 me-2">
+            {{ total_docs }}
+          </span>
+        </div>
+      </button>
+    </h2>
+    <div id="secDocsFaltantes" class="accordion-collapse collapse ">
+      <div class="accordion-body px-3 pt-3 pb-1">
+
+        {% if hay_docs %}
+
+        {% comment %}── Macro: bloque de trabajadores de una obra ──{% endcomment %}
+        {% for entry in docs_obras_activas %}
+        {% include "documentos/_bloque_obra_docs.html" with entry=entry estado_obra="activa" %}
+        {% endfor %}
+
+        {% if docs_obras_cerradas %}
+        <div class="d-flex align-items-center gap-2 my-3">
+          <hr class="flex-grow-1 m-0" style="border-color:#dee2e6;">
+          <span class="badge bg-secondary px-3 py-2" style="font-size:.75rem;">
+            <i class="bi bi-building-x me-1"></i>Obras en cierre / finalizadas
+          </span>
+          <hr class="flex-grow-1 m-0" style="border-color:#dee2e6;">
+        </div>
+        {% for entry in docs_obras_cerradas %}
+        {% include "documentos/_bloque_obra_docs.html" with entry=entry estado_obra="cerrada" %}
+        {% endfor %}
+        {% endif %}
+
+        {% else %}
+        <div class="pb-3 text-success small">
+          <i class="bi bi-check-circle me-1"></i>Sin documentos obligatorios faltantes.
         </div>
         {% endif %}
 
       </div>
     </div>
-
   </div>
   {% endwith %}
-  {% endwith %}
-  {% endfor %}
-</div>
 
-{% else %}
-<div class="card border-0 shadow-sm">
-  <div class="card-body text-center py-5">
-    <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-3"></i>
-    <h5 class="text-success fw-bold">¡Todo al día!</h5>
-    <p class="text-muted mb-0">Toda la documentación obligatoria está vigente.</p>
+  <!-- ── 5. PRÓXIMOS A VENCER ─────────────────────────────────────────── -->
+  <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden"
+       style="border-left:4px solid #f59e0b !important;">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed py-3 px-4"
+              type="button" data-bs-toggle="collapse" data-bs-target="#secProximos"
+              style="background:linear-gradient(90deg,#fffbeb 0%,#fff 100%);">
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
+               style="width:38px;height:38px;background:#f59e0b;font-size:1.1rem;">
+            <i class="bi bi-hourglass-split"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">Contratos próximos a vencer <small class="text-muted">(≤ 30 días)</small></div>
+            <div class="small text-muted">Preparar Anexo de Contrato o Finiquito antes del vencimiento</div>
+          </div>
+          <span class="badge {% if proximos %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill fs-6 me-2">
+            {{ proximos|length }}
+          </span>
+        </div>
+      </button>
+    </h2>
+    <div id="secProximos" class="accordion-collapse collapse ">
+      <div class="accordion-body p-0">
+        {% if proximos %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Trabajador</th>
+                <th>Obra</th>
+                <th>Especialidad</th>
+                <th>Vence el</th>
+                <th>Días restantes</th>
+                <th class="pe-4 text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in proximos %}
+              <tr>
+                <td class="ps-4">
+                  <a href="{% url 'trabajador_detail' p.contrato.trabajador.rut %}?tab=contratos"
+                     class="fw-semibold text-decoration-none">{{ p.contrato.trabajador.nombre_completo }}</a>
+                  <div class="text-muted" style="font-size:.75rem">{{ p.contrato.trabajador.rut }}</div>
+                </td>
+                <td>
+                  <a href="{% url 'obra_detail' p.contrato.obra.pk %}"
+                     class="text-decoration-none text-dark">{{ p.contrato.obra.nombre }}</a>
+                </td>
+                <td class="text-muted">{{ p.contrato.especialidad.nombre|default:"—" }}</td>
+                <td><span class="fw-semibold">{{ p.fecha|date:"d/m/Y" }}</span></td>
+                <td>
+                  <span class="badge {% if p.dias <= 7 %}bg-danger{% elif p.dias <= 15 %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">
+                    {{ p.dias }} día{% if p.dias != 1 %}s{% endif %}
+                  </span>
+                </td>
+                <td class="pe-4 text-end">
+                  <a href="{% url 'doc_generado_create' %}?tipo=anexo_contrato&contrato_id={{ p.contrato.pk }}"
+                     class="btn btn-sm btn-warning me-1" title="Generar Anexo de Contrato">
+                    <i class="bi bi-file-earmark-plus me-1"></i>Anexo
+                  </a>
+                  <a href="{% url 'doc_generado_create' %}?tipo=finiquito&contrato_id={{ p.contrato.pk }}"
+                     class="btn btn-sm btn-outline-secondary me-1" title="Generar Finiquito">
+                    <i class="bi bi-file-earmark-x me-1"></i>Finiquito
+                  </a>
+                  <a href="{% url 'trabajador_detail' p.contrato.trabajador.rut %}?tab=contratos"
+                     class="btn btn-sm btn-outline-secondary" title="Ver trabajador">
+                    <i class="bi bi-person"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="px-4 py-3 text-success small">
+          <i class="bi bi-check-circle me-1"></i>Sin contratos próximos a vencer.
+        </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
+
+  <!-- ── 6. OBRAS EN CIERRE ─────────────────────────────────────────────── -->
+  <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden"
+       style="border-left:4px solid #0ea5e9 !important;">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed py-3 px-4"
+              type="button" data-bs-toggle="collapse" data-bs-target="#secObras"
+              style="background:linear-gradient(90deg,#f0f9ff 0%,#fff 100%);">
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
+               style="width:38px;height:38px;background:#0ea5e9;font-size:1.1rem;">
+            <i class="bi bi-building-x"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">Obras en cierre</div>
+            <div class="small text-muted">Obras pendientes de archivar — completar carpetas de documentos</div>
+          </div>
+          <span class="badge {% if obras_en_cierre %}bg-info text-dark{% else %}bg-secondary{% endif %} rounded-pill fs-6 me-2">
+            {{ obras_en_cierre|length }}
+          </span>
+        </div>
+      </button>
+    </h2>
+    <div id="secObras" class="accordion-collapse collapse ">
+      <div class="accordion-body p-0">
+        {% if obras_en_cierre %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Obra</th>
+                <th>Empresa mandante</th>
+                <th>Trabajadores finalizados</th>
+                <th>Aún activos</th>
+                <th class="pe-4 text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in obras_en_cierre %}
+              <tr>
+                <td class="ps-4">
+                  <a href="{% url 'obra_detail' item.obra.pk %}"
+                     class="fw-semibold text-decoration-none">{{ item.obra.nombre }}</a>
+                </td>
+                <td class="text-muted">{{ item.obra.constructora_mandante|default:"—" }}</td>
+                <td>
+                  <span class="badge bg-secondary">{{ item.terminados }}</span>
+                </td>
+                <td>
+                  {% if item.vigentes > 0 %}
+                  <span class="badge bg-warning text-dark">
+                    <i class="bi bi-person-fill me-1"></i>{{ item.vigentes }}
+                  </span>
+                  {% else %}
+                  <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Sin activos</span>
+                  {% endif %}
+                </td>
+                <td class="pe-4 text-end">
+                  <a href="{% url 'obra_detail' item.obra.pk %}"
+                     class="btn btn-sm btn-outline-info me-1">
+                    <i class="bi bi-eye me-1"></i>Ver Obra
+                  </a>
+                  {% if item.vigentes == 0 %}
+                  <form method="post" action="{% url 'obra_archivar' item.obra.pk %}" class="d-inline"
+                        onsubmit="return confirm('¿Archivar «{{ item.obra.nombre }}»? Quedará en solo lectura.')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-dark" title="Archivar obra">
+                      <i class="bi bi-archive me-1"></i>Archivar
+                    </button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="px-4 py-3 text-success small">
+          <i class="bi bi-check-circle me-1"></i>Sin obras en proceso de cierre.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endif %}
 
@@ -236,7 +514,9 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header border-0">
-        <h5 class="modal-title"><i class="bi bi-upload me-2"></i><span id="modalSubirTitulo">Subir Documento</span></h5>
+        <h5 class="modal-title">
+          <i class="bi bi-upload me-2"></i><span id="modalSubirTitulo">Subir Documento</span>
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="{% url 'documento_upload_rapido' %}" enctype="multipart/form-data">
@@ -248,19 +528,16 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-semibold">Archivo</label>
-            <input type="file" name="archivo" class="form-control" required accept=".pdf,.jpg,.jpeg,.png,.docx,.doc">
+            <input type="file" name="archivo" class="form-control" required
+                   accept=".pdf,.jpg,.jpeg,.png,.docx,.doc">
             <div class="form-text">PDF, imagen o Word. Máximo 20 MB.</div>
-          </div>
-          <div class="mb-1">
-            <label class="form-label fw-semibold">Fecha de vencimiento <small class="text-muted fw-normal">(opcional)</small></label>
-            <input type="date" name="fecha_vencimiento" class="form-control"
-                   placeholder="Se calcula automáticamente si el tipo tiene vigencia">
-            <div class="form-text">Solo si la fecha impresa en el documento difiere de la calculada.</div>
           </div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-upload me-1"></i>Subir</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-upload me-1"></i>Subir
+          </button>
         </div>
       </form>
     </div>

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Licencia #{{ lic.pk }} — {{ lic.trabajador.nombre_completo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0"><i class="bi bi-hospital me-2"></i>Licencia Médica #{{ lic.pk }}</h4>
+  <div class="d-flex gap-2">
+    <a href="{% url 'licencia_edit' lic.pk %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Editar
+    </a>
+    <a href="{% url 'licencia_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Volver
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for m in messages %}
+    <div class="alert alert-{{ m.tags }} alert-dismissible fade show py-2">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-md-8">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header py-2 bg-light fw-semibold">Información General</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Trabajador</dt>
+          <dd class="col-sm-8">
+            <a href="{% url 'trabajador_detail' lic.trabajador.rut %}">{{ lic.trabajador.nombre_completo }}</a>
+            <small class="text-muted ms-1">{{ lic.trabajador.rut }}</small>
+          </dd>
+
+          <dt class="col-sm-4">Obra</dt>
+          <dd class="col-sm-8">
+            {% if lic.obra %}
+              <a href="{% url 'obra_detail' lic.obra.pk %}">{{ lic.obra.nombre }}</a>
+            {% else %}—{% endif %}
+          </dd>
+
+          {% if lic.contrato %}
+          <dt class="col-sm-4">Contrato</dt>
+          <dd class="col-sm-8">Estado: <strong>{{ lic.contrato.estado }}</strong> — Desde {{ lic.contrato.fecha_inicio }}</dd>
+          {% endif %}
+
+          <dt class="col-sm-4">Tipo</dt>
+          <dd class="col-sm-8">
+            {% for val, label in lic.TIPO_CHOICES %}{% if val == lic.tipo %}{{ label }}{% endif %}{% endfor %}
+          </dd>
+
+          <dt class="col-sm-4">Organismo</dt>
+          <dd class="col-sm-8">{{ lic.organismo }}</dd>
+
+          <dt class="col-sm-4">N° Folio</dt>
+          <dd class="col-sm-8">{{ lic.numero_folio|default:"—" }}</dd>
+
+          <dt class="col-sm-4">Diagnóstico</dt>
+          <dd class="col-sm-8">{{ lic.diagnostico|default:"—" }}</dd>
+
+          <dt class="col-sm-4">Estado</dt>
+          <dd class="col-sm-8">
+            {% if lic.estado == 'Autorizada' %}<span class="badge bg-success">{{ lic.estado }}</span>
+            {% elif lic.estado == 'Rechazada' %}<span class="badge bg-danger">{{ lic.estado }}</span>
+            {% elif lic.estado == 'Prorrogada' %}<span class="badge bg-warning text-dark">{{ lic.estado }}</span>
+            {% elif lic.estado == 'En trámite' %}<span class="badge bg-info text-dark">{{ lic.estado }}</span>
+            {% else %}<span class="badge bg-secondary">{{ lic.estado }}</span>{% endif %}
+          </dd>
+
+          <dt class="col-sm-4">Período</dt>
+          <dd class="col-sm-8">
+            {{ lic.fecha_inicio }} → {% if lic.fecha_fin %}{{ lic.fecha_fin }}{% else %}<em class="text-muted">abierta</em>{% endif %}
+            <small class="text-muted ms-1">({{ lic.dias_autorizados }} días autorizados)</small>
+          </dd>
+
+          <dt class="col-sm-4">Empresa pagó 3 días</dt>
+          <dd class="col-sm-8">{% if lic.empresa_pago_3_dias %}Sí{% else %}No{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header py-2 bg-light fw-semibold">Subsidio</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Monto esperado</dt>
+          <dd class="col-sm-8">{% if lic.monto_subsidio_esperado %}${{ lic.monto_subsidio_esperado|floatformat:0 }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4">Monto recibido</dt>
+          <dd class="col-sm-8">{% if lic.monto_subsidio_recibido %}${{ lic.monto_subsidio_recibido|floatformat:0 }}{% else %}—{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if lic.observaciones %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header py-2 bg-light fw-semibold">Observaciones</div>
+      <div class="card-body"><p class="mb-0" style="white-space:pre-wrap">{{ lic.observaciones }}</p></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header py-2 bg-light fw-semibold">Documentos Adjuntos</div>
+      <div class="card-body">
+        <ul class="list-unstyled mb-0">
+          <li class="mb-1">
+            <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+            {% if lic.archivo_formulario %}
+              <a href="{{ lic.archivo_formulario.url }}" target="_blank">Formulario licencia</a>
+            {% else %}<span class="text-muted">Formulario no adjunto</span>{% endif %}
+          </li>
+          <li class="mb-1">
+            <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+            {% if lic.archivo_resolucion %}
+              <a href="{{ lic.archivo_resolucion.url }}" target="_blank">Resolución organismo</a>
+            {% else %}<span class="text-muted">Resolución no adjunta</span>{% endif %}
+          </li>
+          <li>
+            <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+            {% if lic.archivo_alta %}
+              <a href="{{ lic.archivo_alta.url }}" target="_blank">Alta / Reincorporación</a>
+            {% else %}<span class="text-muted">Alta no adjunta</span>{% endif %}
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Prórroga -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-header py-2 bg-light fw-semibold">Registrar Prórroga</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'licencia_prorroga' lic.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label form-label-sm">Nueva fecha fin</label>
+            <input type="date" name="nueva_fecha_fin" class="form-control form-control-sm" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label form-label-sm">Días adicionales</label>
+            <input type="number" name="dias_extra" class="form-control form-control-sm" min="1" value="0">
+          </div>
+          <div class="mb-2">
+            <label class="form-label form-label-sm">Observación</label>
+            <input type="text" name="obs" class="form-control form-control-sm">
+          </div>
+          <button type="submit" class="btn btn-warning btn-sm w-100">
+            <i class="bi bi-calendar-plus me-1"></i>Registrar Prórroga
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header py-2 bg-light fw-semibold">Metadatos</div>
+      <div class="card-body">
+        <small class="text-muted">
+          Registrada por: <strong>{{ lic.usuario_registro }}</strong><br>
+          Fecha registro: {{ lic.creado_el|date:"d/m/Y H:i" }}
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Eliminar -->
+<div class="mt-3">
+  <form method="post" action="{% url 'licencia_delete' lic.pk %}"
+        onsubmit="return confirm('¿Eliminar esta licencia?');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Eliminar Licencia
+    </button>
+  </form>
+</div>
+{% endblock %}

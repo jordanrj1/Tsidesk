@@ -70,6 +70,12 @@ def bodega_material_delete(request, pk):
     """Desactiva (soft-delete) un material del catálogo."""
     mat = get_object_or_404(CatalogoMaterial, pk=pk)
     if request.method == 'POST':
+        if mat.stock_global > 0:
+            messages.warning(
+                request,
+                f'El material "{mat.nombre}" tiene {mat.stock_global} {mat.get_unidad_medida_display()} en stock. '
+                f'Se eliminó del catálogo pero el stock queda registrado en el historial.'
+            )
         mat.activo = False
         mat.save()
         messages.success(request, f'Material "{mat.nombre}" eliminado del catálogo.')

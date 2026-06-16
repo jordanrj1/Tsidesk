@@ -4,34 +4,60 @@
 <meta charset="UTF-8">
 <title>Contrato de Trabajo — {{ doc.trabajador.nombre_completo }}</title>
 <style>
-  @page { size: A4; margin: 1.4cm 1.5cm 2cm 1.5cm; }
+  @page { size: A4; margin: 1.2cm 1.5cm 1.2cm 1.5cm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; color: #000; background: #fff; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #000; background: #fff; }
 
-  .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #1e3a5f; color: #fff;
-    padding: 8px 20px; display: flex; gap: 12px; align-items: center; z-index: 9999; }
-  .print-bar button { background: #28a745; color: #fff; border: none; padding: 6px 16px;
-    border-radius: 4px; cursor: pointer; font-weight: bold; }
-  .print-bar a { color: #adc8ff; text-decoration: none; }
-  @media print { .print-bar { display: none !important; } body { margin: 0; } }
+  .print-bar { position:fixed; top:0; left:0; right:0;
+    background: linear-gradient(90deg,#0f2543 0%,#1d4ed8 100%);
+    color:#fff; padding:0 24px; display:flex; align-items:center; gap:12px;
+    z-index:9999; min-height:62px; box-shadow:0 2px 14px rgba(0,0,0,.4); }
+  .pb-info { flex:1; min-width:0; }
+  .pb-tipo { font-size:10px; text-transform:uppercase; letter-spacing:.1em; opacity:.6; }
+  .pb-nombre { font-size:18px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pb-btns { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+  .pb-btn { display:inline-flex; align-items:center; gap:5px; padding:7px 15px;
+    border-radius:7px; font-size:12px; font-weight:600; text-decoration:none;
+    cursor:pointer; border:none; line-height:1; white-space:nowrap; }
+  .pb-btn:hover { filter:brightness(1.15); }
+  .pb-print { background:#16a34a; color:#fff; }
+  .pb-word  { background:#1565c0; color:#fff; }
+  .pb-edit  { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); }
+  .pb-back  { background:transparent; color:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.2); font-size:11px; }
+  .pb-back:hover { color:#fff; border-color:rgba(255,255,255,.5); }
 
-  .page { max-width: 19cm; margin: 0 auto; padding: 0.3cm 0; margin-top: 44px; }
-  @media print { .page { margin-top: 0; } }
+  @media print {
+    .print-bar { display: none !important; }
+    body { margin: 0; }
+    .page { margin-top: 0 !important; }
+  }
 
-  table { width: 100%; border-collapse: collapse; margin-bottom: 3px; }
-  td, th { border: 1px solid #000; padding: 2px 5px; vertical-align: middle; line-height: 1.3; }
-  td.nb { border: none; }
+  .page { max-width: 19cm; margin: 64px auto 0; }
 
-  .titulo { text-align: center; font-weight: bold; font-size: 13pt; text-transform: uppercase; padding: 5px 0; }
-  .subtipo { text-align: center; font-size: 9pt; text-transform: uppercase; padding: 2px 0; }
-  .sec-hdr { background: #c6efce; font-weight: bold; font-size: 8.5pt; }
-  .lbl { font-weight: bold; font-size: 8pt; white-space: nowrap; }
-  .val { font-size: 8pt; }
-  .green { background: #c6efce; }
-  .obs-red { background: #d00; color: #fff; font-weight: bold; font-size: 8pt; padding: 2px 6px; margin: 2px 0; }
-  .cuerpo { margin: 3px 0; font-size: 8.5pt; text-align: justify; line-height: 1.4; }
+  .titulo-bloque { text-align: center; margin-bottom: 4px; }
+  .titulo-bloque .titulo { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
+  .titulo-bloque .subtipo { font-size: 9pt; text-transform: uppercase; margin-top: 1px; }
+  .titulo-bloque .fecha-lugar { font-size: 8pt; text-align: right; margin-top: 3px; }
+
+  .tbl { width: 100%; border-collapse: collapse; margin-bottom: 3px; font-size: 8pt; }
+  .tbl td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; line-height: 1.25; }
+  .tbl td.nb { border: none; }
+  .tbl .hdr { font-weight: bold; background: none; padding: 2px 4px; border: 1px solid #000; }
+  .tbl .lbl { font-weight: bold; width: 22%; white-space: nowrap; }
+  .tbl .val { width: 28%; }
+
+  .obs-red { background: #c00; color: #fff; font-weight: bold; font-size: 7.5pt;
+    padding: 1px 5px; margin: 2px 0; display: inline-block; }
+
+  .cuerpo { margin: 2px 0; font-size: 8pt; text-align: justify; line-height: 1.35; }
   .cnum { font-weight: bold; }
-  .sig-line { border-bottom: 1px solid #000; height: 30px; margin-bottom: 4px; }
+  .hl { font-weight: bold; }
+
+  .firmas { display: flex; justify-content: space-around; margin-top: 30px; }
+  .firma-bloque { text-align: center; width: 45%; }
+  .firma-linea { border-bottom: 1px solid #000; height: 28px; margin-bottom: 4px; }
+
+  .pie { font-size: 7pt; color: #888; text-align: center; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -44,240 +70,43 @@
     <input type="number" id="copiasInput" value="1" min="1" max="20"
            style="width:55px;padding:3px 6px;border-radius:4px;border:none;font-size:13px">
   </span>
-  <button onclick="imprimirCopias()" style="background:#28a745;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-weight:bold;">Imprimir</button>
-  <a href="{% url 'doc_generado_create' %}" style="color:#adc8ff;margin-left:auto">← Volver</a>
+  <button onclick="imprimirCopias()">Imprimir</button>
+  <a href="{% url 'doc_generado_create' %}" style="margin-left:auto">← Volver</a>
 </div>
 {% else %}
 <div class="print-bar">
-  <strong>{{ doc.trabajador.nombre_completo }}</strong>
-  <button onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
-  <a href="{% url 'doc_generado_word' doc.pk %}" style="background:#1565c0; color:#fff; padding:6px 16px; border-radius:4px; text-decoration:none; font-weight:bold;">📄 Descargar Word</a>
-  <a href="{% url 'doc_generado_edit' doc.pk %}">Editar</a>
-  <a href="{% url 'doc_generado_list' %}">← Volver</a>
+  <div class="pb-info">
+    <div class="pb-tipo">Contrato de Trabajo</div>
+    <div class="pb-nombre">{{ doc.trabajador.nombre_completo }}</div>
+  </div>
+  <div class="pb-btns">
+    <button class="pb-btn pb-print" onclick="window.print()">🖨 Imprimir / PDF</button>
+    <a class="pb-btn pb-word" href="{% url 'doc_generado_word' doc.pk %}">📄 Word</a>
+    <a class="pb-btn pb-edit"
+       href="{% url 'doc_generado_edit' doc.pk %}?next={{ back_url|default:'/documentos-empresa/borradores/' }}"
+       onclick="if(window!==window.parent){window.parent.location.href=this.href;return false;}">✏ Editar PDF</a>
+    {% if doc.contrato %}
+    <a class="pb-btn pb-edit"
+       href="{% url 'contrato_edit' doc.contrato.pk %}?next={{ back_url|default:'/documentos-empresa/borradores/' }}"
+       onclick="if(window!==window.parent){window.parent.location.href=this.href;return false;}">📋 Contrato</a>
+    {% endif %}
+    <a class="pb-btn pb-back"
+       href="{{ back_url|default:'#' }}"
+       onclick="if(window!==window.parent){try{var m=window.parent.bootstrap.Modal.getInstance(window.parent.document.getElementById('modalPreviewDoc'));if(m)m.hide();}catch(e){}return false;}">← Volver</a>
+  </div>
 </div>
 {% endif %}
 
-<div class="page">
-
-  <!-- TÍTULO -->
-  <table>
-    <tr><td colspan="4" class="titulo">CONTRATO DE TRABAJO</td></tr>
-    <tr><td colspan="4" class="subtipo">{% if doc.contrato %}{{ doc.contrato.tipo_contrato|upper }}{% else %}Por Obra o Faena{% endif %}</td></tr>
-    <tr>
-      <td colspan="2" class="nb" style="width:55%;"></td>
-      <td colspan="2" style="text-align:right; font-size:8.5pt; width:45%;">
-        En {{ d.ciudad_documento|default:"_______________" }},&nbsp;
-        a {{ d.fecha_documento|date:"d \d\e F \d\e Y"|default:"___________" }}
-      </td>
-    </tr>
-  </table>
-
-  <!-- TRABAJADOR -->
-  <table>
-    <tr><td colspan="4" class="sec-hdr">INDIVIDUALIZACION DEL TRABAJADOR:</td></tr>
-    <tr>
-      <td class="lbl" style="width:22%;">Nombre del Trabajador:</td>
-      <td class="val" style="width:28%;">{{ doc.trabajador.nombre_completo }}</td>
-      <td class="lbl" style="width:22%;">Nacionalidad:</td>
-      <td class="val" style="width:28%;">{{ d.nacionalidad|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Cédula Nac. de Identidad:</td>
-      <td class="val">{{ doc.trabajador.rut }}</td>
-      <td class="lbl">Estado Civil:</td>
-      <td class="val">{{ d.estado_civil|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Fecha de Nacimiento:</td>
-      <td class="val">{{ doc.trabajador.fecha_nacimiento|date:"d/m/Y"|default:"" }}</td>
-      <td class="lbl">Procedencia:</td>
-      <td class="val">{{ d.procedencia|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Domicilio:</td>
-      <td class="val">{{ d.domicilio_trabajador|default:doc.trabajador.direccion|default:"" }}</td>
-      <td class="lbl">Ciudad:</td>
-      <td class="val">{{ d.ciudad_trabajador|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Previsión:</td>
-      <td class="val">{{ d.prevision|default:"" }}</td>
-      <td class="lbl">Salud:</td>
-      <td class="val">{{ d.salud|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Teléfono:</td>
-      <td class="val">{{ doc.trabajador.telefono|default:"" }}</td>
-      <td class="lbl">Correo:</td>
-      <td class="val">{{ doc.trabajador.correo|default:"" }}</td>
-    </tr>
-  </table>
-
-  <!-- EMPLEADOR -->
-  <table>
-    <tr><td colspan="4" class="sec-hdr">INDIVIDUALIZACION DEL EMPLEADOR:</td></tr>
-    <tr>
-      <td class="lbl" style="width:22%;">Nombre del Empleador:</td>
-      <td class="val green" style="width:28%;">{{ empresa_print.nombre|default:"" }}</td>
-      <td class="lbl" style="width:22%;">RUT N°</td>
-      <td class="val green" style="width:28%;">{{ empresa_print.rut_empresa|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Dirección:</td>
-      <td class="val green">{{ empresa_print.direccion|default:"" }}</td>
-      <td class="lbl">Ciudad:</td>
-      <td class="val green">{{ empresa_print.ciudad|default:"" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Representante Legal:</td>
-      <td class="val green">{{ empresa_print.nombre_representante|default:"" }}</td>
-      <td class="lbl">RUT N°</td>
-      <td class="val green">{{ empresa_print.rut_representante|default:"" }}</td>
-    </tr>
-    {% if empresa_print.correo_electronico %}
-    <tr>
-      <td class="lbl">Correo Electrónico:</td>
-      <td class="val green" colspan="3">{{ empresa_print.correo_electronico }}</td>
-    </tr>
-    {% endif %}
-  </table>
-
-  <p class="cuerpo" style="margin-top:5px;">
-    Entre las partes arriba individualizadas se suscribe el presente contrato de trabajo, para cuyo efecto, los contratantes convienen en denominarse <strong>Trabajador y Empleador</strong>, respectivamente.
-  </p>
-
-  <!-- CLÁUSULA 1 -->
-  <p class="cuerpo">
-    <span class="cnum">1.-</span> El Trabajador se compromete a ejecutar la labor de
-    <span class="green">&nbsp;{% if doc.contrato %}{{ doc.contrato.especialidad.nombre }}{% else %}_______________{% endif %}&nbsp;</span>
-    en la obra denominada
-    <span class="green">&nbsp;{% if doc.contrato %}{{ doc.contrato.obra.nombre }}{% else %}_______________{% endif %}&nbsp;</span>
-    ubicada en
-    <span class="green">&nbsp;{% if doc.contrato and doc.contrato.obra.direccion %}{{ doc.contrato.obra.direccion }}{% else %}_______________{% endif %}&nbsp;</span>;
-    el trabajo se efectuará fundamentalmente en la obra mencionada en el párrafo anterior, sin perjuicio de la facultad del Empleador para trasladar, por causa justificada, al trabajador a cualquier Obra que tenga en ejecución dentro de la ciudad, sin que ello importe menoscabo.
-  </p>
-
-  <!-- CLÁUSULA 2 — JORNADA -->
-  <p class="cuerpo">
-    <span class="cnum">2.-</span> La jornada de trabajo se ejecutará de
-    <span class="green">&nbsp;{{ d.dias_laborales|default:"Lunes a Viernes" }}&nbsp;</span>
-    con <span class="green">&nbsp;{% if d.horas_semanales %}{{ d.horas_semanales }}{% else %}___ hrs semanales con ___ hr de colación{% endif %}&nbsp;</span>
-    la que no se considerará laborada para ningún efecto legal.
-  </p>
-  <div class="obs-red">OBS: HORARIO SERÁ SEGÚN LO ESTIPULADO POR OBRA</div>
-  <table style="font-size:8pt; margin-bottom:3px;">
-    {% if d.dias_laborales == "Lunes a Sábado" %}
-    <tr>
-      <td class="lbl green" rowspan="2" style="width:20%; text-align:center;">LUNES A JUEVES</td>
-      <td style="width:12%;">Desde</td><td class="green" style="width:14%;">{{ d.inicio_am|default:"08:00 HRS" }}.</td>
-      <td style="width:8%;">A</td><td class="green">{{ d.termino_am|default:"13:00 HRS" }}.</td>
-    </tr>
-    <tr>
-      <td>Desde</td><td class="green">{{ d.inicio_pm|default:"14:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_lj|default:"18:00 HRS" }}.</td>
-    </tr>
-    <tr>
-      <td class="lbl green" rowspan="2" style="text-align:center;">VIERNES</td>
-      <td>Desde</td><td class="green">{{ d.inicio_am|default:"08:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_am|default:"13:00 HRS" }}</td>
-    </tr>
-    <tr>
-      <td>Desde</td><td class="green">{{ d.inicio_pm|default:"14:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_v|default:"17:00 HRS" }}</td>
-    </tr>
-    <tr>
-      <td class="lbl green" rowspan="2" style="text-align:center;">SÁBADO</td>
-      <td>Desde</td><td class="green">{{ d.inicio_am|default:"08:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_am|default:"13:00 HRS" }}</td>
-    </tr>
-    <tr>
-      <td colspan="4" class="green" style="text-align:center; font-style:italic;">Tarde libre</td>
-    </tr>
-    {% else %}
-    <tr>
-      <td class="lbl green" rowspan="2" style="width:20%; text-align:center;">LUNES A JUEVES</td>
-      <td style="width:12%;">Desde</td><td class="green" style="width:14%;">{{ d.inicio_am|default:"08:00 HRS" }}.</td>
-      <td style="width:8%;">A</td><td class="green">{{ d.termino_am|default:"13:00 HRS" }}.</td>
-    </tr>
-    <tr>
-      <td>Desde</td><td class="green">{{ d.inicio_pm|default:"14:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_lj|default:"18:00 HRS" }}.</td>
-    </tr>
-    <tr>
-      <td class="lbl green" rowspan="2" style="text-align:center;">VIERNES</td>
-      <td>Desde</td><td class="green">{{ d.inicio_am|default:"08:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_am|default:"13:00 HRS" }}</td>
-    </tr>
-    <tr>
-      <td>Desde</td><td class="green">{{ d.inicio_pm|default:"14:00 HRS" }}</td><td>A</td><td class="green">{{ d.termino_v|default:"17:00 HRS" }}</td>
-    </tr>
-    {% endif %}
-  </table>
-
-  <!-- CLÁUSULA 3 -->
-  <p class="cuerpo">
-    <span class="cnum">3.-</span> El trabajo se ejecutará por:
-    <span class="green">&nbsp;{% if doc.contrato %}{{ doc.contrato.tipo_contrato|upper }}{% else %}_______________{% endif %}&nbsp;</span>
-  </p>
-
-  <!-- CLÁUSULA 4 — REMUNERACIÓN -->
-  <p class="cuerpo">
-    <span class="cnum">4.-</span> El Empleador se compromete a remunerar al trabajador, por mes efectivamente trabajado en jornada completa, la suma de: $<span class="green">&nbsp;{% if sueldo_formateado %}{{ sueldo_formateado }}{% else %}_______________________________{% endif %}&nbsp;</span>
-    pesos.-) El tiempo extraordinario se pagará con el recargo legal y se cancelará conjuntamente con el respectivo sueldo, dentro de los cinco primeros días del mes siguiente al período vencido, y de cuyo monto el Empleador hará las deducciones que establecen las leyes vigentes.
-  </p>
-
-  <!-- CLÁUSULA 5 -->
-  <p class="cuerpo">
-    <span class="cnum">5.-</span> El presente contrato durará hasta el:
-    {% if doc.contrato and doc.contrato.fecha_termino_estimada %}
-    <span class="green">&nbsp;{{ doc.contrato.fecha_termino_estimada|date:"d \d\e F \d\e Y" }}&nbsp;</span>
-    {% else %}
-    ___________________________________
-    {% endif %}
-    , sin embargo, podrá ponérsele término cuando concurran para ello causas justificadas, que en conformidad a la Ley, puedan producir su caducidad o término.
-  </p>
-
-  <!-- CLÁUSULA 6 -->
-  <p class="cuerpo">
-    <span class="cnum">6.-</span> En este acto las partes acuerdan que, sin perjuicio de lo dispuesto en las cláusulas anteriores, este contrato podrá expirar paulatina y anticipadamente al término final o entrega definitiva de la obra, en virtud de ir concluyendo en forma decreciente las labores de la faena.<br>
-    También este contrato terminará anticipadamente cuando el trabajador incurra en causales para ello, según lo dispuesto en el artículo 160 del Código del Trabajo, sin derecho a indemnización alguna. Igualmente, este contrato terminará anticipadamente, si el dueño de la obra termina unilateralmente el contrato con el empleador, o reduce el monto o cuantía del contrato celebrado, en cuyo caso el trabajador acepta que la causa de término de la relación laboral, sea el artículo 159, N° 5 del Código del Trabajo, es decir, "Conclusión del trabajo o servicio que dio origen al contrato".
-  </p>
-
-  <!-- CLÁUSULA 7 -->
-  <p class="cuerpo">
-    <span class="cnum">7.-</span> Se deja constancia que el trabajador: <strong>{{ doc.trabajador.nombre_completo }}</strong> ingresó al servicio el
-    <span class="green">&nbsp;{% if doc.contrato %}{{ doc.contrato.fecha_inicio|date:"d \d\e F \d\e Y" }}{% else %}_______________{% endif %}&nbsp;</span>
-  </p>
-
-  <!-- CLÁUSULA 8 -->
-  <p class="cuerpo">
-    <span class="cnum">8.-</span> Se entienden incorporadas al presente contrato todas las disposiciones legales que se dicten con posterioridad a la fecha de suscripción y que tengan relación con él, y las cláusulas adicionales estipuladas en el <strong>ANEXO DE CONTRATO DE TRABAJO</strong>. -
-  </p>
-
-  <!-- CLÁUSULA 9 -->
-  <p class="cuerpo">
-    <span class="cnum">9.-</span> El presente contrato se firma en tres ejemplares del mismo tenor, dejando expresa constancia que en este acto el Trabajador recibe uno de ellos.
-  </p>
-
-  {% if d.observaciones %}<p class="cuerpo"><em>{{ d.observaciones }}</em></p>{% endif %}
-
-  <!-- FIRMAS -->
-  <table style="margin-top:35px; border:none;">
-    <tr>
-      <td class="nb" style="width:50%; text-align:center; padding-top:35px;">
-        <div class="sig-line" style="width:75%; margin:0 auto;"></div>
-        <strong>Firma del Empleador</strong><br>
-        <span style="font-size:8pt;">{{ empresa_print.nombre|default:"" }}</span><br>
-        <span style="font-size:8pt;">RUT: {{ empresa_print.rut_empresa|default:"" }}</span>
-      </td>
-      <td class="nb" style="width:50%; text-align:center; padding-top:35px;">
-        <div class="sig-line" style="width:75%; margin:0 auto;"></div>
-        <strong>Firma del Trabajador</strong><br>
-        <span style="font-size:8pt;">{{ doc.trabajador.nombre_completo }}</span><br>
-        <span style="font-size:8pt;">RUT: {{ doc.trabajador.rut }}</span>
-      </td>
-    </tr>
-  </table>
-
-  <p style="font-size:7pt; color:#888; text-align:center; margin-top:18px;">
-    Contrato N° {% if doc.contrato %}{{ doc.contrato.pk }}{% else %}{{ doc.pk }}{% endif %} &mdash; Generado por TsDesk
-  </p>
-
+<div id="savedBanner" style="display:none;position:fixed;top:62px;left:0;right:0;background:#15803d;color:#fff;padding:10px 24px;z-index:9998;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.3)">
+  <span>✓ Borrador guardado — imprime, envía a firmar y luego sube el documento firmado en la carpeta digital del trabajador.</span>
+  <button onclick="document.getElementById('savedBanner').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;margin-left:16px" title="Cerrar">×</button>
 </div>
+<script>if(new URLSearchParams(location.search).get('saved')==='1'){var b=document.getElementById('savedBanner');b.style.display='flex';}</script>
+
+<div class="page">
+  {% include "documentos_generados/print/_contrato_body.html" %}
+</div>
+
 {% if is_blank %}
 <script>
 function imprimirCopias() {

@@ -24,10 +24,15 @@
         <hr class="border-secondary">
 
         <!-- ACCIÓN PRINCIPAL -->
-        <div class="px-2 mb-3">
+        <div class="px-2 mb-3 d-flex gap-2">
           <a href="{% url 'doc_generado_create' %}"
-             class="btn btn-warning w-100 fw-semibold {% if request.resolver_match.url_name == 'doc_generado_create' %}active{% endif %}">
+             class="btn btn-warning flex-grow-1 fw-semibold {% if request.resolver_match.url_name == 'doc_generado_create' %}active{% endif %}">
             <i class="bi bi-file-earmark-plus me-1"></i>Generar Documento
+          </a>
+          <a href="{% url 'doc_generado_borradores' %}"
+             class="btn btn-outline-warning {% if request.resolver_match.url_name == 'doc_generado_borradores' %}active{% endif %}"
+             title="Borradores">
+            <i class="bi bi-journals"></i>
           </a>
         </div>
 
@@ -79,6 +84,11 @@
             </a>
           </li>
           <li class="nav-item">
+            <a class="nav-link text-white {% if 'licencia' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'licencia_list' %}">
+              <i class="bi bi-hospital me-2"></i>Licencias Médicas
+            </a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link text-white {% if request.resolver_match.url_name == 'papelera_documentos' %}active bg-primary rounded{% endif %}" href="{% url 'papelera_documentos' %}">
               <i class="bi bi-trash3 me-2 text-secondary"></i>Papelera
             </a>
@@ -102,6 +112,11 @@
           <li class="nav-item">
             <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_auditoria' %}active bg-primary rounded{% endif %}" href="{% url 'admin_auditoria' %}">
               <i class="bi bi-journal-text me-2"></i>Auditoría
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white {% if 'config_remuneraciones' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'config_remuneraciones_list' %}">
+              <i class="bi bi-sliders me-2"></i>Tasas AFP/Salud
             </a>
           </li>
         </ul>
@@ -165,8 +180,8 @@
 <!-- Modal preview documental global -->
 <div class="modal fade" id="modalPreviewDoc" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content" style="height:90vh;display:flex;flex-direction:column">
+      <div class="modal-header" style="flex-shrink:0">
         <h5 class="modal-title" id="previewDocTitle">Vista Previa</h5>
         <div class="ms-auto d-flex gap-2">
           <a id="previewDocDownload" href="#" class="btn btn-sm btn-outline-primary" download>
@@ -175,7 +190,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
       </div>
-      <div class="modal-body p-0" id="previewDocBody" style="min-height:500px">
+      <div class="modal-body p-0" id="previewDocBody" style="flex:1;min-height:0;overflow:hidden">
         <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
       </div>
     </div>
@@ -188,12 +203,12 @@ function previewDoc(url, nombre, extension) {
   document.getElementById('previewDocDownload').href = url;
   const body = document.getElementById('previewDocBody');
   const ext = (extension || '').toLowerCase();
-  if (['pdf'].includes(ext)) {
-    body.innerHTML = `<iframe src="${url}" style="width:100%;height:75vh;border:none;"></iframe>`;
+  if (ext === 'pdf' || ext === 'html') {
+    body.innerHTML = `<iframe src="${url}" style="width:100%;height:100%;border:none;"></iframe>`;
   } else if (['jpg','jpeg','png','gif','webp'].includes(ext)) {
     body.innerHTML = `<div class="text-center p-3"><img src="${url}" class="img-fluid" style="max-height:75vh;"></div>`;
   } else {
-    body.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-file-earmark fs-1 d-block mb-3"></i>Vista previa no disponible para este tipo de archivo.<br><a href="${url}" class="btn btn-primary mt-3" download>Descargar archivo</a></div>`;
+    body.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-file-earmark fs-1 d-block mb-3"></i>Vista previa no disponible.<br><a href="${url}" class="btn btn-primary mt-3" download>Descargar archivo</a></div>`;
   }
   new bootstrap.Modal(document.getElementById('modalPreviewDoc')).show();
 }

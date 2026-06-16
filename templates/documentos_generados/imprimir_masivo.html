@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+{% block title %}Contratos Masivos | TsDesk{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0">
+      <i class="bi bi-printer-fill text-primary me-2"></i>Contratos Masivos para Obra
+    </h2>
+    <small class="text-muted">Selecciona trabajadores, genera sus contratos uno por uno y luego imprímelos todos juntos.</small>
+  </div>
+  <a href="{% url 'doc_generado_borradores' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-journals me-1"></i>Todos los borradores
+  </a>
+</div>
+
+<!-- PASO 1: Seleccionar obra -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-light fw-semibold d-flex align-items-center gap-2">
+    <span class="badge bg-primary rounded-pill">1</span>Elige la obra
+  </div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col">
+        <select name="obra_id" class="form-select" onchange="this.form.submit()">
+          <option value="">— Elige una obra —</option>
+          {% for o in obras %}
+          <option value="{{ o.pk }}" {% if obra_obj and obra_obj.pk == o.pk %}selected{% endif %}>{{ o.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Ver</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if obra_obj %}
+
+<!-- PASO 2: Seleccionar trabajadores -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-light fw-semibold d-flex align-items-center gap-2">
+    <span class="badge bg-primary rounded-pill">2</span>
+    Selecciona trabajadores
+    <span class="text-muted fw-normal small ms-1">— <strong>{{ obra_obj.nombre }}</strong></span>
+  </div>
+  <div class="card-body pb-2">
+
+    <!-- Chips de seleccionados -->
+    <div id="selectedZone" class="mb-2" style="display:none">
+      <div class="d-flex flex-wrap gap-1 align-items-center p-2 rounded" style="background:#f0f4ff; border:1px solid #c7d7ff; min-height:38px;">
+        <span class="text-muted small me-1" style="white-space:nowrap">Seleccionados:</span>
+        <div id="selectedChips" class="d-flex flex-wrap gap-1"></div>
+      </div>
+    </div>
+
+    <!-- Búsqueda rápida -->
+    <div class="mb-2">
+      <input type="text" id="workerSearchInput" class="form-control form-control-sm"
+             placeholder="Filtrar por nombre o RUT..."
+             oninput="filtrarWorkers(this.value)">
+    </div>
+
+    <!-- Lista scrollable de trabajadores -->
+    <div id="workerList" style="max-height:240px; overflow-y:auto; border:1px solid #dee2e6; border-radius:.375rem;">
+      {% for t in trabajadores %}
+      <label class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3 cursor-pointer worker-item"
+             data-search="{{ t.nombre_completo|lower }} {{ t.rut }}"
+             data-nombre="{{ t.nombre_completo }}">
+        <input type="checkbox" class="form-check-input worker-check flex-shrink-0"
+               value="{{ t.rut }}"
+               onchange="workerToggle(this)">
+        <div class="flex-grow-1">
+          <span class="fw-semibold worker-nombre">{{ t.nombre_completo }}</span>
+          <code class="text-muted ms-2" style="font-size:.75rem">{{ t.rut }}</code>
+        </div>
+        {% if t.pk in borrador_trabajador_ids %}
+        <span class="badge bg-success" title="Ya tiene borrador para esta obra">
+          <i class="bi bi-check-circle me-1"></i>Con borrador
+        </span>
+        {% endif %}
+      </label>
+      {% empty %}
+      <div class="text-center text-muted py-4 small">No hay trabajadores activos registrados.</div>
+      {% endfor %}
+    </div>
+    <div id="listaVaciaMsg" class="text-center text-muted py-3 small" style="display:none">
+      <i class="bi bi-check2-all me-1"></i>Todos seleccionados
+    </div>
+
+    <!-- Controles -->
+    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleTodos(true)">
+        <i class="bi bi-check-all me-1"></i>Todos
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleTodos(false)">
+        <i class="bi bi-x-lg me-1"></i>Limpiar
+      </button>
+      <div class="flex-grow-1"></div>
+      <button id="btnGenerar" class="btn btn-primary" disabled onclick="generarBorradores()">
+        <i class="bi bi-file-earmark-plus me-1"></i><span id="btnGenerarTxt">Generar borradores</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Trabajadores en dotación SIN borrador (alerta amarilla) -->
+{% if sin_borrador %}
+<div class="alert alert-warning border-0 shadow-sm mb-4">
+  <div class="d-flex align-items-start gap-3">
+    <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0 mt-1"></i>
+    <div class="flex-grow-1">
+      <div class="fw-bold mb-1">{{ sin_borrador|length }} trabajador{% if sin_borrador|length != 1 %}es{% endif %} en dotación sin borrador</div>
+      <div class="small mb-2">Están en la obra con contrato "Pendiente de Firma" pero falta generar el PDF del contrato.</div>
+      <div class="list-group list-group-flush rounded">
+        {% for contrato in sin_borrador %}
+        <div class="list-group-item list-group-item-warning d-flex align-items-center gap-3 py-2 px-3">
+          <div class="flex-grow-1">
+            <span class="fw-semibold">{{ contrato.trabajador.nombre_completo }}</span>
+            <code class="text-muted ms-2" style="font-size:.78rem">{{ contrato.trabajador.rut }}</code>
+            {% if contrato.especialidad %}<span class="text-muted small ms-2">— {{ contrato.especialidad.nombre }}</span>{% endif %}
+          </div>
+          <a href="{% url 'doc_generado_create' %}?tipo=contrato_trabajo&trabajador_rut={{ contrato.trabajador.rut }}&contrato_id={{ contrato.pk }}&next={{ request.get_full_path|urlencode }}"
+             class="btn btn-sm btn-warning fw-semibold text-nowrap">
+            <i class="bi bi-file-earmark-plus me-1"></i>Generar borrador
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- PASO 3: Revisar borradores y seleccionar para imprimir -->
+{% if borradores %}
+
+<form id="printForm" method="post" action="{% url 'doc_generado_imprimir_masivo' %}">
+  {% csrf_token %}
+  <input type="hidden" name="obra_id" value="{{ obra_obj.pk }}">
+</form>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+    <div>
+      <span class="badge bg-primary rounded-pill me-1">3</span>
+      <span class="fw-semibold"><i class="bi bi-building me-1 text-warning"></i>{{ obra_obj.nombre }}</span>
+      <span class="text-muted small ms-2">— {{ borradores|length }} borrador{% if borradores|length != 1 %}es{% endif %} generados</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-light"
+              onclick="document.querySelectorAll('.doc-check').forEach(c=>c.checked=true)">
+        <i class="bi bi-check-all me-1"></i>Todos
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="document.querySelectorAll('.doc-check').forEach(c=>c.checked=false)">
+        <i class="bi bi-x-lg me-1"></i>Ninguno
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    <div class="list-group list-group-flush">
+      {% for doc in borradores %}
+      <div class="list-group-item px-3 py-2 d-flex align-items-center gap-3">
+
+        <input type="checkbox" name="doc_ids" value="{{ doc.pk }}"
+               class="form-check-input doc-check flex-shrink-0"
+               form="printForm" checked
+               title="Marcar para incluir en la impresión">
+
+        <div style="min-width:130px">
+          <span class="badge bg-primary">Contrato de Trabajo</span>
+          {% if doc.contrato and doc.contrato.estado == 'Pendiente de Firma' %}
+          <span class="badge bg-warning text-dark ms-1" style="font-size:.6rem">Dotación</span>
+          {% endif %}
+        </div>
+
+        <div class="flex-grow-1">
+          {% if doc.trabajador %}
+            <a href="{% url 'trabajador_detail' doc.trabajador.rut %}" class="fw-semibold text-decoration-none">{{ doc.trabajador.nombre_completo }}</a>
+            <code class="text-muted ms-2" style="font-size:.78rem">{{ doc.trabajador.rut }}</code>
+          {% else %}<span class="text-muted">Sin trabajador</span>{% endif %}
+        </div>
+
+        <div class="text-muted small d-none d-lg-block" style="min-width:160px">
+          {{ doc.empresa.nombre|default:"—" }}
+        </div>
+
+        <div class="text-muted small text-end" style="min-width:100px">
+          {{ doc.creado_el|date:"d/m/Y H:i" }}
+        </div>
+
+        <div class="d-flex gap-1 flex-wrap">
+          <button type="button" class="btn btn-sm btn-primary"
+                  onclick="previewDoc('{% url 'doc_generado_preview' doc.pk %}?next={{ request.get_full_path|urlencode }}', '{{ doc.trabajador.nombre_completo|default:"Borrador" }}', 'html')"
+                  title="Ver el borrador sin salir de esta página">
+            <i class="bi bi-eye me-1"></i>Ver
+          </button>
+          <a href="{% url 'doc_generado_edit' doc.pk %}?next={{ request.get_full_path|urlencode }}"
+             class="btn btn-sm btn-outline-secondary"
+             title="Editar datos del PDF (ciudad, jornada, datos personales)">
+            <i class="bi bi-file-earmark-text me-1"></i><span class="d-none d-xl-inline">Editar PDF</span>
+          </a>
+          {% if doc.contrato %}
+          <a href="{% url 'contrato_edit' doc.contrato.pk %}?next={{ request.get_full_path|urlencode }}"
+             class="btn btn-sm btn-outline-secondary"
+             title="Editar datos del contrato (especialidad, sueldo, fechas)">
+            <i class="bi bi-briefcase me-1"></i><span class="d-none d-xl-inline">Contrato</span>
+          </a>
+          {% endif %}
+          <form method="post" action="{% url 'doc_generado_delete' doc.pk %}"
+                onsubmit="return confirm('¿Eliminar borrador de {{ doc.trabajador.nombre_completo|default:"este trabajador" }}?');"
+                style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar este borrador">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- PASO 4: Imprimir -->
+<div class="card border-0 shadow-sm border-start border-4 border-success">
+  <div class="card-body d-flex align-items-center gap-3 py-3">
+    <span id="badgePaso4" class="badge bg-success rounded-pill fs-6" style="min-width:72px; text-align:center">{{ borradores|length }} contrato{% if borradores|length != 1 %}s{% endif %}</span>
+    <div class="flex-grow-1">
+      <div class="fw-semibold">¿Todo revisado? Imprime los contratos seleccionados</div>
+      <div class="text-muted small">Se abrirá una página con todos los contratos marcados en hojas separadas. Usa Ctrl+P o guarda como PDF.</div>
+    </div>
+    <button type="submit" form="printForm" class="btn btn-success btn-lg text-nowrap">
+      <i class="bi bi-printer-fill me-2"></i>Imprimir seleccionados
+    </button>
+  </div>
+</div>
+
+{% else %}
+
+{% if not sin_borrador %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-file-earmark-plus fs-1 d-block mb-3 opacity-25"></i>
+    <p class="mb-1 fw-semibold">Aún no hay borradores para <strong>{{ obra_obj.nombre }}</strong>.</p>
+    <p class="small mb-0">Usa el paso 2 para seleccionar los trabajadores y generar sus contratos.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endif %}
+
+<script>
+// ── Paso 2: selección con chips ──────────────────────────────────────────────
+
+function workerToggle(cb) {
+  const item = cb.closest('.worker-item');
+  const nombre = item.querySelector('.worker-nombre').textContent.trim();
+  const rut = cb.value;
+
+  if (cb.checked) {
+    item.style.display = 'none';
+    _addChip(nombre, rut);
+  } else {
+    item.style.display = '';
+    _removeChip(rut);
+  }
+  _syncEstado();
+}
+
+function _addChip(nombre, rut) {
+  const chip = document.createElement('span');
+  chip.className = 'badge d-inline-flex align-items-center gap-1';
+  chip.style.cssText = 'background:#1d4ed8; color:#fff; font-size:.78rem; padding:4px 8px; border-radius:20px;';
+  chip.dataset.rut = rut;
+  chip.innerHTML = nombre
+    + ' <button type="button" onclick="quitarSeleccion(\'' + CSS.escape(rut) + '\')" '
+    + 'style="background:none;border:none;color:rgba(255,255,255,.7);padding:0 0 0 4px;cursor:pointer;font-size:.7rem;line-height:1" title="Quitar">✕</button>';
+  document.getElementById('selectedChips').appendChild(chip);
+}
+
+function _removeChip(rut) {
+  const chip = document.querySelector('#selectedChips [data-rut="' + rut + '"]');
+  if (chip) chip.remove();
+}
+
+function quitarSeleccion(rut) {
+  const cb = document.querySelector('.worker-check[value="' + rut + '"]');
+  if (cb) { cb.checked = false; cb.closest('.worker-item').style.display = ''; }
+  _removeChip(rut);
+  _syncEstado();
+}
+
+function toggleTodos(marcar) {
+  document.querySelectorAll('.worker-check').forEach(cb => {
+    const item = cb.closest('.worker-item');
+    if (item.style.display === 'none' && !marcar) {
+      // estaba oculto (seleccionado) → deseleccionar
+      cb.checked = false;
+      item.style.display = '';
+      _removeChip(cb.value);
+    } else if (item.style.display !== 'none' && marcar) {
+      // visible → seleccionar
+      const nombre = item.querySelector('.worker-nombre').textContent.trim();
+      cb.checked = true;
+      item.style.display = 'none';
+      _addChip(nombre, cb.value);
+    }
+  });
+  if (!marcar) document.getElementById('selectedChips').innerHTML = '';
+  _syncEstado();
+}
+
+function filtrarWorkers(q) {
+  const texto = q.toLowerCase().trim();
+  document.querySelectorAll('.worker-item').forEach(item => {
+    // No mostrar los ya seleccionados aunque coincidan
+    const check = item.querySelector('.worker-check');
+    if (check && check.checked) return;
+    item.style.display = (!texto || item.dataset.search.includes(texto)) ? '' : 'none';
+  });
+}
+
+function _syncEstado() {
+  const n = document.querySelectorAll('.worker-check:checked').length;
+  const btn = document.getElementById('btnGenerar');
+  const txt = document.getElementById('btnGenerarTxt');
+  const zone = document.getElementById('selectedZone');
+  const listaVacia = document.getElementById('listaVaciaMsg');
+
+  zone.style.display = n > 0 ? '' : 'none';
+  btn.disabled = n === 0;
+  txt.textContent = n > 0
+    ? 'Generar ' + n + ' borrador' + (n > 1 ? 'es' : '')
+    : 'Generar borradores';
+
+  // Mostrar mensaje si no quedan items visibles en la lista
+  const visibles = [...document.querySelectorAll('.worker-item')].filter(i => i.style.display !== 'none').length;
+  listaVacia.style.display = visibles === 0 && n > 0 ? '' : 'none';
+}
+
+// ── Paso 4: badge dinámico ───────────────────────────────────────────────────
+
+function actualizarBadgePaso4() {
+  const n = document.querySelectorAll('.doc-check:checked').length;
+  const badge = document.getElementById('badgePaso4');
+  if (badge) badge.textContent = n + ' contrato' + (n !== 1 ? 's' : '');
+}
+
+document.querySelectorAll('.doc-check').forEach(cb => {
+  cb.addEventListener('change', actualizarBadgePaso4);
+});
+
+// ── Generar borradores ───────────────────────────────────────────────────────
+
+function generarBorradores() {
+  const checks = [...document.querySelectorAll('.worker-check:checked')];
+  if (!checks.length) return;
+
+  {% if obra_obj %}
+  const obraId = {{ obra_obj.pk }};
+  const ruts = checks.map(c => c.value).reverse();
+  let nextUrl = '/documentos-empresa/imprimir-masivo/?obra_id=' + obraId;
+
+  for (const rut of ruts) {
+    nextUrl = '/documentos-empresa/nuevo/?tipo=contrato_trabajo'
+      + '&trabajador_rut=' + encodeURIComponent(rut)
+      + '&obra_id=' + obraId
+      + '&next=' + encodeURIComponent(nextUrl);
+  }
+
+  window.location.href = nextUrl;
+  {% endif %}
+}
+</script>
+
+{% endblock %}

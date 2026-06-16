@@ -4,12 +4,28 @@
 <meta charset="UTF-8">
 <title>Anexo Contrato — {{ doc.trabajador.nombre_completo }}</title>
 <style>
+  @page { size: A4; margin: 1.5cm 2cm; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
-  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 20mm; }
-  .print-bar { position:fixed; top:0; left:0; right:0; background:#1e3a5f; color:white; padding:8px 20px; display:flex; gap:12px; align-items:center; z-index:9999; }
-  .print-bar a { color:#adc8ff; text-decoration:none; margin-left:auto; }
-  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; } }
+  .page { width: 210mm; margin: 64px auto 0; padding: 18mm 20mm; }
+  .print-bar { position:fixed; top:0; left:0; right:0;
+    background:linear-gradient(90deg,#0f2543 0%,#1d4ed8 100%);
+    color:#fff; padding:0 24px; display:flex; align-items:center; gap:12px;
+    z-index:9999; min-height:62px; box-shadow:0 2px 14px rgba(0,0,0,.4); }
+  .pb-info { flex:1; min-width:0; }
+  .pb-tipo { font-size:10px; text-transform:uppercase; letter-spacing:.1em; opacity:.6; }
+  .pb-nombre { font-size:18px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pb-btns { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+  .pb-btn { display:inline-flex; align-items:center; gap:5px; padding:7px 15px;
+    border-radius:7px; font-size:12px; font-weight:600; text-decoration:none;
+    cursor:pointer; border:none; line-height:1; white-space:nowrap; }
+  .pb-btn:hover { filter:brightness(1.15); }
+  .pb-print  { background:#16a34a; color:#fff; }
+  .pb-upload { background:#0d6efd; color:#fff; }
+  .pb-edit   { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); }
+  .pb-back   { background:transparent; color:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.2); font-size:11px; }
+  .pb-back:hover { color:#fff; border-color:rgba(255,255,255,.5); }
+  @media print { .print-bar { display:none !important; } .page { margin-top:0 !important; width:auto; padding:0; } }
   h1.titulo { font-size:14px; font-weight:bold; text-align:center; text-decoration:underline; margin-bottom:14px; }
   .ciudad-fecha { text-align:right; font-style:italic; margin-bottom:12px; }
   .seccion-titulo { font-weight:bold; text-decoration:underline; margin:10px 0 6px; }
@@ -39,15 +55,36 @@
 </div>
 {% else %}
 <div class="print-bar">
-  <strong>Anexo Contrato — {{ doc.trabajador.nombre_completo }}</strong>
-  <button onclick="window.print()" style="background:#28a745;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;margin-left:12px;">Imprimir / Guardar PDF</button>
-  <a href="{% url 'doc_generado_edit' doc.pk %}">Editar</a>
-  <a href="{% url 'trabajador_upload_doc' doc.trabajador.rut %}" style="background:#0d6efd;color:white;padding:6px 14px;border-radius:4px;">Subir firmado</a>
-  <a href="{% url 'doc_generado_list' %}">← Volver</a>
+  <div class="pb-info">
+    <div class="pb-tipo">Anexo Contrato de Trabajo</div>
+    <div class="pb-nombre">{{ doc.trabajador.nombre_completo }}</div>
+  </div>
+  <div class="pb-btns">
+    <button class="pb-btn pb-print" onclick="window.print()">🖨 Imprimir / PDF</button>
+    <a class="pb-btn pb-upload" href="{% url 'trabajador_detail' doc.trabajador.rut %}?tab=documentos" title="Ir a la carpeta del trabajador para subir el documento firmado">📁 Ir a carpeta del trabajador</a>
+    <a class="pb-btn pb-edit" href="{% url 'doc_generado_edit' doc.pk %}">✏ Editar</a>
+    <a class="pb-btn pb-back" href="{% url 'doc_generado_list' %}">← Volver</a>
+  </div>
 </div>
 {% endif %}
 
-<div class="page" style="margin-top:45px">
+<div id="savedBanner" style="display:none;position:fixed;top:62px;left:0;right:0;background:#15803d;color:#fff;padding:10px 24px;z-index:9998;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.3)">
+  <span id="savedBannerMsg">✓ Borrador guardado — imprime, envía a firmar y luego sube el documento firmado en la carpeta digital del trabajador.</span>
+  <button onclick="document.getElementById('savedBanner').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;margin-left:16px" title="Cerrar">×</button>
+</div>
+<script>
+(function(){
+  var p = new URLSearchParams(location.search);
+  if(p.get('saved')==='1'){
+    var ext = p.get('ext');
+    if(ext) document.getElementById('savedBannerMsg').textContent =
+      '✓ Borrador guardado — vigencia extendida hasta ' + ext + '. El contrato original no fue modificado. Imprime y envía a firmar.';
+    document.getElementById('savedBanner').style.display='flex';
+  }
+})();
+</script>
+
+<div class="page">
   <h1 class="titulo">ANEXO CONTRATO DE TRABAJO</h1>
   <div class="ciudad-fecha">En {{ d.ciudad_documento|default:"___________" }}, {{ d.fecha_documento|date:"d \d\e F \d\e Y"|default:"___________" }}</div>
 
@@ -68,9 +105,9 @@
 
   <p class="clausula" style="margin-top:12px">Entre las partes arriba individualizadas se suscribe el presente <b>Anexo de Contrato de Trabajo</b>, para cuyo efecto los contratantes convienen en denominarse <b>Trabajador y Empleador</b>, respectivamente.</p>
 
-  <p class="clausula"><b>1.-</b> A contar del <span class="valor">{{ d.fecha_contrato_original|date:"d \d\e F \d\e Y"|default:"___________" }}</span>, entre las partes ya individualizadas anteriormente se firma el siguiente Anexo de Contrato con el objeto de regularizar el primero.</p>
+  <p class="clausula"><b>1.-</b> A contar del <span class="valor">{{ d.fecha_vigencia_anexo|date:"d \d\e F \d\e Y"|default:"___________" }}</span>, entre las partes ya individualizadas anteriormente se firma el siguiente Anexo de Contrato con el objeto de regularizar el primero.</p>
 
-  <p class="clausula"><b>2.-</b> Queda de manifiesto que se conservarán todas y cada una de las cláusulas del contrato original de fecha <span class="valor">{{ d.fecha_contrato_original|date:"d \d\e F \d\e Y"|default:"" }}</span> y demás disposiciones que se dicten con posterioridad a la fecha de suscripción del presente "Anexo de Contrato", y que tengan relación con él.</p>
+  <p class="clausula"><b>2.-</b> Queda de manifiesto que se conservarán todas y cada una de las cláusulas del contrato original de fecha <span class="valor">{{ d.fecha_contrato_original|date:"d \d\e F \d\e Y"|default:"___________" }}</span> y demás disposiciones que se dicten con posterioridad a la fecha de suscripción del presente "Anexo de Contrato", y que tengan relación con él.</p>
 
   <p class="clausula"><b>3.-</b> El presente anexo al contrato se firma en dos ejemplares del mismo tenor, dejando expresa constancia que el trabajador recibe uno de ellos.</p>
 
