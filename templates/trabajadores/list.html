@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 {% load core_extras %}
 {% block title %}Trabajadores | TsDesk{% endblock %}
+{% block page_title %}Trabajadores{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="mb-0 fw-bold"><i class="bi bi-person-badge-fill text-primary me-2"></i>Fichas de Trabajadores</h2>
+  <h4 class="mb-0 fw-bold"><i class="bi bi-person-badge-fill text-primary me-2"></i>Fichas de Trabajadores</h4>
   <a href="{% url 'trabajador_create' %}" class="btn btn-primary">
     <i class="bi bi-person-plus-fill me-1"></i>Nuevo Trabajador
   </a>
@@ -51,7 +52,7 @@
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
-        <thead class="table-dark">
+        <thead>
           <tr>
             <th>RUT</th>
             <th>Nombre Completo</th>
@@ -124,14 +125,16 @@
               {% endif %}
             </td>
             <td>
-              <a href="{% url 'trabajador_detail' t.rut %}" class="btn btn-sm btn-outline-primary" title="Ver ficha"><i class="bi bi-eye"></i></a>
-              {% if user.is_superuser %}
-              <button type="button" class="btn btn-sm btn-outline-danger" title="Desactivar ficha"
-                      data-bs-toggle="modal" data-bs-target="#modalEliminar"
-                      data-rut="{{ t.rut }}" data-nombre="{{ t.nombre_completo }}">
-                <i class="bi bi-trash"></i>
-              </button>
-              {% endif %}
+              <div class="action-group">
+                <a href="{% url 'trabajador_detail' t.rut %}" class="btn btn-table btn-outline-primary" title="Ver ficha"><i class="bi bi-eye-fill"></i></a>
+                {% if user.is_superuser %}
+                <button type="button" class="btn btn-table btn-outline-danger" title="Desactivar ficha"
+                        data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                        data-rut="{{ t.rut }}" data-nombre="{{ t.nombre_completo }}">
+                  <i class="bi bi-trash3-fill"></i>
+                </button>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}

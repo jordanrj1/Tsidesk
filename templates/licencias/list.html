@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Licencias Médicas{% endblock %}
+{% block title %}Licencias Médicas | TsDesk{% endblock %}
+{% block page_title %}Licencias Médicas{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="mb-0"><i class="bi bi-hospital me-2"></i>Licencias Médicas</h4>
+  <h4 class="mb-0 fw-bold"><i class="bi bi-bandaid-fill text-primary me-2"></i>Licencias Médicas</h4>
   <a href="{% url 'licencia_create' %}" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-circle me-1"></i>Registrar Licencia
   </a>
@@ -72,7 +73,7 @@
               <a href="{% url 'obra_detail' lic.obra.pk %}">{{ lic.obra.nombre }}</a>
             {% else %}<span class="text-muted">—</span>{% endif %}
           </td>
-          <td><span class="badge bg-secondary">Tipo {{ lic.tipo }}</span></td>
+          <td><span class="badge badge-archivada">Tipo {{ lic.tipo }}</span></td>
           <td>{{ lic.organismo }}</td>
           <td>{{ lic.numero_folio|default:"—" }}</td>
           <td>{{ lic.fecha_inicio }}</td>
@@ -85,23 +86,25 @@
           </td>
           <td>
             {% if lic.estado == 'Autorizada' %}
-              <span class="badge bg-success">{{ lic.estado }}</span>
+              <span class="badge badge-vigente">{{ lic.estado }}</span>
             {% elif lic.estado == 'Rechazada' %}
-              <span class="badge bg-danger">{{ lic.estado }}</span>
+              <span class="badge badge-vencido">{{ lic.estado }}</span>
             {% elif lic.estado == 'Prorrogada' %}
-              <span class="badge bg-warning text-dark">{{ lic.estado }}</span>
+              <span class="badge badge-proximo">{{ lic.estado }}</span>
             {% elif lic.estado == 'En trámite' %}
-              <span class="badge bg-info text-dark">{{ lic.estado }}</span>
+              <span class="badge badge-pendiente">{{ lic.estado }}</span>
             {% else %}
-              <span class="badge bg-secondary">{{ lic.estado }}</span>
+              <span class="badge badge-archivada">{{ lic.estado }}</span>
             {% endif %}
             {% if lic.fecha_fin and lic.fecha_fin < hoy and lic.estado not in 'Autorizada,Rechazada' %}
               <br><small class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Vencida</small>
             {% endif %}
           </td>
           <td class="text-end">
-            <a href="{% url 'licencia_detail' lic.pk %}" class="btn btn-link btn-sm p-0 me-1" title="Ver"><i class="bi bi-eye"></i></a>
-            <a href="{% url 'licencia_edit' lic.pk %}" class="btn btn-link btn-sm p-0" title="Editar"><i class="bi bi-pencil"></i></a>
+            <div class="action-group">
+              <a href="{% url 'licencia_detail' lic.pk %}" class="btn btn-table btn-outline-secondary" title="Ver"><i class="bi bi-eye-fill"></i></a>
+              <a href="{% url 'licencia_edit' lic.pk %}" class="btn btn-table btn-outline-primary" title="Editar"><i class="bi bi-pencil-square"></i></a>
+            </div>
           </td>
         </tr>
         {% empty %}

@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}Reportes Ejecutivos | TsDesk{% endblock %}
+{% block page_title %}Reportes Ejecutivos{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Reportes Ejecutivos</h2>
+  <h4 class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Reportes Ejecutivos</h4>
   <a href="{% url 'reportes_exportar_excel' %}" class="btn btn-success">
     <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel Completo
   </a>
