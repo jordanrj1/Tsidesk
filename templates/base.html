@@ -164,12 +164,12 @@
     <!-- Footer de usuario -->
     <div class="sidebar-footer">
       <div class="d-flex align-items-center gap-2">
-        <div class="flex-grow-1 overflow-hidden">
+        <a href="{% url 'perfil_editar' %}" class="flex-grow-1 overflow-hidden text-decoration-none" title="Editar mi perfil">
           <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
           <div class="sidebar-user-role">
             {% if user.is_superuser %}Super Admin{% else %}Secretaria Operativa{% endif %}
           </div>
-        </div>
+        </a>
         <a href="{% url 'logout' %}"
            class="btn btn-sm p-1 flex-shrink-0"
            style="border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:6px"

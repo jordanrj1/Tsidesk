@@ -126,6 +126,9 @@ urlpatterns = [
     path('admin-panel/remuneraciones/', views.config_remuneraciones_list, name='config_remuneraciones_list'),
     path('admin-panel/remuneraciones/guardar/', views.config_remuneraciones_save, name='config_remuneraciones_save'),
 
+    # Perfil propio (cualquier usuario autenticado)
+    path('perfil/', views.perfil_editar, name='perfil_editar'),
+
     # Admin Panel
     path('admin-panel/usuarios/', views.admin_usuarios, name='admin_usuarios'),
     path('admin-panel/usuarios/nuevo/', views.admin_usuario_create, name='admin_usuario_create'),

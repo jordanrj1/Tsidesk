@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
+from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
 from ..models import LogAuditoria, TipoDocumento, Especialidad, CatalogoMaterial, BodegaObra, Obra
 from ..forms import (TipoDocumentoForm, EspecialidadForm, CatalogoMaterialForm,
@@ -9,6 +10,58 @@ from ..forms import (TipoDocumentoForm, EspecialidadForm, CatalogoMaterialForm,
 
 def superuser_required(view_func):
     return user_passes_test(lambda u: u.is_superuser)(view_func)
+
+
+@login_required
+def perfil_editar(request):
+    user = request.user
+    errores = {}
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion', 'perfil')
+
+        if accion == 'perfil':
+            first_name = request.POST.get('first_name', '').strip()
+            last_name  = request.POST.get('last_name', '').strip()
+            email      = request.POST.get('email', '').strip()
+
+            if not first_name:
+                errores['first_name'] = 'El nombre es obligatorio.'
+            if not last_name:
+                errores['last_name'] = 'El apellido es obligatorio.'
+            if not email:
+                errores['email'] = 'El correo es obligatorio.'
+            elif User.objects.filter(email=email).exclude(pk=user.pk).exists():
+                errores['email'] = 'Ese correo ya está en uso por otro usuario.'
+
+            if not errores:
+                user.first_name = first_name
+                user.last_name  = last_name
+                user.email      = email
+                user.save(update_fields=['first_name', 'last_name', 'email'])
+                messages.success(request, 'Perfil actualizado correctamente.')
+                return redirect('perfil_editar')
+
+        elif accion == 'password':
+            password_actual = request.POST.get('password_actual', '')
+            password_nueva  = request.POST.get('password_nueva', '')
+            password_conf   = request.POST.get('password_conf', '')
+
+            if not user.check_password(password_actual):
+                errores['password_actual'] = 'La contraseña actual es incorrecta.'
+            if len(password_nueva) < 6:
+                errores['password_nueva'] = 'La nueva contraseña debe tener al menos 6 caracteres.'
+            elif password_nueva != password_conf:
+                errores['password_conf'] = 'Las contraseñas no coinciden.'
+
+            if not errores:
+                user.set_password(password_nueva)
+                user.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Contraseña cambiada correctamente. Tu sesión sigue activa.')
+                return redirect('perfil_editar')
+
+    return render(request, 'perfil/editar.html', {'errores': errores})
 
 
 @login_required

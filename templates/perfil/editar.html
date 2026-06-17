@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Mi Perfil | TsDesk{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+
+{% block content %}
+<div class="row g-4" style="max-width:720px">
+
+  <!-- ── Datos personales ── -->
+  <div class="col-12">
+    <div class="card card-accent-primary">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-person-circle text-primary"></i>
+        <span>Datos Personales</span>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="perfil">
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nombre(s) <span class="text-danger">*</span></label>
+              <input type="text" name="first_name" class="form-control {% if errores.first_name %}is-invalid{% endif %}"
+                     value="{{ request.POST.first_name|default:user.first_name }}" placeholder="Ej: Valeria Nicol" autofocus>
+              {% if errores.first_name %}<div class="invalid-feedback">{{ errores.first_name }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Apellido(s) <span class="text-danger">*</span></label>
+              <input type="text" name="last_name" class="form-control {% if errores.last_name %}is-invalid{% endif %}"
+                     value="{{ request.POST.last_name|default:user.last_name }}" placeholder="Ej: López Soto">
+              {% if errores.last_name %}<div class="invalid-feedback">{{ errores.last_name }}</div>{% endif %}
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Correo electrónico <span class="text-danger">*</span></label>
+              <input type="email" name="email" class="form-control {% if errores.email %}is-invalid{% endif %}"
+                     value="{{ request.POST.email|default:user.email }}" placeholder="correo@empresa.cl">
+              {% if errores.email %}<div class="invalid-feedback">{{ errores.email }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Nombre de usuario</label>
+              <input type="text" class="form-control" value="{{ user.username }}" disabled>
+              <div class="form-text">No es modificable.</div>
+            </div>
+          </div>
+
+          <div class="mt-3 pt-2 border-top d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle-fill me-1"></i>Guardar cambios
+            </button>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+      <div class="card-footer d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle text-muted"></i>
+        <span>Los cambios se reflejan de inmediato en el sidebar del sistema.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cambiar contraseña ── -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-shield-lock-fill text-muted"></i>
+        <span>Cambiar Contraseña</span>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="password">
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Contraseña actual <span class="text-danger">*</span></label>
+              <input type="password" name="password_actual"
+                     class="form-control {% if errores.password_actual %}is-invalid{% endif %}"
+                     autocomplete="current-password">
+              {% if errores.password_actual %}<div class="invalid-feedback">{{ errores.password_actual }}</div>{% endif %}
+            </div>
+            <div class="col-12"></div>
+            <div class="col-md-6">
+              <label class="form-label">Nueva contraseña <span class="text-danger">*</span></label>
+              <input type="password" name="password_nueva" id="pwNueva"
+                     class="form-control {% if errores.password_nueva %}is-invalid{% endif %}"
+                     autocomplete="new-password" minlength="6">
+              {% if errores.password_nueva %}<div class="invalid-feedback">{{ errores.password_nueva }}</div>{% endif %}
+              <div class="form-text">Mínimo 6 caracteres.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Confirmar nueva contraseña <span class="text-danger">*</span></label>
+              <input type="password" name="password_conf" id="pwConf"
+                     class="form-control {% if errores.password_conf %}is-invalid{% endif %}"
+                     autocomplete="new-password">
+              {% if errores.password_conf %}<div class="invalid-feedback">{{ errores.password_conf }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="mt-3 pt-2 border-top">
+            <button type="submit" class="btn btn-outline-danger">
+              <i class="bi bi-shield-lock-fill me-1"></i>Cambiar contraseña
+            </button>
+          </div>
+        </form>
+      </div>
+      <div class="card-footer d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle text-muted"></i>
+        <span>Tu sesión permanece activa tras el cambio.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Info de sesión ── -->
+  <div class="col-12">
+    <div class="card card-accent-muted">
+      <div class="card-body py-2 px-3 d-flex align-items-center gap-3" style="font-size:var(--text-sm)">
+        <i class="bi bi-person-badge-fill text-muted" style="font-size:1.4rem"></i>
+        <div>
+          <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+          <div class="text-muted" style="font-size:var(--text-xs)">
+            {% if user.is_superuser %}Super Admin{% else %}Secretaria Operativa{% endif %}
+            &nbsp;·&nbsp; Miembro desde {{ user.date_joined|date:"d/m/Y" }}
+            {% if user.last_login %}&nbsp;·&nbsp; Último acceso {{ user.last_login|date:"d/m/Y H:i" }}{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Validación visual en tiempo real de que las contraseñas coinciden */
+document.getElementById('pwConf').addEventListener('input', function() {
+  var ok = this.value === document.getElementById('pwNueva').value;
+  this.classList.toggle('is-invalid', !ok && this.value.length > 0);
+  this.classList.toggle('is-valid',    ok && this.value.length > 0);
+});
+</script>
+{% endblock %}
