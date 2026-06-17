@@ -1,188 +1,237 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sistema de Gestión Contratista{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/custom-theme.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}TsDesk{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/custom-theme.css">
+  {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-light">
+<body>
 
 {% if user.is_authenticated %}
-<div class="container-fluid">
-  <div class="row">
 
-    <!-- SIDEBAR -->
-    <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse min-vh-100 position-sticky top-0">
-      <div class="position-sticky pt-3 sidebar-inner">
-        <div class="px-3 mb-4">
-          <h5 class="text-warning mb-0"><i class="bi bi-building-fill-gear"></i> TsDesk</h5>
-          <small class="text-secondary">Gestión Constructora</small>
-        </div>
-        <hr class="border-secondary">
+<div id="layoutWrapper">
 
-        <!-- ACCIÓN PRINCIPAL -->
-        <div class="px-2 mb-3 d-flex gap-2">
-          <a href="{% url 'doc_generado_create' %}"
-             class="btn btn-warning flex-grow-1 fw-semibold {% if request.resolver_match.url_name == 'doc_generado_create' %}active{% endif %}">
-            <i class="bi bi-file-earmark-plus me-1"></i>Generar Documento
-          </a>
-          <a href="{% url 'doc_generado_borradores' %}"
-             class="btn btn-outline-warning {% if request.resolver_match.url_name == 'doc_generado_borradores' %}active{% endif %}"
-             title="Borradores">
-            <i class="bi bi-journals"></i>
-          </a>
-        </div>
+  <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+  <nav id="sidebarMenu">
 
-        <!-- PANEL PRINCIPAL -->
-        <ul class="nav flex-column mb-2">
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'dashboard' %}active bg-primary rounded{% endif %}" href="{% url 'dashboard' %}">
-              <i class="bi bi-speedometer2 me-2"></i>Panel Principal
-            </a>
-          </li>
-        </ul>
-        <hr class="border-secondary my-2">
-        <!-- OPERACIONES -->
-        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Operaciones</p>
-        <ul class="nav flex-column mb-3">
-          <li class="nav-item">
-            <a class="nav-link text-white {% if 'trabajadores' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'trabajadores_list' %}">
-              <i class="bi bi-person-badge-fill me-2"></i>Trabajadores
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if 'obras' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'obras_list' %}">
-              <i class="bi bi-building me-2"></i>Obras y Proyectos
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if 'bodega' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'bodega_index' %}">
-              <i class="bi bi-boxes me-2"></i>Bodega / Materiales
-            </a>
-          </li>
-        </ul>
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <div class="brand-name"><i class="bi bi-building-fill-gear me-1" style="color:#3b82f6"></i>TsDesk</div>
+      <div class="brand-sub">Sistema de Gestión</div>
+    </div>
 
-        <!-- DOCUMENTOS -->
-        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Documentos</p>
-        <ul class="nav flex-column mb-3">
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'documentos_pendientes' %}active bg-primary rounded{% endif %}" href="{% url 'documentos_pendientes' %}">
-              <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Pendientes
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'documentos_central' %}active bg-primary rounded{% endif %}" href="{% url 'documentos_central' %}">
-              <i class="bi bi-folder2-open me-2"></i>Centro de Documentos
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'reportes_consolidados' %}active bg-primary rounded{% endif %}" href="{% url 'reportes_consolidados' %}">
-              <i class="bi bi-bar-chart-fill me-2"></i>Reportes
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if 'licencia' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'licencia_list' %}">
-              <i class="bi bi-hospital me-2"></i>Licencias Médicas
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'papelera_documentos' %}active bg-primary rounded{% endif %}" href="{% url 'papelera_documentos' %}">
-              <i class="bi bi-trash3 me-2 text-secondary"></i>Papelera
-            </a>
-          </li>
-        </ul>
+    <!-- Acción primaria -->
+    <div class="sidebar-primary-action">
+      <a href="{% url 'doc_generado_create' %}"
+         class="btn-new-doc {% if request.resolver_match.url_name == 'doc_generado_create' %}active{% endif %}">
+        <i class="bi bi-plus-circle-fill"></i>Nuevo Documento
+      </a>
+      <a href="{% url 'doc_generado_borradores' %}"
+         class="sidebar-sub-link mt-1 {% if request.resolver_match.url_name == 'doc_generado_borradores' %}active{% endif %}">
+        <i class="bi bi-journals" style="font-size:.75rem"></i>Borradores guardados
+      </a>
+    </div>
 
-        {% if user.is_superuser %}
-        <!-- ADMIN — solo superusuario -->
-        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Administración</p>
-        <ul class="nav flex-column mb-3">
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_usuarios' %}active bg-primary rounded{% endif %}" href="{% url 'admin_usuarios' %}">
-              <i class="bi bi-people-fill me-2"></i>Usuarios
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_catalogos' %}active bg-primary rounded{% endif %}" href="{% url 'admin_catalogos' %}">
-              <i class="bi bi-gear-fill me-2"></i>Catálogos
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if request.resolver_match.url_name == 'admin_auditoria' %}active bg-primary rounded{% endif %}" href="{% url 'admin_auditoria' %}">
-              <i class="bi bi-journal-text me-2"></i>Auditoría
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-white {% if 'config_remuneraciones' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'config_remuneraciones_list' %}">
-              <i class="bi bi-sliders me-2"></i>Tasas AFP/Salud
-            </a>
-          </li>
-        </ul>
-        {% endif %}
+    <div class="sidebar-divider"></div>
 
-        <!-- CONFIGURACIÓN — visible para todos -->
-        <hr class="border-secondary">
-        <p class="px-3 text-uppercase text-secondary small fw-bold mb-1">Configuración</p>
-        <ul class="nav flex-column mb-2">
-          <li class="nav-item">
-            <a class="nav-link text-white {% if 'empresa' in request.resolver_match.url_name %}active bg-primary rounded{% endif %}" href="{% url 'empresa_list' %}">
-              <i class="bi bi-building-fill-gear me-2"></i>Mis Empresas
-              <br><small class="text-secondary ms-4" style="font-size:0.7rem;">Datos para contratos y PDF</small>
-            </a>
-          </li>
-        </ul>
+    <!-- Panel principal -->
+    <ul class="sidebar-nav" style="padding-bottom:.25rem">
+      <li>
+        <a href="{% url 'dashboard' %}"
+           class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+          <i class="bi bi-speedometer2 nav-icon"></i>Panel Principal
+        </a>
+      </li>
+    </ul>
 
-        <hr class="border-secondary">
-        <div class="px-3 pb-3">
-          <small class="text-secondary d-block mb-1">
-            <i class="bi bi-person-circle me-1"></i>
-            <strong class="text-white">{{ user.get_full_name|default:user.username }}</strong>
-          </small>
-          <small class="text-secondary">{% if user.is_superuser %}Super Admin{% else %}Secretaria Operativa{% endif %}</small>
-          <div class="mt-2">
-            <a href="{% url 'logout' %}" class="btn btn-outline-light btn-sm w-100">
-              <i class="bi bi-box-arrow-left me-1"></i>Cerrar Sesión
-            </a>
+    <!-- OPERACIONES -->
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operaciones</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li>
+        <a href="{% url 'trabajadores_list' %}"
+           class="{% if 'trabajadores' in request.resolver_match.url_name %}active{% endif %}">
+          <i class="bi bi-person-badge-fill nav-icon"></i>Trabajadores
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'obras_list' %}"
+           class="{% if 'obras' in request.resolver_match.url_name or request.resolver_match.url_name == 'obra_detail' or request.resolver_match.url_name == 'obra_ingreso_rapido' %}active{% endif %}">
+          <i class="bi bi-building-fill nav-icon"></i>Obras y Proyectos
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'contratos_list' %}"
+           class="{% if 'contrato' in request.resolver_match.url_name and 'doc' not in request.resolver_match.url_name and 'obra' not in request.resolver_match.url_name %}active{% endif %}">
+          <i class="bi bi-file-earmark-person-fill nav-icon"></i>Contratos
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'bodega_index' %}"
+           class="{% if 'bodega' in request.resolver_match.url_name %}active{% endif %}">
+          <i class="bi bi-boxes nav-icon"></i>Bodega / Materiales
+        </a>
+      </li>
+    </ul>
+
+    <!-- DOCUMENTOS -->
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Documentos</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li>
+        <a href="{% url 'documentos_pendientes' %}"
+           class="{% if request.resolver_match.url_name == 'documentos_pendientes' %}active{% endif %}">
+          <i class="bi bi-exclamation-triangle-fill nav-icon" style="color:#f59e0b"></i>Centro de Alertas
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'documentos_central' %}"
+           class="{% if request.resolver_match.url_name == 'documentos_central' %}active{% endif %}">
+          <i class="bi bi-folder2-open nav-icon"></i>Archivo Documental
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'licencia_list' %}"
+           class="{% if 'licencia' in request.resolver_match.url_name %}active{% endif %}">
+          <i class="bi bi-bandaid-fill nav-icon"></i>Licencias Médicas
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'reportes_consolidados' %}"
+           class="{% if request.resolver_match.url_name == 'reportes_consolidados' %}active{% endif %}">
+          <i class="bi bi-bar-chart-fill nav-icon"></i>Reportes
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'papelera_documentos' %}"
+           class="{% if request.resolver_match.url_name == 'papelera_documentos' %}active{% endif %}">
+          <i class="bi bi-trash3 nav-icon" style="opacity:.6"></i>Papelera
+        </a>
+      </li>
+    </ul>
+
+    {% if user.is_superuser %}
+    <!-- ADMIN -->
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Administración</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li>
+        <a href="{% url 'admin_usuarios' %}"
+           class="{% if request.resolver_match.url_name == 'admin_usuarios' %}active{% endif %}">
+          <i class="bi bi-people-fill nav-icon"></i>Usuarios
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'admin_catalogos' %}"
+           class="{% if request.resolver_match.url_name == 'admin_catalogos' %}active{% endif %}">
+          <i class="bi bi-gear-fill nav-icon"></i>Catálogos
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'admin_auditoria' %}"
+           class="{% if request.resolver_match.url_name == 'admin_auditoria' %}active{% endif %}">
+          <i class="bi bi-journal-text nav-icon"></i>Auditoría
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'config_remuneraciones_list' %}"
+           class="{% if 'config_remuneraciones' in request.resolver_match.url_name %}active{% endif %}">
+          <i class="bi bi-sliders nav-icon"></i>Tasas AFP/Salud
+        </a>
+      </li>
+    </ul>
+    {% endif %}
+
+    <div class="sidebar-divider"></div>
+
+    <!-- CONFIGURACIÓN -->
+    <ul class="sidebar-nav">
+      <li>
+        <a href="{% url 'empresa_list' %}"
+           class="{% if 'empresa' in request.resolver_match.url_name %}active{% endif %}">
+          <i class="bi bi-building-fill-gear nav-icon"></i>Mis Empresas
+        </a>
+      </li>
+    </ul>
+
+    <!-- Footer de usuario -->
+    <div class="sidebar-footer">
+      <div class="d-flex align-items-center gap-2">
+        <div class="flex-grow-1 overflow-hidden">
+          <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
+          <div class="sidebar-user-role">
+            {% if user.is_superuser %}Super Admin{% else %}Secretaria Operativa{% endif %}
           </div>
         </div>
+        <a href="{% url 'logout' %}"
+           class="btn btn-sm p-1 flex-shrink-0"
+           style="border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:6px"
+           title="Cerrar sesión">
+          <i class="bi bi-box-arrow-right"></i>
+        </a>
       </div>
-    </nav>
+    </div>
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-      {% if messages %}
-        <div class="mb-3">
-          {% for msg in messages %}
-            <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" role="alert">
-              {{ msg }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
+  </nav>
+  <!-- ══ /SIDEBAR ══════════════════════════════════════════════ -->
 
+  <!-- ══ CONTENIDO PRINCIPAL ═══════════════════════════════════ -->
+  <div id="mainContent">
+
+    <!-- Topbar -->
+    <div id="topbar">
+      <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+      <div class="topbar-user">
+        {% if user.is_superuser %}
+          <span class="badge badge-pendiente">Admin</span>
+        {% endif %}
+        <span class="text-muted" style="font-size:var(--text-xs)">{{ user.get_full_name|default:user.username }}</span>
+      </div>
+    </div>
+
+    <!-- Mensajes flash -->
+    {% if messages %}
+    <div style="padding:.75rem 1.5rem 0">
+      {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show d-flex align-items-center gap-2 mb-2" role="alert">
+        {% if msg.tags == 'success' %}<i class="bi bi-check-circle-fill flex-shrink-0"></i>
+        {% elif msg.tags == 'danger' or msg.tags == 'error' %}<i class="bi bi-exclamation-circle-fill flex-shrink-0"></i>
+        {% elif msg.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+        {% else %}<i class="bi bi-info-circle-fill flex-shrink-0"></i>{% endif %}
+        <span>{{ msg }}</span>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Contenido de página -->
+    <div id="pageContent">
       {% block content %}{% endblock %}
-    </main>
+    </div>
 
   </div>
+  <!-- ══ /CONTENIDO PRINCIPAL ══════════════════════════════════ -->
+
 </div>
 
 {% else %}
-<main>{% block content_auth %}{% endblock %}</main>
+{% block content_auth %}{% endblock %}
 {% endif %}
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/js/app-core.js"></script>
-{% block extra_js %}{% endblock %}
 
 <!-- Modal preview documental global -->
 <div class="modal fade" id="modalPreviewDoc" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content" style="height:90vh;display:flex;flex-direction:column">
-      <div class="modal-header" style="flex-shrink:0">
-        <h5 class="modal-title" id="previewDocTitle">Vista Previa</h5>
+      <div class="modal-header py-2" style="flex-shrink:0">
+        <h6 class="modal-title fw-semibold" id="previewDocTitle">Vista Previa</h6>
         <div class="ms-auto d-flex gap-2">
           <a id="previewDocDownload" href="#" class="btn btn-sm btn-outline-primary" download>
             <i class="bi bi-download me-1"></i>Descargar
@@ -197,7 +246,52 @@
   </div>
 </div>
 
+<!-- Modal upload rápido global -->
+<div class="modal fade" id="modalSubirRapido" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-semibold"><i class="bi bi-cloud-upload-fill me-2 text-primary"></i>Subir Documento</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'documento_upload_rapido' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="hidden" name="trabajador_rut" id="sr_rut">
+        <input type="hidden" name="tipo_documento_id" id="sr_tipo_id">
+        <input type="hidden" name="nivel" id="sr_nivel">
+        <input type="hidden" name="contrato_id" id="sr_contrato_id">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.05em">Tipo de documento</label>
+            <div class="fw-semibold" id="sr_tipo_nombre">—</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Archivo <span class="text-danger">*</span></label>
+            <input type="file" name="archivo" class="form-control" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+          </div>
+          <div class="mb-1">
+            <label class="form-label">Fecha de vencimiento <small class="text-muted">(opcional)</small></label>
+            <input type="date" name="fecha_vencimiento" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-cloud-upload-fill me-1"></i>Subir
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app-core.js"></script>
+{% block extra_js %}{% endblock %}
+
 <script>
+/* Preview documental */
 function previewDoc(url, nombre, extension) {
   document.getElementById('previewDocTitle').textContent = nombre || 'Vista Previa';
   document.getElementById('previewDocDownload').href = url;
@@ -206,12 +300,20 @@ function previewDoc(url, nombre, extension) {
   if (ext === 'pdf' || ext === 'html') {
     body.innerHTML = `<iframe src="${url}" style="width:100%;height:100%;border:none;"></iframe>`;
   } else if (['jpg','jpeg','png','gif','webp'].includes(ext)) {
-    body.innerHTML = `<div class="text-center p-3"><img src="${url}" class="img-fluid" style="max-height:75vh;"></div>`;
+    body.innerHTML = `<div class="text-center p-3"><img src="${url}" class="img-fluid" style="max-height:78vh;"></div>`;
   } else {
-    body.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-file-earmark fs-1 d-block mb-3"></i>Vista previa no disponible.<br><a href="${url}" class="btn btn-primary mt-3" download>Descargar archivo</a></div>`;
+    body.innerHTML = `<div class="empty-state"><i class="bi bi-file-earmark"></i><h6>Vista previa no disponible</h6><a href="${url}" class="btn btn-sm btn-primary mt-3" download>Descargar archivo</a></div>`;
   }
   new bootstrap.Modal(document.getElementById('modalPreviewDoc')).show();
 }
+
+/* Auto-dismiss flash alerts */
+setTimeout(function() {
+  document.querySelectorAll('.alert.fade.show').forEach(function(el) {
+    try { bootstrap.Alert.getOrCreateInstance(el).close(); } catch(e) {}
+  });
+}, 4500);
 </script>
+
 </body>
 </html>
