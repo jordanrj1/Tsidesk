@@ -1,136 +1,131 @@
 {% extends 'base.html' %}
-{% block title %}Inicio | TsDesk{% endblock %}
+{% block title %}Panel Principal | TsDesk{% endblock %}
+{% block page_title %}Panel Principal{% endblock %}
 
 {% block content %}
 
-<!-- Encabezado compacto -->
+<!-- Encabezado -->
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
-    <h4 class="mb-0 fw-bold text-dark">Buenos días{% if request.user.get_full_name %}, {{ request.user.get_full_name }}{% endif %}</h4>
+    <h5 class="mb-0 fw-bold">Buenos días{% if request.user.get_full_name %}, {{ request.user.get_full_name }}{% endif %}</h5>
     <small class="text-muted text-capitalize">{{ hoy|date:"l, d \d\e F \d\e Y" }}</small>
   </div>
   <div class="d-flex gap-2">
     <a href="{% url 'documentos_pendientes' %}" class="btn btn-sm btn-outline-danger">
-      <i class="bi bi-folder-x me-1"></i>Docs Pendientes
+      <i class="bi bi-exclamation-triangle-fill me-1"></i>Centro de Alertas
     </a>
     <a href="{% url 'reportes_consolidados' %}" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-bar-chart me-1"></i>Reportes
+      <i class="bi bi-bar-chart-fill me-1"></i>Reportes
     </a>
   </div>
 </div>
 
 <!-- KPI Strip -->
 <div class="row g-2 mb-4">
-  {% with kpis=total_trabajadores|stringformat:"s" %}
+
   <div class="col-6 col-sm-4 col-lg-2">
     <a href="{% url 'trabajadores_list' %}?estado=activo" class="text-decoration-none">
-    <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #2563EB !important;">
-      <div class="card-body py-2 px-3">
-        <div class="text-muted small mb-1"><i class="bi bi-person-badge-fill me-1 text-primary"></i>Trabajadores</div>
-        <div class="fs-3 fw-bold text-dark">{{ total_trabajadores }}</div>
-        <div class="text-muted" style="font-size:.7rem">activos</div>
+    <div class="card card-accent-primary h-100">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-person-badge-fill text-primary"></i>Trabajadores</div>
+        <div class="kpi-value">{{ total_trabajadores }}</div>
+        <div class="kpi-sub">activos</div>
       </div>
-    </div>
-    </a>
+    </div></a>
   </div>
-  {% endwith %}
 
   <div class="col-6 col-sm-4 col-lg-2">
     <a href="{% url 'obras_list' %}?estado=Activa" class="text-decoration-none">
-    <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #16A34A !important;">
-      <div class="card-body py-2 px-3">
-        <div class="text-muted small mb-1"><i class="bi bi-building me-1 text-success"></i>Obras</div>
-        <div class="fs-3 fw-bold text-dark">{{ obras_activas_count }}</div>
-        <div class="text-muted" style="font-size:.7rem">en ejecución</div>
+    <div class="card card-accent-success h-100">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-building-fill text-success"></i>Obras</div>
+        <div class="kpi-value">{{ obras_activas_count }}</div>
+        <div class="kpi-sub">en ejecución</div>
       </div>
-    </div>
-    </a>
+    </div></a>
   </div>
 
   <div class="col-6 col-sm-4 col-lg-2">
     <a href="{% url 'contratos_list' %}?estado=Pendiente+de+Firma" class="text-decoration-none">
-    <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {% if contratos_pendientes_firma_count > 0 %}#D97706{% else %}#9CA3AF{% endif %} !important;">
-      <div class="card-body py-2 px-3">
-        <div class="text-muted small mb-1"><i class="bi bi-pen-fill me-1 {% if contratos_pendientes_firma_count > 0 %}text-warning{% endif %}"></i>Firma</div>
-        <div class="fs-3 fw-bold {% if contratos_pendientes_firma_count > 0 %}text-warning{% else %}text-muted{% endif %}">{{ contratos_pendientes_firma_count }}</div>
-        <div class="text-muted" style="font-size:.7rem">pendientes</div>
+    <div class="card {% if contratos_pendientes_firma_count > 0 %}card-accent-warning{% else %}card-accent-muted{% endif %} h-100">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-pen-fill {% if contratos_pendientes_firma_count > 0 %}text-warning{% endif %}"></i>Firma</div>
+        <div class="kpi-value {% if contratos_pendientes_firma_count > 0 %}text-warning{% else %}text-muted{% endif %}">{{ contratos_pendientes_firma_count }}</div>
+        <div class="kpi-sub">pendientes</div>
       </div>
-    </div>
-    </a>
+    </div></a>
   </div>
 
   <div class="col-6 col-sm-4 col-lg-2">
     <a href="{% url 'contratos_list' %}?vence_pronto=1" class="text-decoration-none">
-    <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {% if contratos_por_vencer_count > 0 %}#DC2626{% else %}#9CA3AF{% endif %} !important;">
-      <div class="card-body py-2 px-3">
-        <div class="text-muted small mb-1"><i class="bi bi-file-earmark-x-fill me-1 {% if contratos_por_vencer_count > 0 %}text-danger{% endif %}"></i>Contratos</div>
-        <div class="fs-3 fw-bold {% if contratos_por_vencer_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ contratos_por_vencer_count }}</div>
-        <div class="text-muted" style="font-size:.7rem">por vencer</div>
+    <div class="card {% if contratos_por_vencer_count > 0 %}card-accent-danger{% else %}card-accent-muted{% endif %} h-100">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-calendar-x-fill {% if contratos_por_vencer_count > 0 %}text-danger{% endif %}"></i>Contratos</div>
+        <div class="kpi-value {% if contratos_por_vencer_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ contratos_por_vencer_count }}</div>
+        <div class="kpi-sub">por vencer</div>
       </div>
-    </div>
-    </a>
+    </div></a>
   </div>
 
   <div class="col-6 col-sm-4 col-lg-2">
     <a href="{% url 'contratos_list' %}?sin_finiquito=1" class="text-decoration-none">
-    <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {% if finiquitos_pendientes_count > 0 %}#DC2626{% else %}#9CA3AF{% endif %} !important;">
-      <div class="card-body py-2 px-3">
-        <div class="text-muted small mb-1"><i class="bi bi-file-earmark-break-fill me-1 {% if finiquitos_pendientes_count > 0 %}text-danger{% endif %}"></i>Finiquitos</div>
-        <div class="fs-3 fw-bold {% if finiquitos_pendientes_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ finiquitos_pendientes_count }}</div>
-        <div class="text-muted" style="font-size:.7rem">pendientes</div>
+    <div class="card {% if finiquitos_pendientes_count > 0 %}card-accent-danger{% else %}card-accent-muted{% endif %} h-100">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-file-earmark-check-fill {% if finiquitos_pendientes_count > 0 %}text-danger{% endif %}"></i>Finiquitos</div>
+        <div class="kpi-value {% if finiquitos_pendientes_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ finiquitos_pendientes_count }}</div>
+        <div class="kpi-sub">pendientes</div>
       </div>
-    </div>
-    </a>
+    </div></a>
   </div>
 
   <div class="col-6 col-sm-4 col-lg-2">
     <a href="{% url 'obras_list' %}?estado=Activa" class="text-decoration-none">
-    <div class="card border-0 shadow-sm h-100" style="border-left:4px solid {% if obras_proximas_cierre_count > 0 %}#D97706{% else %}#9CA3AF{% endif %} !important;">
-      <div class="card-body py-2 px-3">
-        <div class="text-muted small mb-1"><i class="bi bi-calendar-x-fill me-1 {% if obras_proximas_cierre_count > 0 %}text-warning{% endif %}"></i>Cierres</div>
-        <div class="fs-3 fw-bold {% if obras_proximas_cierre_count > 0 %}text-warning{% else %}text-muted{% endif %}">{{ obras_proximas_cierre_count }}</div>
-        <div class="text-muted" style="font-size:.7rem">próximos 30d</div>
+    <div class="card {% if obras_proximas_cierre_count > 0 %}card-accent-warning{% else %}card-accent-muted{% endif %} h-100">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-calendar-x-fill {% if obras_proximas_cierre_count > 0 %}text-warning{% endif %}"></i>Cierres</div>
+        <div class="kpi-value {% if obras_proximas_cierre_count > 0 %}text-warning{% else %}text-muted{% endif %}">{{ obras_proximas_cierre_count }}</div>
+        <div class="kpi-sub">próximos 30d</div>
       </div>
-    </div>
-    </a>
+    </div></a>
   </div>
+
 </div>
 
-<!-- Cuerpo principal -->
+<!-- Cuerpo -->
 <div class="row g-3">
 
-  <!-- Columna alertas (izquierda) -->
+  <!-- Columna alertas -->
   <div class="col-lg-8">
 
     {% if not alertas_contratos and not alertas_disciplina and not traslados_pendientes_finiquito and not trabajadores_multi_obra and not obras_alertas %}
-    <div class="card border-0 shadow-sm mb-3">
+    <div class="card mb-3">
       <div class="card-body text-center py-5">
-        <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+        <i class="bi bi-check-circle-fill text-success d-block mb-2" style="font-size:2.5rem"></i>
         <h5 class="text-success fw-bold mb-1">Todo al día</h5>
         <p class="text-muted mb-0">Sin alertas operativas en este momento.</p>
       </div>
     </div>
     {% endif %}
 
-    <!-- Estado por Obra -->
+    <!-- ── Estado por Obra (siempre primero) ── -->
     {% if obras_alertas %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#0f2543;color:#fff;">
+    <div class="card card-accent-primary mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:#0f2543;color:#fff;border-radius:var(--radius-md) var(--radius-md) 0 0 !important">
         <i class="bi bi-building-fill-exclamation"></i>
         <strong>Estado por Obra</strong>
-        <span class="badge bg-light text-dark ms-auto">{{ obras_alertas|length }} obra{{ obras_alertas|length|pluralize }} con alertas</span>
+        <span class="badge ms-auto" style="background:rgba(255,255,255,.15);color:#fff">{{ obras_alertas|length }} obra{{ obras_alertas|length|pluralize }} con alertas</span>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.82rem">
-          <thead class="table-light">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
             <tr>
               <th>Obra</th>
               <th class="text-center" title="Finiquitos pendientes de subir">Finiquitos↑</th>
               <th class="text-center" title="Contratos con fecha vencida sin acción">Vencidos</th>
               <th class="text-center" title="Contratos vencen en 10 días">Próx. 10d</th>
-              <th class="text-center" title="Documentos obligatorios faltantes en carpeta">Docs</th>
+              <th class="text-center" title="Documentos obligatorios faltantes">Docs</th>
               <th class="text-center" title="Re-contrataciones con finiquito anterior pendiente">Re-ct.</th>
-              <th class="text-center" title="Días para cierre estimado de la obra">Cierre</th>
+              <th class="text-center" title="Días para cierre estimado">Cierre</th>
             </tr>
           </thead>
           <tbody>
@@ -138,83 +133,55 @@
             <tr>
               <td>
                 <a href="{% url 'obra_detail' oa.obra.pk %}" class="fw-semibold text-decoration-none text-dark">{{ oa.obra.nombre }}</a>
-                {% if oa.obra.estado == 'Pausada' %}<span class="badge bg-secondary ms-1" style="font-size:.6rem">Pausada</span>{% endif %}
+                {% if oa.obra.estado == 'Pausada' %}<span class="badge badge-archivada ms-1">Pausada</span>{% endif %}
               </td>
+              <td class="text-center">{% if oa.n_finiquitos_pend %}<a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge badge-vencido text-decoration-none">{{ oa.n_finiquitos_pend }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-center">{% if oa.n_vencidos %}<a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge badge-vencido text-decoration-none">{{ oa.n_vencidos }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-center">{% if oa.n_proximos %}<a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge badge-proximo text-decoration-none">{{ oa.n_proximos }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-center">{% if oa.n_docs_faltantes %}<a href="{% url 'obra_detail' oa.obra.pk %}?tab=carpeta" class="badge badge-pendiente text-decoration-none">{{ oa.n_docs_faltantes }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-center">{% if oa.n_recontrataciones_pend %}<a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge text-white text-decoration-none" style="background:#7c3aed">{{ oa.n_recontrataciones_pend }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
               <td class="text-center">
-                {% if oa.n_finiquitos_pend %}
-                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge bg-danger text-decoration-none">{{ oa.n_finiquitos_pend }}</a>
-                {% else %}<span class="text-muted">—</span>{% endif %}
-              </td>
-              <td class="text-center">
-                {% if oa.n_vencidos %}
-                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge bg-danger text-decoration-none">{{ oa.n_vencidos }}</a>
-                {% else %}<span class="text-muted">—</span>{% endif %}
-              </td>
-              <td class="text-center">
-                {% if oa.n_proximos %}
-                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge bg-warning text-dark text-decoration-none">{{ oa.n_proximos }}</a>
-                {% else %}<span class="text-muted">—</span>{% endif %}
-              </td>
-              <td class="text-center">
-                {% if oa.n_docs_faltantes %}
-                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=carpeta" class="badge bg-primary text-decoration-none">{{ oa.n_docs_faltantes }}</a>
-                {% else %}<span class="text-muted">—</span>{% endif %}
-              </td>
-              <td class="text-center">
-                {% if oa.n_recontrataciones_pend %}
-                <a href="{% url 'obra_detail' oa.obra.pk %}?tab=dotacion" class="badge text-white text-decoration-none" style="background:#7c3aed">{{ oa.n_recontrataciones_pend }}</a>
-                {% else %}<span class="text-muted">—</span>{% endif %}
-              </td>
-              <td class="text-center">
-                {% if oa.dias_cierre is None %}
-                  <span class="text-muted">—</span>
-                {% elif oa.dias_cierre < 0 %}
-                  <span class="badge bg-danger">VENCIDA</span>
-                {% elif oa.dias_cierre <= 10 %}
-                  <span class="badge bg-danger">{{ oa.dias_cierre }}d</span>
-                {% elif oa.dias_cierre <= 30 %}
-                  <span class="badge bg-warning text-dark">{{ oa.dias_cierre }}d</span>
-                {% else %}
-                  <span class="text-muted">{{ oa.dias_cierre }}d</span>
-                {% endif %}
+                {% if oa.dias_cierre is None %}<span class="text-muted">—</span>
+                {% elif oa.dias_cierre < 0 %}<span class="badge badge-vencido">VENCIDA</span>
+                {% elif oa.dias_cierre <= 10 %}<span class="badge badge-vencido">{{ oa.dias_cierre }}d</span>
+                {% elif oa.dias_cierre <= 30 %}<span class="badge badge-proximo">{{ oa.dias_cierre }}d</span>
+                {% else %}<span class="text-muted">{{ oa.dias_cierre }}d</span>{% endif %}
               </td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      <div class="card-footer py-1 text-muted d-flex flex-wrap gap-3" style="font-size:.72rem">
-        <span><span class="badge bg-danger">N</span> crítico</span>
-        <span><span class="badge bg-warning text-dark">N</span> advertencia</span>
-        <span>Finiquitos↑ = sin doc subido · Vencidos = plazo superado · Docs = carpeta incompleta · Re-ct. = re-contratación con finiquito anterior pendiente</span>
+      <div class="card-footer d-flex flex-wrap gap-3">
+        <span><span class="badge badge-vencido">N</span> crítico</span>
+        <span><span class="badge badge-proximo">N</span> advertencia</span>
+        <span class="text-muted">Finiquitos↑ = sin doc subido · Vencidos = plazo superado · Docs = carpeta incompleta</span>
       </div>
     </div>
     {% endif %}
 
-    <!-- Contratos por vencer -->
+    <!-- ── Contratos por vencer ── -->
     {% if alertas_contratos %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2"
-           style="background:#FFFBEB;border-left:4px solid #D97706;">
+    <div class="card card-accent-warning mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-warning-soft)">
         <i class="bi bi-clock-fill text-warning"></i>
-        <strong class="text-warning">Contratos por Vencer</strong>
-        <span class="badge bg-warning text-dark ms-auto">{{ alertas_contratos|length }}</span>
-        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="collapse" data-bs-target="#colContratos">
+        <strong>Contratos por Vencer</strong>
+        <span class="badge badge-proximo ms-auto">{{ alertas_contratos|length }}</span>
+        <button class="btn btn-sm btn-link p-0 ms-1 text-muted" data-bs-toggle="collapse" data-bs-target="#colContratos" style="line-height:1">
           <i class="bi bi-chevron-down"></i>
         </button>
       </div>
       <div class="collapse show" id="colContratos">
         <div class="list-group list-group-flush">
           {% for c in alertas_contratos %}
-          <div class="list-group-item py-2 d-flex align-items-center gap-3">
-            <span class="badge {% if c.dias_para_vencer <= 3 %}bg-danger{% elif c.dias_para_vencer <= 7 %}bg-warning text-dark{% else %}bg-secondary{% endif %} flex-shrink-0"
-                  style="min-width:36px;text-align:center">{{ c.dias_para_vencer }}d</span>
-            <div class="flex-grow-1 small">
+          <div class="list-group-item py-2 d-flex align-items-center gap-3" style="font-size:var(--text-sm)">
+            <span class="badge {% if c.dias_para_vencer <= 3 %}badge-vencido{% elif c.dias_para_vencer <= 7 %}badge-proximo{% else %}badge-archivada{% endif %} flex-shrink-0" style="min-width:36px;text-align:center">{{ c.dias_para_vencer }}d</span>
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
-              <div class="text-muted">{{ c.obra.nombre }} · vence {{ c.fecha_termino_estimada|date:"d/m/Y" }}</div>
+              <div class="text-muted" style="font-size:var(--text-xs)">{{ c.obra.nombre }} · vence {{ c.fecha_termino_estimada|date:"d/m/Y" }}</div>
             </div>
             <a href="{% url 'contrato_edit' c.pk %}" class="btn btn-sm btn-outline-warning py-0 flex-shrink-0">
-              <i class="bi bi-pencil me-1"></i>Renovar
+              <i class="bi bi-pencil-square me-1"></i>Renovar
             </a>
           </div>
           {% endfor %}
@@ -223,26 +190,26 @@
     </div>
     {% endif %}
 
-    <!-- Carpeta de obra: documentos faltantes -->
+    <!-- ── Carpeta de obra: docs faltantes ── -->
     {% if obras_estado %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#F8FAFC;border-left:4px solid #2563EB;">
-        <i class="bi bi-folder2-open text-primary" style="font-size:.9rem"></i>
-        <strong class="text-dark small">Carpeta de Obra — Documentos Faltantes</strong>
-        <span class="badge bg-danger ms-auto" style="font-size:.7rem">{{ obras_estado|length }} obra{{ obras_estado|length|pluralize }}</span>
+    <div class="card card-accent-primary mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-primary-soft)">
+        <i class="bi bi-folder-x text-primary"></i>
+        <strong>Carpeta de Obra — Documentos Faltantes</strong>
+        <span class="badge badge-vencido ms-auto">{{ obras_estado|length }} obra{{ obras_estado|length|pluralize }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for og in obras_estado %}
         <a href="{% url 'obra_detail' og.obra.pk %}?tab=carpeta"
            class="list-group-item list-group-item-action py-2 px-3 d-flex align-items-start gap-3 text-decoration-none">
           <div class="flex-grow-1">
-            <div class="fw-semibold small text-dark mb-1">
+            <div class="fw-semibold" style="font-size:var(--text-sm)">
               {{ og.obra.nombre }}
-              {% if og.obra.estado == 'Pausada' %}<span class="badge bg-secondary ms-1" style="font-size:.6rem">Pausada</span>{% endif %}
+              {% if og.obra.estado == 'Pausada' %}<span class="badge badge-archivada ms-1">Pausada</span>{% endif %}
             </div>
-            <div class="d-flex flex-wrap gap-1">
+            <div class="d-flex flex-wrap gap-1 mt-1">
               {% for t in og.faltantes %}
-              <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size:.68rem">{{ t.nombre }}</span>
+              <span class="badge badge-vencido" style="font-size:var(--text-xs)">{{ t.nombre }}</span>
               {% endfor %}
             </div>
           </div>
@@ -253,25 +220,23 @@
     </div>
     {% endif %}
 
-    <!-- Traslados con finiquito pendiente -->
+    <!-- ── Traslados con finiquito pendiente ── -->
     {% if traslados_pendientes_finiquito %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2"
-           style="background:#FFFBEB;border-left:4px solid #D97706;">
+    <div class="card card-accent-warning mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-warning-soft)">
         <i class="bi bi-arrow-right-circle-fill text-warning"></i>
-        <strong class="text-warning">Traslados con Finiquito Pendiente</strong>
-        <span class="badge bg-warning text-dark ms-auto">{{ traslados_pendientes_finiquito|length }}</span>
+        <strong>Traslados con Finiquito Pendiente</strong>
+        <span class="badge badge-proximo ms-auto">{{ traslados_pendientes_finiquito|length }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for t in traslados_pendientes_finiquito %}
-        <div class="list-group-item py-2 d-flex align-items-center gap-3">
-          <div class="flex-grow-1 small">
+        <div class="list-group-item py-2 d-flex align-items-center gap-3" style="font-size:var(--text-sm)">
+          <div class="flex-grow-1">
             <div class="fw-semibold">{{ t.trabajador.nombre_completo }}</div>
-            <div class="text-muted">{{ t.obra_origen.nombre }}{% if t.obra_destino %} → {{ t.obra_destino.nombre }}{% endif %}</div>
+            <div class="text-muted" style="font-size:var(--text-xs)">{{ t.obra_origen.nombre }}{% if t.obra_destino %} → {{ t.obra_destino.nombre }}{% endif %}</div>
           </div>
-          <a href="{% url 'trabajador_detail' t.trabajador.rut %}?tab=documentos"
-             class="btn btn-sm btn-outline-warning py-0 flex-shrink-0">
-            <i class="bi bi-upload me-1"></i>Finiquito
+          <a href="{% url 'trabajador_detail' t.trabajador.rut %}?tab=documentos" class="btn btn-sm btn-outline-warning py-0 flex-shrink-0">
+            <i class="bi bi-cloud-upload-fill me-1"></i>Finiquito
           </a>
         </div>
         {% endfor %}
@@ -279,28 +244,24 @@
     </div>
     {% endif %}
 
-    <!-- Trabajadores en 2+ obras simultáneas -->
+    <!-- ── Multi-obra ── -->
     {% if trabajadores_multi_obra %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2"
-           style="background:#EEF2FF;border-left:4px solid #6366F1;">
-        <i class="bi bi-diagram-2-fill text-primary"></i>
-        <strong class="text-primary">Trabajadores en Múltiples Obras</strong>
-        <span class="badge bg-primary ms-auto">{{ trabajadores_multi_obra|length }}</span>
+    <div class="card mb-3" style="border-left:3px solid #6366f1 !important">
+      <div class="card-header d-flex align-items-center gap-2" style="background:#eef2ff">
+        <i class="bi bi-diagram-2-fill" style="color:#6366f1"></i>
+        <strong>Trabajadores en Múltiples Obras</strong>
+        <span class="badge ms-auto" style="background:#6366f1;color:#fff">{{ trabajadores_multi_obra|length }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for t in trabajadores_multi_obra %}
         <div class="list-group-item py-2">
-          <a href="{% url 'trabajador_detail' t.rut %}" class="fw-semibold text-decoration-none small">
-            {{ t.nombre_completo }}
-          </a>
+          <a href="{% url 'trabajador_detail' t.rut %}" class="fw-semibold text-decoration-none" style="font-size:var(--text-sm)">{{ t.nombre_completo }}</a>
           <div class="d-flex flex-wrap gap-1 mt-1">
             {% for c in t.contratos_activos %}
             <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion"
-               class="badge text-decoration-none {% if c.estado == 'Vigente' %}bg-success{% else %}bg-warning text-dark{% endif %}"
-               style="font-size:.7rem">
-              {{ c.obra.nombre }}
-              <span class="opacity-75">({{ c.estado }})</span>
+               class="badge text-decoration-none {% if c.estado == 'Vigente' %}badge-vigente{% else %}badge-proximo{% endif %}"
+               style="font-size:var(--text-xs)">
+              {{ c.obra.nombre }} ({{ c.estado }})
             </a>
             {% endfor %}
           </div>
@@ -310,47 +271,47 @@
     </div>
     {% endif %}
 
-    <!-- Disciplina -->
+    <!-- ── Riesgo disciplinario ── -->
     {% if alertas_disciplina %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2"
-           style="background:#FEF2F2;border-left:4px solid #DC2626;">
+    <div class="card card-accent-danger mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-danger-soft)">
         <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-        <strong class="text-danger">Riesgo Disciplinario (3+ strikes)</strong>
-        <span class="badge bg-danger ms-auto">{{ alertas_disciplina|length }}</span>
+        <strong>Riesgo Disciplinario (3+ strikes)</strong>
+        <span class="badge badge-vencido ms-auto">{{ alertas_disciplina|length }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for a in alertas_disciplina %}
-        <div class="list-group-item py-2 d-flex align-items-center gap-3">
-          <span class="badge bg-danger fs-6 flex-shrink-0">{{ a.strikes_count }}</span>
-          <div class="flex-grow-1 small">
+        <div class="list-group-item py-2 d-flex align-items-center gap-3" style="font-size:var(--text-sm)">
+          <span class="badge badge-vencido" style="font-size:var(--text-base);padding:.35rem .6rem">{{ a.strikes_count }}</span>
+          <div class="flex-grow-1">
             <div class="fw-semibold">{{ a.trabajador.nombre_completo }}</div>
-            <div class="text-muted">{% for c in a.contratos %}{{ c.obra.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+            <div class="text-muted" style="font-size:var(--text-xs)">{% for c in a.contratos %}{{ c.obra.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
           </div>
-          <a href="{% url 'trabajador_detail' a.trabajador.rut %}?tab=strikes"
-             class="btn btn-sm btn-outline-danger py-0 flex-shrink-0">Ver</a>
+          <a href="{% url 'trabajador_detail' a.trabajador.rut %}?tab=strikes" class="btn btn-sm btn-outline-danger py-0 flex-shrink-0">
+            <i class="bi bi-eye-fill me-1"></i>Ver
+          </a>
         </div>
         {% endfor %}
       </div>
     </div>
     {% endif %}
 
-    <!-- Alertas ERP: Contratos vencidos sin renovar -->
+    <!-- ── Contratos vencidos sin renovar ── -->
     {% if contratos_vencidos_sin_renovar %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2" style="background:#FFF1F2;">
+    <div class="card card-accent-danger mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-danger-soft)">
         <i class="bi bi-calendar-x-fill text-danger"></i>
-        <strong class="text-danger small">Contratos Vencidos Sin Renovar</strong>
-        <span class="badge bg-danger ms-auto">{{ contratos_vencidos_sin_renovar|length }}</span>
+        <strong>Contratos Vencidos Sin Renovar</strong>
+        <span class="badge badge-vencido ms-auto">{{ contratos_vencidos_sin_renovar|length }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for c in contratos_vencidos_sin_renovar|slice:":8" %}
         <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion" class="list-group-item list-group-item-action py-2">
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2" style="font-size:var(--text-sm)">
             <i class="bi bi-exclamation-circle-fill text-danger flex-shrink-0"></i>
-            <div class="flex-grow-1 small">
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
-              <div class="text-muted">{{ c.obra.nombre }} · Venció {{ c.fecha_termino_estimada|date:"d/m/Y" }}</div>
+              <div class="text-muted" style="font-size:var(--text-xs)">{{ c.obra.nombre }} · Venció {{ c.fecha_termino_estimada|date:"d/m/Y" }}</div>
             </div>
           </div>
         </a>
@@ -359,22 +320,22 @@
     </div>
     {% endif %}
 
-    <!-- Alertas ERP: En Licencia > 30 días -->
+    <!-- ── Licencias > 30 días ── -->
     {% if contratos_licencia_larga %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2" style="background:#FFFBEB;">
-        <i class="bi bi-hospital-fill text-warning"></i>
-        <strong class="text-warning small">En Licencia > 30 Días</strong>
-        <span class="badge bg-warning text-dark ms-auto">{{ contratos_licencia_larga|length }}</span>
+    <div class="card card-accent-warning mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-warning-soft)">
+        <i class="bi bi-bandaid-fill text-warning"></i>
+        <strong>En Licencia Médica > 30 Días</strong>
+        <span class="badge badge-proximo ms-auto">{{ contratos_licencia_larga|length }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for c in contratos_licencia_larga|slice:":8" %}
         <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion" class="list-group-item list-group-item-action py-2">
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2" style="font-size:var(--text-sm)">
             <i class="bi bi-hourglass-split text-warning flex-shrink-0"></i>
-            <div class="flex-grow-1 small">
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
-              <div class="text-muted">{{ c.obra.nombre }} · Desde {{ c.fecha_inicio_licencia|date:"d/m/Y" }}</div>
+              <div class="text-muted" style="font-size:var(--text-xs)">{{ c.obra.nombre }} · Desde {{ c.fecha_inicio_licencia|date:"d/m/Y" }}</div>
             </div>
           </div>
         </a>
@@ -383,22 +344,22 @@
     </div>
     {% endif %}
 
-    <!-- Alertas ERP: Pendiente de Firma > 15 días -->
+    <!-- ── Pendiente de Firma > 15 días ── -->
     {% if contratos_pdf_antiguos %}
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header d-flex align-items-center gap-2 py-2" style="background:#EFF6FF;">
+    <div class="card card-accent-primary mb-3">
+      <div class="card-header d-flex align-items-center gap-2" style="background:var(--c-primary-soft)">
         <i class="bi bi-pen-fill text-primary"></i>
-        <strong class="text-primary small">Pendiente de Firma > 15 Días</strong>
-        <span class="badge bg-primary ms-auto">{{ contratos_pdf_antiguos|length }}</span>
+        <strong>Pendiente de Firma > 15 Días</strong>
+        <span class="badge badge-pendiente ms-auto">{{ contratos_pdf_antiguos|length }}</span>
       </div>
       <div class="list-group list-group-flush">
         {% for c in contratos_pdf_antiguos|slice:":8" %}
         <a href="{% url 'obra_detail' c.obra.pk %}?tab=dotacion" class="list-group-item list-group-item-action py-2">
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2" style="font-size:var(--text-sm)">
             <i class="bi bi-file-earmark-x text-primary flex-shrink-0"></i>
-            <div class="flex-grow-1 small">
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ c.trabajador.nombre_completo }}</div>
-              <div class="text-muted">{{ c.obra.nombre }} · Desde {{ c.fecha_inicio|date:"d/m/Y" }}</div>
+              <div class="text-muted" style="font-size:var(--text-xs)">{{ c.obra.nombre }} · Desde {{ c.fecha_inicio|date:"d/m/Y" }}</div>
             </div>
           </div>
         </a>
@@ -409,48 +370,42 @@
 
   </div><!-- /col-lg-8 -->
 
-  <!-- Panel derecho: vencimientos -->
+  <!-- Panel derecho: vencimientos próximos -->
   <div class="col-lg-4">
-
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#F8FAFC;">
-        <i class="bi bi-calendar-event-fill text-dark"></i>
-        <strong class="text-dark small">Próximos Vencimientos</strong>
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-calendar-event-fill text-muted"></i>Próximos Vencimientos
       </div>
       <div class="card-body p-0">
 
         {% with total_venc=docs_venc_2|length|add:docs_venc_7|length|add:docs_venc_15|length|add:contr_venc_2|length|add:contr_venc_7|length|add:contr_venc_15|length %}
         {% if total_venc == 0 %}
-        <div class="p-3 text-center text-muted small">
+        <div class="p-3 text-center text-muted" style="font-size:var(--text-sm)">
           <i class="bi bi-calendar-check d-block fs-4 mb-1 text-success"></i>
           Sin vencimientos en los próximos 15 días
         </div>
         {% else %}
 
-        <!-- Umbral 2 días -->
         {% with items2=docs_venc_2|length|add:contr_venc_2|length %}
         {% if items2 > 0 %}
-        <div class="px-3 pt-2 pb-1" style="background:#FEF2F2;">
+        <div class="px-3 pt-2 pb-1" style="background:var(--c-danger-soft)">
           <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="badge bg-danger">⚠ Hoy / 2 días</span>
-            <span class="text-danger small fw-semibold">{{ items2 }} elemento{{ items2|pluralize }}</span>
+            <span class="badge badge-vencido">Hoy / 2 días</span>
+            <span class="text-danger fw-semibold" style="font-size:var(--text-xs)">{{ items2 }} elemento{{ items2|pluralize }}</span>
           </div>
           {% for doc in docs_venc_2 %}
-          <div class="d-flex align-items-center gap-2 py-1 border-bottom border-danger border-opacity-10">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="border-color:rgba(220,38,38,.15) !important;font-size:var(--text-xs)">
             <i class="bi bi-file-earmark-x text-danger flex-shrink-0"></i>
-            <div class="flex-grow-1" style="font-size:.78rem">
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ doc.tipo_documento.nombre }}</div>
-              <div class="text-muted">
-                {% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}{% elif doc.trabajador_rut %}{{ doc.trabajador_rut }}{% endif %}
-                · {{ doc.fecha_vencimiento|date:"d/m" }}
-              </div>
+              <div class="text-muted">{% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}{% elif doc.trabajador_rut %}{{ doc.trabajador_rut }}{% endif %} · {{ doc.fecha_vencimiento|date:"d/m" }}</div>
             </div>
           </div>
           {% endfor %}
           {% for c in contr_venc_2 %}
-          <div class="d-flex align-items-center gap-2 py-1 border-bottom border-danger border-opacity-10">
-            <i class="bi bi-file-earmark-person text-danger flex-shrink-0"></i>
-            <div class="flex-grow-1" style="font-size:.78rem">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="border-color:rgba(220,38,38,.15) !important;font-size:var(--text-xs)">
+            <i class="bi bi-file-earmark-person-fill text-danger flex-shrink-0"></i>
+            <div class="flex-grow-1">
               <div class="fw-semibold">Contrato — {{ c.trabajador.nombre_completo }}</div>
               <div class="text-muted">{{ c.obra.nombre }} · {{ c.fecha_termino_estimada|date:"d/m" }}</div>
             </div>
@@ -460,30 +415,26 @@
         {% endif %}
         {% endwith %}
 
-        <!-- Umbral 7 días -->
         {% with items7=docs_venc_7|length|add:contr_venc_7|length %}
         {% if items7 > 0 %}
-        <div class="px-3 pt-2 pb-1" style="background:#FFFBEB;">
+        <div class="px-3 pt-2 pb-1" style="background:var(--c-warning-soft)">
           <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="badge bg-warning text-dark">Esta semana (7d)</span>
-            <span class="text-warning small fw-semibold">{{ items7 }} elemento{{ items7|pluralize }}</span>
+            <span class="badge badge-proximo">Esta semana (7d)</span>
+            <span class="text-warning fw-semibold" style="font-size:var(--text-xs)">{{ items7 }} elemento{{ items7|pluralize }}</span>
           </div>
           {% for doc in docs_venc_7 %}
-          <div class="d-flex align-items-center gap-2 py-1 border-bottom border-warning border-opacity-25">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="font-size:var(--text-xs)">
             <i class="bi bi-file-earmark-minus text-warning flex-shrink-0"></i>
-            <div class="flex-grow-1" style="font-size:.78rem">
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ doc.tipo_documento.nombre }}</div>
-              <div class="text-muted">
-                {% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}{% elif doc.trabajador_rut %}{{ doc.trabajador_rut }}{% endif %}
-                · {{ doc.fecha_vencimiento|date:"d/m" }}
-              </div>
+              <div class="text-muted">{% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}{% elif doc.trabajador_rut %}{{ doc.trabajador_rut }}{% endif %} · {{ doc.fecha_vencimiento|date:"d/m" }}</div>
             </div>
           </div>
           {% endfor %}
           {% for c in contr_venc_7 %}
-          <div class="d-flex align-items-center gap-2 py-1 border-bottom border-warning border-opacity-25">
-            <i class="bi bi-file-earmark-person text-warning flex-shrink-0"></i>
-            <div class="flex-grow-1" style="font-size:.78rem">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="font-size:var(--text-xs)">
+            <i class="bi bi-file-earmark-person-fill text-warning flex-shrink-0"></i>
+            <div class="flex-grow-1">
               <div class="fw-semibold">Contrato — {{ c.trabajador.nombre_completo }}</div>
               <div class="text-muted">{{ c.obra.nombre }} · {{ c.fecha_termino_estimada|date:"d/m" }}</div>
             </div>
@@ -493,30 +444,26 @@
         {% endif %}
         {% endwith %}
 
-        <!-- Umbral 15 días -->
         {% with items15=docs_venc_15|length|add:contr_venc_15|length %}
         {% if items15 > 0 %}
         <div class="px-3 pt-2 pb-1">
           <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="badge bg-secondary">Próximos 15 días</span>
-            <span class="text-muted small">{{ items15 }} elemento{{ items15|pluralize }}</span>
+            <span class="badge badge-archivada">Próximos 15 días</span>
+            <span class="text-muted" style="font-size:var(--text-xs)">{{ items15 }} elemento{{ items15|pluralize }}</span>
           </div>
           {% for doc in docs_venc_15 %}
-          <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="font-size:var(--text-xs)">
             <i class="bi bi-file-earmark text-muted flex-shrink-0"></i>
-            <div class="flex-grow-1" style="font-size:.78rem">
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ doc.tipo_documento.nombre }}</div>
-              <div class="text-muted">
-                {% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}{% elif doc.trabajador_rut %}{{ doc.trabajador_rut }}{% endif %}
-                · {{ doc.fecha_vencimiento|date:"d/m" }}
-              </div>
+              <div class="text-muted">{% if doc.contrato %}{{ doc.contrato.trabajador.nombre_completo }}{% elif doc.trabajador_rut %}{{ doc.trabajador_rut }}{% endif %} · {{ doc.fecha_vencimiento|date:"d/m" }}</div>
             </div>
           </div>
           {% endfor %}
           {% for c in contr_venc_15 %}
-          <div class="d-flex align-items-center gap-2 py-1 border-bottom">
-            <i class="bi bi-file-earmark-person text-muted flex-shrink-0"></i>
-            <div class="flex-grow-1" style="font-size:.78rem">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="font-size:var(--text-xs)">
+            <i class="bi bi-file-earmark-person-fill text-muted flex-shrink-0"></i>
+            <div class="flex-grow-1">
               <div class="fw-semibold">Contrato — {{ c.trabajador.nombre_completo }}</div>
               <div class="text-muted">{{ c.obra.nombre }} · {{ c.fecha_termino_estimada|date:"d/m" }}</div>
             </div>
@@ -530,7 +477,7 @@
         {% endwith %}
       </div>
     </div>
-
   </div>
+
 </div>
 {% endblock %}
