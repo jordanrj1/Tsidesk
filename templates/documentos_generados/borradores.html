@@ -1,21 +1,107 @@
 {% extends 'base.html' %}
 {% block title %}Borradores | TsDesk{% endblock %}
+{% block page_title %}Borradores Guardados{% endblock %}
+
 {% block content %}
 
+<!-- ── Tarjeta de sugerencia: aparece solo cuando se acaba de crear un borrador ── -->
+{% if request.GET.created %}
+<div class="card card-accent-success mb-4" style="background:var(--c-success-soft)">
+  <div class="card-body py-3">
+    <div class="d-flex align-items-start gap-3">
+      <i class="bi bi-check-circle-fill text-success mt-1" style="font-size:1.6rem;flex-shrink:0"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold mb-1">Borrador guardado — ¿qué sigue ahora?</div>
+        <div class="d-flex flex-wrap gap-3 mt-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge rounded-pill bg-primary">1</span>
+            <span style="font-size:var(--text-sm)"><i class="bi bi-eye-fill me-1 text-primary"></i>Haz clic en <strong>Ver</strong> para revisar el documento</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge rounded-pill bg-primary">2</span>
+            <span style="font-size:var(--text-sm)"><i class="bi bi-printer-fill me-1 text-primary"></i>Imprímelo y fírmalo físicamente con el trabajador</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge rounded-pill bg-primary">3</span>
+            <span style="font-size:var(--text-sm)"><i class="bi bi-cloud-upload-fill me-1 text-primary"></i>Escanéalo y súbelo desde <strong>Trabajadores → carpeta del trabajador</strong> o desde el <strong>Centro de Alertas</strong></span>
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'doc_generado_preview' request.GET.created %}?next=/documentos-empresa/borradores/"
+         class="btn btn-sm btn-success text-nowrap flex-shrink-0">
+        <i class="bi bi-eye-fill me-1"></i>Ver el documento
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Encabezado ── -->
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h2 class="fw-bold mb-0">
+    <h4 class="fw-bold mb-0">
       <i class="bi bi-journals text-warning me-2"></i>Borradores
-      {% if total %}<span class="badge bg-warning text-dark ms-2 fs-6">{{ total }}</span>{% endif %}
-    </h2>
-    <small class="text-muted">Documentos generados listos para imprimir. Se eliminan automáticamente al subir el firmado.</small>
+      {% if total %}<span class="badge badge-proximo ms-2">{{ total }}</span>{% endif %}
+    </h4>
+    <small class="text-muted">Documentos generados listos para imprimir. Una vez firmado, súbelo a la carpeta del trabajador.</small>
   </div>
-  <a href="{% url 'doc_generado_create' %}" class="btn btn-primary">
-    <i class="bi bi-file-earmark-plus me-1"></i>Nuevo borrador
-  </a>
 </div>
 
-<!-- Filtros -->
+<!-- ── Guía de flujo (colapsable) ── -->
+<div class="accordion mb-4" id="accordionGuia">
+  <div class="accordion-item border-0 shadow-sm">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#guiaFlujo">
+        <i class="bi bi-info-circle-fill text-primary me-2"></i>
+        <span style="font-size:var(--text-sm)">¿Cómo funciona el flujo de documentos?</span>
+      </button>
+    </h2>
+    <div id="guiaFlujo" class="accordion-collapse collapse" data-bs-parent="#accordionGuia">
+      <div class="accordion-body py-3">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="card card-accent-primary h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-file-earmark-plus-fill text-primary mb-2 d-block" style="font-size:1.8rem"></i>
+                <div class="fw-semibold mb-1" style="font-size:var(--text-sm)">1. Generar</div>
+                <div class="text-muted" style="font-size:var(--text-xs)">Crea el documento desde <strong>Nuevo Documento</strong> en el menú lateral. Queda guardado aquí como borrador.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card card-accent-warning h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-printer-fill text-warning mb-2 d-block" style="font-size:1.8rem"></i>
+                <div class="fw-semibold mb-1" style="font-size:var(--text-sm)">2. Imprimir</div>
+                <div class="text-muted" style="font-size:var(--text-xs)">Haz clic en <strong>Ver</strong> y desde la vista previa imprímelo. Luego fírmalo con el trabajador.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card card-accent-success h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-cloud-upload-fill text-success mb-2 d-block" style="font-size:1.8rem"></i>
+                <div class="fw-semibold mb-1" style="font-size:var(--text-sm)">3. Subir firmado</div>
+                <div class="text-muted" style="font-size:var(--text-xs)">Escanea el documento firmado y súbelo desde <strong>Trabajadores → perfil</strong> o desde el <strong>Centro de Alertas</strong>.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card card-accent-muted h-100">
+              <div class="card-body text-center py-3">
+                <i class="bi bi-archive-fill text-muted mb-2 d-block" style="font-size:1.8rem"></i>
+                <div class="fw-semibold mb-1" style="font-size:var(--text-sm)">4. Archivado</div>
+                <div class="text-muted" style="font-size:var(--text-xs)">El borrador desaparece automáticamente. El documento firmado queda en el <strong>Archivo Documental</strong>.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Filtros ── -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end">
@@ -45,75 +131,80 @@
 <div class="card border-0 shadow-sm">
   <div class="card-body text-center py-5 text-muted">
     <i class="bi bi-journals fs-1 d-block mb-3 opacity-25"></i>
-    <p class="mb-3">No hay borradores activos{% if tipo_f or obra_f %} con esos filtros{% endif %}.</p>
-    <a href="{% url 'doc_generado_create' %}" class="btn btn-primary"><i class="bi bi-file-earmark-plus me-1"></i>Generar primer borrador</a>
+    <p class="mb-1">No hay borradores activos{% if tipo_f or obra_f %} con esos filtros{% endif %}.</p>
+    <p class="text-muted small mb-3">Los borradores se generan desde <strong>Nuevo Documento</strong> en el menú lateral.</p>
+    <a href="{% url 'doc_generado_create' %}" class="btn btn-primary">
+      <i class="bi bi-file-earmark-plus me-1"></i>Generar documento
+    </a>
   </div>
 </div>
 {% else %}
 
 {% for obra_nombre, docs in grupos.items %}
 <div class="card border-0 shadow-sm mb-3">
-  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+  <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#0f2543;color:#fff">
     <div class="fw-semibold"><i class="bi bi-building me-2 text-warning"></i>{{ obra_nombre }}</div>
-    <span class="badge bg-warning text-dark">{{ docs|length }} borrador{% if docs|length != 1 %}es{% endif %}</span>
+    <span class="badge badge-proximo">{{ docs|length }} borrador{% if docs|length != 1 %}es{% endif %}</span>
   </div>
   <div class="card-body p-0">
     <div class="list-group list-group-flush">
       {% for doc in docs %}
-      <div class="list-group-item px-3 py-2 d-flex align-items-center gap-3">
+      <div class="list-group-item px-3 py-2 d-flex align-items-center gap-3 flex-wrap">
 
         <!-- Tipo badge -->
         <div style="min-width:140px">
-          {% if doc.tipo == 'contrato_trabajo' %}<span class="badge bg-primary">Contrato de Trabajo</span>
-          {% elif doc.tipo == 'anexo_contrato' %}<span class="badge bg-info text-dark">Anexo</span>
-          {% elif doc.tipo == 'finiquito' %}<span class="badge bg-danger">Finiquito</span>
-          {% elif doc.tipo == 'pacto_horas_extras' %}<span class="badge bg-warning text-dark">Horas Extras</span>
-          {% elif doc.tipo == 'acta_epp' %}<span class="badge bg-success">Acta EPP</span>
-          {% elif doc.tipo == 'acta_reglamento' %}<span class="badge bg-secondary">Reglamento</span>
-          {% else %}<span class="badge bg-secondary">{{ doc.get_tipo_display }}</span>{% endif %}
+          {% if doc.tipo == 'contrato_trabajo' %}<span class="badge badge-vigente">Contrato de Trabajo</span>
+          {% elif doc.tipo == 'anexo_contrato' %}<span class="badge badge-pendiente">Anexo</span>
+          {% elif doc.tipo == 'finiquito' %}<span class="badge badge-vencido">Finiquito</span>
+          {% elif doc.tipo == 'pacto_horas_extras' %}<span class="badge badge-proximo">Horas Extras</span>
+          {% elif doc.tipo == 'acta_epp' %}<span class="badge badge-vigente">Acta EPP</span>
+          {% elif doc.tipo == 'acta_reglamento' %}<span class="badge badge-archivada">Reglamento</span>
+          {% else %}<span class="badge badge-archivada">{{ doc.get_tipo_display }}</span>{% endif %}
         </div>
 
         <!-- Trabajador -->
         <div class="flex-grow-1">
           {% if doc.trabajador %}
             <a href="{% url 'trabajador_detail' doc.trabajador.rut %}" class="fw-semibold text-decoration-none">{{ doc.trabajador.nombre_completo }}</a>
-            <code class="text-muted ms-2" style="font-size:.78rem">{{ doc.trabajador.rut }}</code>
+            <code class="text-muted ms-2" style="font-size:var(--text-xs)">{{ doc.trabajador.rut }}</code>
           {% else %}<span class="text-muted">Sin trabajador</span>{% endif %}
         </div>
 
         <!-- Empresa -->
-        <div class="text-muted small d-none d-lg-block" style="min-width:160px">
+        <div class="text-muted d-none d-lg-block" style="min-width:160px;font-size:var(--text-xs)">
           {{ doc.empresa.nombre|default:"—" }}
         </div>
 
         <!-- Fecha -->
-        <div class="text-muted small text-end" style="min-width:120px">
+        <div class="text-muted text-end" style="min-width:110px;font-size:var(--text-xs)">
           {{ doc.creado_el|date:"d/m/Y H:i" }}
         </div>
 
         <!-- Acciones -->
-        <div class="d-flex gap-1 flex-wrap">
-          <button type="button" class="btn btn-sm btn-primary"
+        <div class="action-group">
+          <button type="button" class="btn btn-table btn-primary"
                   onclick="previewDoc('{% url 'doc_generado_preview' doc.pk %}?next=/documentos-empresa/borradores/', '{{ doc.trabajador.nombre_completo|default:"Borrador" }}', 'html')"
-                  title="Ver borrador">
-            <i class="bi bi-eye me-1"></i>Ver
+                  title="Ver e imprimir borrador">
+            <i class="bi bi-eye-fill me-1"></i>Ver
           </button>
           <a href="{% url 'doc_generado_edit' doc.pk %}?next=/documentos-empresa/borradores/"
-             class="btn btn-sm btn-outline-secondary" title="Editar datos del PDF (jornada, ciudad, datos personales)">
-            <i class="bi bi-file-earmark-text me-1"></i><span class="d-none d-xl-inline">Editar PDF</span>
+             class="btn btn-table btn-outline-secondary" title="Editar datos del documento">
+            <i class="bi bi-pencil-square me-1"></i><span class="d-none d-xl-inline">Editar</span>
           </a>
           {% if doc.contrato %}
           <a href="{% url 'contrato_edit' doc.contrato.pk %}?next=/documentos-empresa/borradores/"
-             class="btn btn-sm btn-outline-secondary" title="Editar datos del contrato (especialidad, sueldo, fechas)">
+             class="btn btn-table btn-outline-secondary" title="Editar datos del contrato">
             <i class="bi bi-briefcase me-1"></i><span class="d-none d-xl-inline">Contrato</span>
           </a>
           {% endif %}
           <form method="post" action="{% url 'doc_generado_delete' doc.pk %}"
-                onsubmit="return confirm('¿Eliminar borrador de {{ doc.trabajador.nombre_completo|default:"este trabajador" }}?');"
+                data-confirm="¿Eliminar borrador de {{ doc.trabajador.nombre_completo|default:'este trabajador' }}? Esto no elimina el documento físico."
                 style="display:inline">
             {% csrf_token %}
             <input type="hidden" name="next" value="/documentos-empresa/borradores/">
-            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar borrador"><i class="bi bi-trash"></i></button>
+            <button type="submit" class="btn btn-table btn-outline-danger" title="Eliminar borrador">
+              <i class="bi bi-trash3-fill"></i>
+            </button>
           </form>
         </div>
 

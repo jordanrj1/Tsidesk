@@ -1,14 +1,43 @@
 {% extends 'base.html' %}
 {% block title %}Generar Documento | TsDesk{% endblock %}
+{% block page_title %}Nuevo Documento{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
   <div>
-    <h2 class="fw-bold mb-0"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Generar Documento</h2>
+    <h4 class="fw-bold mb-0"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Generar Documento</h4>
     <small class="text-muted">Elige el tipo y completa los datos para generar un borrador imprimible.</small>
   </div>
-  <a href="{% url 'doc_generado_borradores' %}" class="btn btn-outline-warning">
+  <a href="{% url 'doc_generado_borradores' %}" class="btn btn-outline-warning btn-sm">
     <i class="bi bi-journals me-1"></i>Ver Borradores
   </a>
+</div>
+
+<!-- Tarjeta de sugerencia: flujo de trabajo -->
+<div class="card border-0 shadow-sm mb-4" style="background:var(--c-primary-soft,#eff6ff)">
+  <div class="card-body py-3 px-4">
+    <div class="fw-semibold mb-2" style="font-size:var(--text-sm)"><i class="bi bi-lightbulb-fill text-warning me-1"></i> Flujo de trabajo</div>
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge rounded-pill bg-primary">1</span>
+        <span style="font-size:var(--text-xs)">Selecciona el tipo de documento</span>
+      </div>
+      <i class="bi bi-chevron-right text-muted d-none d-md-inline"></i>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge rounded-pill bg-primary">2</span>
+        <span style="font-size:var(--text-xs)">Completa los datos y genera</span>
+      </div>
+      <i class="bi bi-chevron-right text-muted d-none d-md-inline"></i>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge rounded-pill bg-primary">3</span>
+        <span style="font-size:var(--text-xs)">El borrador queda en <strong>Borradores Guardados</strong></span>
+      </div>
+      <i class="bi bi-chevron-right text-muted d-none d-md-inline"></i>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge rounded-pill bg-primary">4</span>
+        <span style="font-size:var(--text-xs)">Imprímelo, fírmalo y súbelo desde el perfil del trabajador</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% if not empresas %}

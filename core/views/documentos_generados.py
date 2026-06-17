@@ -425,25 +425,20 @@ def doc_generado_create(request):
             _prev.update(activo=False)
             doc.save()
             # Anexo de contrato: actualizar fecha_extension en el contrato vinculado
-            ext_param = ''
             if tipo == 'anexo_contrato' and doc.contrato:
                 nueva_fecha = form.cleaned_data.get('nueva_fecha_vigencia')
                 if nueva_fecha:
                     doc.contrato.fecha_extension = nueva_fecha
                     doc.contrato.save(update_fields=['fecha_extension'])
-                    ext_param = f'&ext={nueva_fecha.strftime("%d/%m/%Y")}'
-                    if next_url:
-                        messages.success(
-                            request,
-                            f'{label} generado. Vigencia extendida hasta {nueva_fecha.strftime("%d/%m/%Y")}. '
-                            f'El contrato original no fue modificado.'
-                        )
+                    messages.success(
+                        request,
+                        f'{label} generado. Vigencia extendida hasta {nueva_fecha.strftime("%d/%m/%Y")}.'
+                    )
             else:
-                if next_url:
-                    messages.success(request, f'{label} creado y guardado.')
+                messages.success(request, f'{label} generado y guardado en Borradores.')
             if next_url:
                 return redirect(next_url)
-            return redirect(f'/documentos-empresa/{doc.pk}/preview/?saved=1{ext_param}')
+            return redirect(f'/documentos-empresa/borradores/?created={doc.pk}')
         else:
             if not empresa_id:
                 messages.error(request, 'Debe seleccionar una empresa.')
